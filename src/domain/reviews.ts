@@ -1,6 +1,7 @@
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js';
 import type { Branch, Recommendation, Repository, ReviewDecision } from './types';
+import { taskKey } from './agents';
 
 export const SNOOZE_MS = 7 * 86_400_000;
 const compare = (a: unknown, b: unknown) =>
@@ -52,12 +53,13 @@ export function recommendationRevision(repository: Repository, branch: Branch): 
       .sort((a, b) => compare(a[0], b[0])),
     branch.tasks
       ?.map((task) => [
-        task.id,
+        task.tool && task.tool !== 'codex' ? taskKey(task) : task.id,
         task.title,
         task.status,
         task.association,
         task.archived ?? false,
         task.updatedAt,
+        ...(task.model ? [task.model.id, task.model.provider] : []),
       ])
       .sort((a, b) => compare(a[0], b[0])) ?? [],
     branch.pullRequest

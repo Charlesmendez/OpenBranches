@@ -136,6 +136,8 @@ function factsFor(repository: Repository, branch: Branch, now: number): AdvisorB
     add(
       'tasks',
       branch.tasks.slice(0, 3).map((task) => ({
+        tool: task.tool ?? 'unknown',
+        model: text(task.model?.id ?? '', 200),
         title: text(task.title, 180),
         association: task.association,
         activity: task.status,

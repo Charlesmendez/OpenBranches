@@ -3,7 +3,12 @@
 import { createRoot } from 'react-dom/client';
 import { useState } from 'react';
 import { App } from '../../src/ui/App';
-import type { GitStatus, Snapshot, ProjectDiscoveryState } from '../../src/domain/types';
+import type {
+  GitStatus,
+  Snapshot,
+  ProjectDiscoveryState,
+  AgentHistoryStatus,
+} from '../../src/domain/types';
 import { createDemoSnapshot } from '../../src/data/demo';
 import '../../src/ui/styles.css';
 
@@ -25,6 +30,10 @@ let failInstaller = false;
 const gitListeners = new Set<(status: GitStatus) => void>();
 const snapshotListeners = new Set<(snapshot: Snapshot) => void>();
 const discoveryListeners = new Set<(state: ProjectDiscoveryState) => void>();
+let agents: AgentHistoryStatus[] = [
+  { tool: 'claude-code', enabled: false, state: 'not-connected' },
+];
+const agentListeners = new Set<(statuses: AgentHistoryStatus[]) => void>();
 const excluded = new Set<string>();
 const names = [
   'Atlas API',
@@ -92,6 +101,11 @@ const subscribe = <T,>(listeners: Set<(value: T) => void>, listener: (value: T) 
   };
 };
 window.openbranches = {
+  setAgentHistoryEnabled: async (tool, enabled) => {
+    agents = [{ tool, enabled, state: enabled ? 'ready' : 'not-connected', taskCount: 0 }];
+    agentListeners.forEach((listener) => listener(agents));
+  },
+  onAgentHistory: (listener) => subscribe(agentListeners, listener),
   getDiscoveredProjects: async () => discovery,
   followDiscoveredProjects: async (enabled) => {
     discovery = { ...discovery, enabled };
@@ -147,6 +161,7 @@ window.openbranches = {
   revealWorktree: async () => {},
   openExternal: async () => {},
   getProviderStatus: async () => ({
+    agents,
     codex: { installed: false, enabled: false, state: 'not-connected' },
     github: { connected: false, configured: false },
   }),

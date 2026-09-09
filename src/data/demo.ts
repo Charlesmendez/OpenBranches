@@ -107,29 +107,41 @@ function makeRepository(
           ? [
               {
                 id: `demo-task-${id}-${i}`,
+                tool: i % 3 === 0 ? 'codex' : i % 3 === 1 ? 'claude-code' : 'cursor',
+                model:
+                  i % 3 === 1
+                    ? { id: 'claude-sonnet-4-6', provider: 'anthropic' }
+                    : i % 3 === 2
+                      ? { id: 'grok-code-fast-1', provider: 'xai' }
+                      : undefined,
                 title: `Improve ${title.toLowerCase()}`,
                 status: i === 0 ? 'active' : 'idle',
-                association: 'verified',
+                association: i % 3 === 1 ? 'possible' : 'verified',
                 summary: `Implement and verify ${title.toLowerCase()}.`,
                 updatedAt,
                 checkedAt: new Date().toISOString(),
                 evidence: [
                   'Saved task folder belongs to this repository.',
-                  'Saved branch name and local commit match.',
+                  i % 3 === 1
+                    ? 'Saved branch name matches; no commit was recorded.'
+                    : 'Saved branch name and local commit match.',
                 ],
               },
               ...(i === 0
                 ? [
                     {
                       id: `demo-review-${id}`,
+                      tool: 'claude-code' as const,
+                      model: { id: 'claude-sonnet-4-6', provider: 'anthropic' as const },
                       title: `Review ${title.toLowerCase()}`,
                       status: 'unknown' as const,
-                      association: 'verified' as const,
+                      association: 'possible' as const,
                       updatedAt,
-                      evidence: ['Saved branch and commit match this local worktree.'],
+                      evidence: ['Saved folder and branch match; no commit was recorded.'],
                     },
                     {
                       id: `demo-investigate-${id}`,
+                      tool: 'codex' as const,
                       title: `Investigate ${title.toLowerCase()}`,
                       status: 'unknown' as const,
                       association: 'possible' as const,
@@ -142,6 +154,8 @@ function makeRepository(
                     },
                     {
                       id: `demo-followup-${id}`,
+                      tool: 'cursor' as const,
+                      model: { id: 'grok-code-fast-1', provider: 'xai' as const },
                       title: `Follow up on ${title.toLowerCase()}`,
                       status: 'unknown' as const,
                       association: 'possible' as const,

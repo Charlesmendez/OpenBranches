@@ -22,6 +22,8 @@ import { createTokenVault } from './github/vault';
 import { CodexService } from './codex/service';
 import { openCodexTask } from './codex/openTask';
 import { ProjectDiscoveryService } from './discovery/service';
+import { LocalHistoryService } from './agents/history';
+import { createClaudeHistorySource } from './claude/reader';
 import { GitInstallation, GIT_SETUP_GUIDE } from './git/installation';
 import { ReviewService } from './services/reviews';
 import { stopMonitoring } from './services/monitoring';
@@ -43,6 +45,9 @@ let store: AppStore;
 let github: GitHubService | undefined;
 let codex: CodexService | undefined;
 let discovery: ProjectDiscoveryService | undefined;
+const localHistories = new Map<string, LocalHistoryService>();
+const refreshHistories = () =>
+  Promise.all([...localHistories.values()].map((history) => history.refresh()));
 let reviews: ReviewService;
 let githubAuth: GitHubAuth;
 let authTimer: ReturnType<typeof setInterval> | undefined;
@@ -124,11 +129,18 @@ app.whenReady().then(() => {
   store = new AppStore(app.getPath('userData'));
   const snapshot = () => {
     const source = github?.enrich(service.current()) ?? service.current();
-    return codex?.enrich(source) ?? source;
+    return [...localHistories.values()].reduce(
+      (snapshot, history) => history.enrich(snapshot),
+      codex?.enrich(source) ?? source,
+    );
   };
   const publish = () => {
     window?.webContents.send('snapshot:updated', snapshot());
     if (codex) window?.webContents.send('codex:updated', codex.status());
+    window?.webContents.send(
+      'agents:updated',
+      [...localHistories.values()].map((history) => history.status()),
+    );
   };
   const git = new GitInstallation((status) => window?.webContents.send('git:updated', status));
   service = new RepositoryService(store, publish, git);
@@ -139,6 +151,15 @@ app.whenReady().then(() => {
     join(app.getPath('userData'), 'codex-inspection'),
     () => github!.enrich(service.current()),
     publish,
+  );
+  localHistories.set(
+    'claude-code',
+    new LocalHistoryService(
+      store,
+      () => github!.enrich(service.current()),
+      publish,
+      createClaudeHistorySource(),
+    ),
   );
   reviews = new ReviewService(store, snapshot, (state) =>
     window?.webContents.send('reviews:updated', state),
@@ -162,6 +183,11 @@ app.whenReady().then(() => {
     if (githubAuth.status().device) void pollGitHub();
   }, 5000);
   handle('snapshot:get', snapshot);
+  handle('agents:enable', (tool: unknown, enabled: unknown) =>
+    localHistories
+      .get(z.literal('claude-code').parse(tool))!
+      .setEnabled(z.boolean().parse(enabled)),
+  );
   handle('discovery:get', () => discovery!.state());
   handle('discovery:follow', (enabled: unknown) =>
     discovery!.setEnabled(z.boolean().parse(enabled)),
@@ -181,7 +207,7 @@ app.whenReady().then(() => {
   handle('git:guide', () => shell.openExternal(GIT_SETUP_GUIDE));
   handle('snapshot:refresh', async () => {
     await service.refresh();
-    await Promise.all([github!.refresh(), codex!.refresh()]);
+    await Promise.all([github!.refresh(), codex!.refresh(), refreshHistories()]);
   });
   handle('repository:add', async () => {
     await git.executable();
@@ -193,12 +219,16 @@ app.whenReady().then(() => {
     const repository = await service.add(result.filePaths[0]);
     void github!.refresh();
     void codex!.refresh();
+    void refreshHistories();
     return repository;
   });
   handle('repository:remove', (id: unknown) => {
-    stopMonitoring(z.string().parse(id), service, github!, codex!, reviews, discovery);
+    stopMonitoring(z.string().parse(id), service, github!, codex!, reviews, discovery, [
+      ...localHistories.values(),
+    ]);
     void github!.refresh();
     void codex!.refresh();
+    void refreshHistories();
   });
   handle('worktree:reveal', async (id: unknown, branchId: unknown) => {
     const repository = service.current().repositories.find((r) => r.id === z.string().parse(id));
@@ -225,7 +255,11 @@ app.whenReady().then(() => {
   });
   handle('providers:status', async () => {
     await codex!.detect();
-    return { codex: codex!.status(), github: githubStatus() };
+    return {
+      codex: codex!.status(),
+      github: githubStatus(),
+      agents: [...localHistories.values()].map((history) => history.status()),
+    };
   });
   handle('codex:connect', () => codex!.connect());
   handle('codex:disconnect', () => codex!.disconnect());
@@ -253,6 +287,7 @@ app.whenReady().then(() => {
   });
   createWindow();
   void discovery.refresh();
+  void refreshHistories();
   // A monochrome template icon adapts to the system menu bar appearance.
   const icon = nativeImage
     .createFromPath(join(__dirname, '../assets/trayTemplate.png'))
@@ -307,6 +342,7 @@ app.on('before-quit', () => {
   github?.close();
   codex?.close();
   discovery?.close();
+  for (const history of localHistories.values()) history.close();
   service?.close();
   store?.close();
 });

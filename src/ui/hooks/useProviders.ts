@@ -18,10 +18,14 @@ export function useProviders() {
       .catch(() => {});
     const off = api.onGitHub((github) => setStatus((previous) => ({ ...previous, github })));
     const offCodex = api.onCodex((codex) => setStatus((previous) => ({ ...previous, codex })));
+    const offAgents = api.onAgentHistory((agents) =>
+      setStatus((previous) => ({ ...previous, agents })),
+    );
     return () => {
       mounted = false;
       off();
       offCodex();
+      offAgents();
     };
   }, []);
   return status;

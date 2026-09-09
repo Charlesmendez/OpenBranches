@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Check, LoaderCircle, Sparkles } from 'lucide-react';
+import { Check, LoaderCircle } from 'lucide-react';
 import type { CodexStatus } from '../../domain/types';
 import { relativeTime } from '../../domain/branches';
 import { CodexAllowance } from './CodexAllowance';
+import { ToolIcon } from './AgentBadges';
 
 export function CodexConnection({ status }: { status: CodexStatus }) {
   const [error, setError] = useState('');
@@ -30,7 +31,7 @@ export function CodexConnection({ status }: { status: CodexStatus }) {
     <>
       <div className="settings-row">
         <span className="settings-icon">
-          <Sparkles size={20} />
+          <ToolIcon tool="codex" />
         </span>
         <div>
           <h3>Codex tasks</h3>

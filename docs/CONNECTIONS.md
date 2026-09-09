@@ -41,6 +41,14 @@ Disconnect stops inspection and clears OpenBranches' task cache and in-memory ac
 
 Protocol reference: [official Codex app-server documentation](https://learn.chatgpt.com/docs/app-server).
 
+## Claude Code
+
+Connect **Claude Code sessions** in Settings to read local saved metadata associated with monitored branches. This connection is separate from Codex, does not require an API key, and does not run a model or upload data. It starts disabled and refreshes every minute when enabled. Disconnect clears OpenBranches' Claude cache; original Claude session files remain untouched.
+
+Only explicit custom titles, selected folder/branch metadata, timestamps, session IDs, and reported model IDs are retained. Transcript bytes are read in bounded chunks; prompts and tool output are discarded. Current activity, ownership, and model provider are not inferred. Claude folder/branch matches are possible associations because this source does not provide a saved commit. Settings labels partial history and the last checked time.
+
+The current reader supports the observed local main-session JSONL layout and an absolute inherited `CLAUDE_CONFIG_DIR`. It does not claim all Claude Desktop, Cowork, remote, subagent, or historical file formats. See [source documentation, bounds, tests, and limitations](AGENT_ATTRIBUTION.md). Cursor/Grok examples demonstrate the common UI; their live adapters remain unfinished.
+
 ## Apple release signing
 
 Normal `npm run make` is local and unsigned. It forces signing/notarization off, even if Apple credentials are present in the environment.

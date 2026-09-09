@@ -1,3 +1,4 @@
+import { AgentHistoryConnection } from './AgentHistoryConnection';
 import { useEffect, useState } from 'react';
 import { ArrowUpRight, Check, Cloud, Copy, Laptop, LoaderCircle, ShieldCheck } from 'lucide-react';
 import type { GitHubStatus, Repository } from '../../domain/types';
@@ -183,6 +184,13 @@ export function Settings({
           </p>
         )}
         <CodexConnection status={providers.codex} />
+        {(
+          providers.agents ?? [
+            { tool: 'claude-code' as const, enabled: false, state: 'not-connected' as const },
+          ]
+        ).map((status) => (
+          <AgentHistoryConnection key={status.tool} status={status} />
+        ))}
       </section>
       <section className="settings-section">
         <div className="section-kicker">

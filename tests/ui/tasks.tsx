@@ -1,3 +1,4 @@
+import { AgentBadges } from '../../src/ui/components/AgentBadges';
 // Development-only fictional task action fixture. No system handler, network,
 // repository, or real Codex task is opened by this page.
 import { createRoot } from 'react-dom/client';
@@ -9,6 +10,7 @@ import '../../src/ui/styles.css';
 const results: OpenTaskResult[] = ['sent', 'not-linked', 'invalid-link', 'unavailable', 'failed'];
 const tasks: TaskLink[] = Array.from({ length: 4 }, (_, i) => ({
   id: `fictional-${i}`,
+  tool: 'codex',
   title: [
     'Improve project search',
     'Recover the unfinished navigation experiment across branch groups and worktrees',
@@ -22,6 +24,18 @@ const tasks: TaskLink[] = Array.from({ length: 4 }, (_, i) => ({
   checkedAt: '2026-09-09T12:00:00.000Z',
   evidence: ['Saved branch matches.', 'Saved commit matches the local branch tip.'],
 }));
+
+const mixed = new URLSearchParams(location.search).has('agents');
+if (mixed) {
+  tasks[1] = {
+    ...tasks[1],
+    id: tasks[0].id,
+    tool: 'claude-code',
+    model: { id: 'claude-sonnet-4-6' },
+  };
+  tasks[2] = { ...tasks[2], tool: 'unknown', title: 'Session without a recorded tool' };
+  tasks[3] = { ...tasks[3], tool: 'cursor', model: { id: 'grok-code-fast-1', provider: 'xai' } };
+}
 
 function Fixture() {
   const [mode, setMode] = useState('desktop');
@@ -87,6 +101,7 @@ function Fixture() {
         <pre aria-label="Requested task">{JSON.stringify(requests.at(-1) ?? null, null, 2)}</pre>
       </div>
       <div>
+        {mixed && <AgentBadges branch={{ tasks }} />}
         <TaskDetails
           key={mode}
           tasks={tasks}

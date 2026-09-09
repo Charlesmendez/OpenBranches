@@ -3,6 +3,7 @@ import type { GitHubService } from '../github/service';
 import type { CodexService } from '../codex/service';
 import type { ReviewService } from './reviews';
 import type { ProjectDiscoveryService } from '../discovery/service';
+import type { LocalHistoryService } from '../agents/history';
 
 /** Each prepared cache write joins RepositoryService's SQLite transaction.
  * Memory and watchers change only after every write has committed. */
@@ -13,17 +14,20 @@ export function stopMonitoring(
   codex: Pick<CodexService, 'prepareForgetUnselected'>,
   reviews: Pick<ReviewService, 'prepareForgetUnselected'>,
   discovery?: Pick<ProjectDiscoveryService, 'prepareExclude'>,
+  histories: Pick<LocalHistoryService, 'prepareForgetUnselected'>[] = [],
 ): void {
   repositories.remove(id, (next) => {
     const adoptGitHub = github.prepareForgetUnselected(next);
     const adoptCodex = codex.prepareForgetUnselected(github.enrich(next));
     const adoptReviews = reviews.prepareForgetUnselected(next);
     const adoptDiscovery = discovery?.prepareExclude(id);
+    const adoptHistories = histories.map((history) => history.prepareForgetUnselected(next));
     return () => {
       adoptGitHub();
       adoptCodex();
       adoptReviews();
       adoptDiscovery?.();
+      adoptHistories.forEach((adopt) => adopt());
     };
   });
 }

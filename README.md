@@ -19,6 +19,7 @@ OpenBranches brings local Git and GitHub into one workspace: a grouped branch ma
 - Review findings about work that may deserve attention. Snooze for seven days or dismiss; choices survive restarts and new evidence brings the finding back. The attention count includes only findings waiting for review.
 - Stop monitoring projects from Settings without changing their files, branches, or worktrees. Their valid cached connection metadata and review choices are removed together.
 - Connect local Codex task history, including archived tasks. Inspect the evidence for each branch association; multiple tasks can belong to a branch. This connection reads saved metadata and does not run AI.
+- Connect Claude Code local session history for monitored folders. See evidence-based tool badges, recorded model names, and mixed-tool sessions; search by tool or model. See [attribution and source limits](docs/AGENT_ATTRIBUTION.md).
 - Send a saved task to the desktop app with **Open in Codex**, with feedback for outdated associations and missing handlers. [Destination verification limits](docs/TASK_LINKS.md) remain explicit.
 - See the existing Codex account’s shared usage allowance. The advisor’s budget and evidence validators are implemented; [model execution remains gated](docs/ADVISOR.md).
 - Explore a fictional demo with 403 branch entries, independent of your real repositories.
@@ -29,7 +30,7 @@ Repository inspection is read-only. OpenBranches does not fetch into your reposi
 
 The intended release experience is **download the DMG, drag OpenBranches into Applications, open it, follow discovered projects or choose a folder**. End users will not need Node.js or a terminal. Git 2.36 or newer is required for local inspection. The app detects it and provides a guided setup when needed; see [Mac setup](docs/INSTALLATION.md).
 
-Multi-agent attribution and team workspaces are part of the planned first release. Team mode will combine GitHub activity with local work that each member explicitly chooses to share through the Mac app and an optional open-source shared service. Claude/Grok attribution, that service, and local sharing are not implemented yet; see [team scope and privacy](docs/TEAM_WORKSPACES.md).
+Multi-agent attribution and team workspaces are part of the planned first release. Team mode will combine GitHub activity with local work that each member explicitly chooses to share through the Mac app and an optional open-source shared service. Codex and Claude Code local attribution are implemented. Live Cursor/Grok ingestion, that service, and local sharing remain unfinished; see [team scope and privacy](docs/TEAM_WORKSPACES.md).
 
 Current installers are **unsigned developer previews**, not normal public releases. Signed and notarized downloads for Apple Silicon and Intel Macs are a release gate. We do not recommend changing macOS security settings to install a preview.
 

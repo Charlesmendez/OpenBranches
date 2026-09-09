@@ -48,7 +48,9 @@ export class CodexService {
   status(): CodexStatus {
     const ids = new Set(
       this.enrich(this.current()).repositories.flatMap((r) =>
-        r.branches.flatMap((b) => b.tasks?.map((t) => t.id) ?? []),
+        r.branches.flatMap(
+          (b) => b.tasks?.filter((t) => t.tool === 'codex').map((t) => t.id) ?? [],
+        ),
       ),
     );
     return {
@@ -146,7 +148,11 @@ export class CodexService {
         )
       : [];
     const ids = new Set(
-      linked.flatMap((r) => r.branches.flatMap((b) => b.tasks?.map((t) => t.id) ?? [])),
+      linked.flatMap((r) =>
+        r.branches.flatMap(
+          (b) => b.tasks?.filter((t) => t.tool === 'codex').map((t) => t.id) ?? [],
+        ),
+      ),
     );
     return { ...index, tasks: index.tasks.filter((task) => ids.has(task.id)) };
   }

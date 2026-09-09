@@ -1,3 +1,4 @@
+import { AgentBadges } from './AgentBadges';
 import { ArrowUpRight, Check, Copy, FolderOpen, GitBranch, Cloud, Laptop, X } from 'lucide-react';
 import type { Branch, Repository } from '../../domain/types';
 import { relativeTime, shortPath } from '../../domain/branches';
@@ -80,6 +81,7 @@ export function Inspector({
           onClick={() => void copyName()}
         />
       </div>
+      <AgentBadges branch={branch} />
       <IntegrationEvidence key={`history:${branch.id}`} branch={branch} repository={repository} />
       <section className="inspector-section">
         <h3>Where it lives</h3>

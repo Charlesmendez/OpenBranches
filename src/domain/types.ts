@@ -36,8 +36,15 @@ export interface PullRequest {
   headSha: string;
   updatedAt: string;
 }
+export type CodingTool = 'codex' | 'claude-code' | 'cursor' | 'other' | 'unknown';
+export interface ModelIdentity {
+  id: string;
+  provider?: 'openai' | 'anthropic' | 'xai' | 'other';
+}
 export interface TaskLink {
   id: string;
+  tool?: CodingTool;
+  model?: ModelIdentity;
   title: string;
   status: 'active' | 'idle' | 'unknown';
   association: 'verified' | 'possible';
@@ -194,6 +201,16 @@ export interface CodexStatus {
 export interface ProviderStatus {
   codex: CodexStatus;
   github: GitHubStatus;
+  agents?: AgentHistoryStatus[];
+}
+export interface AgentHistoryStatus {
+  tool: CodingTool;
+  enabled: boolean;
+  state: 'not-connected' | 'reading' | 'ready' | 'error';
+  checkedAt?: string;
+  partial?: boolean;
+  taskCount?: number;
+  error?: string;
 }
 export interface GitStatus {
   state: 'checking' | 'ready' | 'missing' | 'unsupported' | 'unavailable';
@@ -202,6 +219,8 @@ export interface GitStatus {
   message?: string;
 }
 export interface DesktopApi {
+  setAgentHistoryEnabled(tool: CodingTool, enabled: boolean): Promise<void>;
+  onAgentHistory(callback: (statuses: AgentHistoryStatus[]) => void): () => void;
   getDiscoveredProjects(): Promise<ProjectDiscoveryState>;
   followDiscoveredProjects(enabled: boolean): Promise<void>;
   refreshDiscoveredProjects(): Promise<void>;

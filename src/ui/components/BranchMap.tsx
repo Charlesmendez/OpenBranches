@@ -1,3 +1,4 @@
+import { AgentBadges } from './AgentBadges';
 import { memo, useMemo, useState } from 'react';
 import {
   Background,
@@ -76,7 +77,10 @@ const MapNodeView = memo(function MapNodeView({ data, selected }: NodeProps<MapN
           {data.label}
           <ArrowUpRight size={15} />
         </div>
-        <code>{data.branch!.name}</code>
+        <div className="branch-ref-line">
+          <code>{data.branch!.name}</code>
+          <AgentBadges branch={data.branch!} compact />
+        </div>
         <div className="node-card-bottom">
           <Locations branch={data.branch!} />
           <BranchStatus branch={data.branch!} />

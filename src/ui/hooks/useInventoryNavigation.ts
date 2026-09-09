@@ -1,3 +1,4 @@
+import { agentSearchText } from '../../domain/agents';
 import { useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import type { Branch } from '../../domain/types';
@@ -41,8 +42,8 @@ export function useInventoryNavigation(
       .filter(
         (branch) =>
           (!needle ||
-            [branch.name, branch.title, ...(branch.tasks?.map((task) => task.title) ?? [])].some(
-              (value) => value.toLocaleLowerCase().includes(needle),
+            [branch.name, branch.title, agentSearchText(branch)].some((value) =>
+              value.toLocaleLowerCase().includes(needle),
             )) &&
           (position.location === 'all' ||
             (position.location === 'local' && (branch.local || branch.detached)) ||

@@ -1,5 +1,7 @@
+import { knownTool, taskKey, toolNames } from '../../domain/agents';
+import { ToolIcon, ReportedModel } from './AgentBadges';
 import { useRef, useState } from 'react';
-import { ArrowUpRight, Link2, LoaderCircle } from 'lucide-react';
+import { ArrowUpRight, LoaderCircle } from 'lucide-react';
 import type { OpenTaskResult, TaskLink } from '../../domain/types';
 import { relativeTime } from '../../domain/branches';
 
@@ -79,13 +81,15 @@ export function TaskDetails({ tasks, ...context }: TaskContext & { tasks: TaskLi
   if (!tasks.length) return null;
   return (
     <section className="inspector-section">
-      <h3>Codex {tasks.length === 1 ? 'task' : `tasks · ${tasks.length}`}</h3>
+      <h3>Related {tasks.length === 1 ? 'session' : `sessions · ${tasks.length}`}</h3>
       <div className="task-list">
         {(expanded ? tasks : tasks.slice(0, 3)).map((task) => (
-          <div className="task-detail" key={task.id}>
-            <Link2 size={17} />
+          <div className="task-detail" key={taskKey(task)}>
+            <ToolIcon tool={knownTool(task.tool)} />
             <div>
+              <span className="task-tool-name">{toolNames[knownTool(task.tool)]}</span>
               <strong>{task.title}</strong>
+              {task.model && <ReportedModel model={task.model} />}
               <small>
                 {task.association === 'verified'
                   ? 'Branch and commit match'
@@ -111,7 +115,7 @@ export function TaskDetails({ tasks, ...context }: TaskContext & { tasks: TaskLi
                   )}
                 </details>
               ) : null}
-              <OpenTaskAction task={task} {...context} />
+              {task.tool === 'codex' && <OpenTaskAction task={task} {...context} />}
             </div>
           </div>
         ))}
@@ -123,7 +127,8 @@ export function TaskDetails({ tasks, ...context }: TaskContext & { tasks: TaskLi
       )}
       {!context.demo && (
         <p className="evidence-note">
-          Saved task history. Current activity in Codex is not available.
+          Saved session history. These associations do not establish current activity, authorship,
+          or exclusive ownership of a branch.
         </p>
       )}
     </section>

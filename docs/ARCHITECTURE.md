@@ -8,7 +8,9 @@ The renderer has no Node.js access. It talks through a narrow typed preload brid
 - `electron/git`: Git installation discovery and explicit Apple setup, read-only Git commands, NUL-delimited parsing, bounded worktree inspection, and a worker client with terminal errors/timeouts. Discovery supplies an absolute executable; inspection clears inherited Git repository/config overrides.
 - `electron/services`: SQLite persistence, repository watching/reconciliation, review decisions, and coordinated project monitoring. A Git failure retains the previous snapshot with an availability error.
 - `electron/github`: fixed-origin HTTP transport, GitHub App device authorization, encrypted credential vault, paginated metadata reading, bounded immutable-SHA comparisons, source enrichment, and refresh scheduling.
-- `electron/codex`: executable/version detection, a stdio inspection client with a read-method allowlist, bounded task-index parsing, pure association rules, and a cancellable refresh/cache service.
+- `electron/codex`: executable/version detection, a stdio inspection client with a read-method allowlist, bounded task-index parsing, a wrapper over shared association rules, and a cancellable refresh/cache service.
+- `electron/agents`: shared session associations and a provider-scoped local history service with opt-in state, bounded validation, cancellation, and transactional cache removal. Tool/model display and search share `src/domain/agents.ts`.
+- `electron/claude`: read-only, bounded local Claude session metadata extraction. Retains selected-folder/branch evidence and explicit titles/model IDs; discards transcript content. See [attribution](AGENT_ATTRIBUTION.md).
 - `electron/discovery`: bounded saved-project readers and opt-in imports through the existing Git scanner. Repository exclusions join monitoring removal's transaction; late imports recheck the current preference before adoption. Codex saved-project discovery uses observed local desktop metadata, separately from the app-server task index; see [source limits](PROJECT_DISCOVERY.md).
 - `electron/advisor`: shared policy, persistent global allowance, bounded metadata preparation, evidence identifiers, and structured finding validation. Model execution and scheduling are not yet wired; see `docs/ADVISOR.md` for the execution gate.
 - `scripts`: reproducible builds, generated icons, and native macOS disk images. Local builds and release uploads use separate commands.
@@ -25,13 +27,15 @@ GitHub enrichment does not fetch into a repository. Exact local or cached ancest
 
 Review choices belong to a finding ID and a SHA-256 revision of its branch evidence. Observation timestamps and unrelated target-tip advances are excluded so normal refreshes do not undo choices. Native commands recheck the current finding before writing SQLite; the renderer cannot choose its own expiry time. The demo has an independent store and stable fictional evidence. See [review behavior](REVIEWS.md).
 
-Stopping monitoring prepares the next repository snapshot, GitHub/Codex/valid review caches, and automatic-discovery exclusion in one SQLite transaction. Services adopt the new memory state and stop watchers only after commit. A failed cache write rolls back every record. Local scans and provider refreshes from the previous monitoring session cannot replace data after removal/re-addition.
+Stopping monitoring prepares the next repository snapshot, GitHub/Codex/local-history/valid review caches, and automatic-discovery exclusion in one SQLite transaction. Services adopt the new memory state and stop watchers only after commit. A failed cache write rolls back every record. Local scans and provider refreshes from the previous monitoring session cannot replace data after removal/re-addition.
 
 ## Process boundaries
 
 Production content uses a restricted custom protocol, CSP, sandboxed renderer, context isolation, validated IPC senders, denied popups/permissions, and allowlisted external links. Git commands use argument arrays, have timeouts, disable fsmonitor and configured file-filter commands, and do not take optional index locks. SQLite stores snapshots; GitHub credentials use Electron safeStorage with a macOS Keychain-protected key, so the database stores ciphertext only.
 
 Codex task discovery uses a separate app-server process with no thread creation or model execution. Its request allowlist is independent of renderer IPC, and server-initiated requests are refused. Disconnect invalidates in-flight results before closing the process and clearing cached data. Metadata overlays never alter the underlying Git snapshot. Branch names index candidate tasks so a large history does not require matching every task against every branch.
+
+Session identity includes its coding tool. Multi-tool overlays preserve each other, and badges distinguish matching commits from possible associations. Claude history is disabled until connected; disconnect invalidates in-flight reads and clears its cache. Reported model identity is separate from the tool, and neither establishes a human owner.
 
 Task opening has a separate narrow IPC command. The main process validates IDs, checks current association evidence, resolves the OS protocol handler, and rechecks the association before constructing an existing-task-only Codex link. It never accepts a renderer URL or changes the inspection-method allowlist. The UI distinguishes system handoff from confirmed task loading. See [task-link checks and limits](TASK_LINKS.md).
 

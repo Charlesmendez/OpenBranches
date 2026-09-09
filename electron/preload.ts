@@ -7,9 +7,17 @@ import type {
   Snapshot,
   ReviewState,
   ProjectDiscoveryState,
+  AgentHistoryStatus,
 } from '../src/domain/types';
 
 const api: DesktopApi = {
+  setAgentHistoryEnabled: (tool, enabled) => ipcRenderer.invoke('agents:enable', tool, enabled),
+  onAgentHistory: (callback) => {
+    const listener = (_event: Electron.IpcRendererEvent, statuses: AgentHistoryStatus[]) =>
+      callback(statuses);
+    ipcRenderer.on('agents:updated', listener);
+    return () => ipcRenderer.removeListener('agents:updated', listener);
+  },
   getDiscoveredProjects: () => ipcRenderer.invoke('discovery:get'),
   followDiscoveredProjects: (enabled) => ipcRenderer.invoke('discovery:follow', enabled),
   refreshDiscoveredProjects: () => ipcRenderer.invoke('discovery:refresh'),

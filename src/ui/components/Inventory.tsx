@@ -1,3 +1,4 @@
+import { AgentBadges } from './AgentBadges';
 import { Search, X, ArrowUpDown, GitBranch } from 'lucide-react';
 import { useRef } from 'react';
 import type { Branch, Repository } from '../../domain/types';
@@ -186,7 +187,10 @@ export function Inventory({
                         <i className={`branch-dot ${lifecycleOf(branch)}`} />
                         <span>
                           <strong id={`${rowId}-title`}>{branch.title}</strong>
-                          <code>{branch.name}</code>
+                          <span className="branch-ref-line">
+                            <code>{branch.name}</code>
+                            <AgentBadges branch={branch} compact />
+                          </span>
                         </span>
                       </span>
                       <span>
