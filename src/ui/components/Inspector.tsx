@@ -4,6 +4,7 @@ import { relativeTime, shortPath } from '../../domain/branches';
 import { BranchStatus, IconButton } from './Primitives';
 import { useState } from 'react';
 import { TaskDetails } from './TaskDetails';
+import { IntegrationEvidence } from './IntegrationEvidence';
 
 export function Inspector({
   branch,
@@ -79,58 +80,7 @@ export function Inspector({
           onClick={() => void copyName()}
         />
       </div>
-      <section className="inspector-section">
-        <h3>Integration evidence</h3>
-        <div className="integration-path">
-          <div className="path-step complete">
-            <span className="step-marker">
-              <Check size={12} />
-            </span>
-            <div>
-              <strong>Committed</strong>
-              <small>
-                {(branch.local ?? branch.remote)?.sha.slice(0, 7) ?? 'Detached worktree'}{' '}
-                <span>·</span> {relativeTime(branch.updatedAt)}
-              </small>
-            </div>
-          </div>
-          {repository.targets.map((target) => (
-            <div
-              key={target.name}
-              className={`path-step ${branch.integration[target.name] === 'integrated' ? 'complete' : ''} ${target.name === 'master' || target.name === 'main' ? 'stable' : ''}`}
-            >
-              <span className="step-marker">
-                {branch.integration[target.name] === 'integrated' && <Check size={12} />}
-              </span>
-              <div>
-                <strong>{target.name}</strong>
-                <small>
-                  {branch.integration[target.name] === 'integrated'
-                    ? 'Commit is in this history'
-                    : branch.integration[target.name] === 'pending'
-                      ? 'Commit not in this history'
-                      : 'Needs more evidence'}
-                </small>
-              </div>
-            </div>
-          ))}
-          {!repository.targets.length && (
-            <p className="muted-note">No standard integration branch found.</p>
-          )}
-        </div>
-        <p className="evidence-note">
-          Each target is checked independently against {branch.local ? 'the local' : 'the remote'}{' '}
-          commit. Squash or rebased changes can require PR verification.
-        </p>
-        {differs && (
-          <div className="source-error inline-evidence">
-            <span>
-              Local and remote tips differ. The status above describes local commit{' '}
-              {branch.local!.sha.slice(0, 7)}.
-            </span>
-          </div>
-        )}
-      </section>
+      <IntegrationEvidence key={`history:${branch.id}`} branch={branch} repository={repository} />
       <section className="inspector-section">
         <h3>Where it lives</h3>
         {(branch.local || branch.detached) && (
@@ -172,7 +122,7 @@ export function Inspector({
                   Remote tip: {branch.remote.sha.slice(0, 7)}
                   {Object.entries(branch.remoteIntegration ?? {})
                     .filter(([, s]) => s === 'integrated')
-                    .map(([target]) => ` · in ${target}`)
+                    .map(([target]) => ` · in locally observed ${target} history`)
                     .join('')}
                 </small>
               )}

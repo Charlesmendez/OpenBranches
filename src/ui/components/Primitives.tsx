@@ -120,6 +120,7 @@ export function BranchStatus({ branch }: { branch: Branch }) {
       </span>
     );
   if (!branch.remote) return <span className="pill amber">Local branch</span>;
+  if (branch.local) return <span className="pill neutral">Mac + remote</span>;
   return <span className="pill neutral">Remote reference</span>;
 }
 export function EmptyState({

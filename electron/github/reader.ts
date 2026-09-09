@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { GitHubHttp } from './http';
+import { historySchema, readHistory, type HistoryOptions } from './history';
 
 export function githubRepository(remoteUrl: string): string | undefined {
   const scp = /^(?:git@)?github\.com:([^/]+\/[^/]+?)\/?$/.exec(remoteUrl);
@@ -62,6 +63,7 @@ export const remoteSnapshotSchema = z.object({
   branchesComplete: z.boolean(),
   pullHistoryComplete: z.boolean(),
   error: cachedText.optional(),
+  history: historySchema.optional(),
 });
 export type RemoteSnapshot = z.infer<typeof remoteSnapshotSchema>;
 
@@ -71,19 +73,27 @@ export async function readRemote(
   http: GitHubHttp,
   repository: string,
   remoteName: string,
+  options: HistoryOptions = {},
 ): Promise<RemoteSnapshot> {
+  // A multi-page snapshot is observed over an interval, not atomically. Use
+  // its earliest observation so slow comparisons never make old refs look new.
+  const checkedAt = new Date().toISOString();
+  const assertCurrent = () => {
+    if (options.isCurrent?.() === false) throw new Error('GitHub refresh was cancelled.');
+  };
   const prefix = `/repos/${repository.split('/').map(encodeURIComponent).join('/')}`;
   const branches: RemoteSnapshot['branches'] = [];
   const pulls: RemoteSnapshot['pulls'] = [];
   let branchesComplete = false;
   let pullHistoryComplete = false;
   for (let page = 1; page <= 50; page++) {
+    assertCurrent();
     const response = await http.get(`${prefix}/branches?per_page=100&page=${page}`);
     branches.push(
       ...z
         .array(branchSchema)
         .parse(response.body)
-        .map((b) => ({ name: b.name, sha: b.commit.sha })),
+        .map((b) => ({ name: b.name, sha: b.commit.sha.toLowerCase() })),
     );
     if (!response.hasNext) {
       branchesComplete = true;
@@ -91,6 +101,7 @@ export async function readRemote(
     }
   }
   for (let page = 1; page <= 3; page++) {
+    assertCurrent();
     const response = await http.get(
       `${prefix}/pulls?state=all&sort=updated&direction=desc&per_page=100&page=${page}`,
     );
@@ -124,6 +135,7 @@ export async function readRemote(
       break;
     }
   }
+  const history = await readHistory(http, repository, branches, options);
   return {
     repository,
     remoteName,
@@ -131,6 +143,7 @@ export async function readRemote(
     pulls,
     branchesComplete,
     pullHistoryComplete,
-    checkedAt: new Date().toISOString(),
+    checkedAt,
+    history,
   };
 }

@@ -65,6 +65,16 @@ export function validateFindings(output: unknown, prepared: PreparedAnalysis) {
         })
         .parse(fact('source')?.value);
       const remote = fact('remote')?.value;
+      const published = fact('published-history');
+      const publishedHistory = published
+        ? z
+            .object({
+              tip: z.string().nullable(),
+              unavailable: z.boolean(),
+              targets: z.array(z.object({ tip: z.string().nullable(), state: z.string() })),
+            })
+            .parse(published.value)
+        : undefined;
       const localEvidence = z
         .object({ present: z.boolean(), tip: z.string().nullable() })
         .parse(fact('local')?.value);
@@ -94,6 +104,7 @@ export function validateFindings(output: unknown, prepared: PreparedAnalysis) {
         'integration',
         'source',
         ...(remote ? ['remote'] : []),
+        ...(published ? ['published-history'] : []),
         ...(pull ? ['pull-request'] : []),
         ...(tasks ? ['tasks', 'task-activity'] : []),
       ].some((kind) => !finding.evidenceIds.includes(fact(kind)!.id));
@@ -107,6 +118,13 @@ export function validateFindings(output: unknown, prepared: PreparedAnalysis) {
         source.localStale ||
         source.shallow ||
         !remoteIsCurrent ||
+        (publishedHistory &&
+          (publishedHistory.unavailable ||
+            !publishedHistory.tip ||
+            !publishedHistory.targets.length ||
+            publishedHistory.targets.some(
+              (target) => !target.tip || target.state !== 'integrated',
+            ))) ||
         hasOpenPull ||
         hasActiveTask ||
         (local && !localEvidence.tip) ||

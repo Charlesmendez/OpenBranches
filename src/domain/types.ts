@@ -58,6 +58,22 @@ export interface Branch {
   updatedAt: string;
   integration: Record<string, IntegrationState>;
   remoteIntegration?: Record<string, IntegrationState>;
+  publishedHistory?: {
+    repository: string;
+    remoteName: string;
+    branchSha: string;
+    checkedAt: string;
+    unavailable: boolean;
+    partial?: boolean;
+    targets: {
+      name: string;
+      sha: string;
+      state: IntegrationState;
+      checkedAt?: string;
+      source?: 'git' | 'github' | 'identical';
+    }[];
+    error?: string;
+  };
   pullRequest?: PullRequest;
   tasks?: TaskLink[];
   codexNamed: boolean;
@@ -67,6 +83,7 @@ export interface Target {
   name: string;
   sha: string;
   source: 'local' | 'cached-remote' | 'github';
+  remote?: string;
 }
 export interface Repository {
   id: string;
@@ -80,7 +97,12 @@ export interface Repository {
   scannedAt: string;
   error?: string;
   shallow: boolean;
-  github?: { checkedAt: string; partial: boolean; error?: string };
+  github?: {
+    checkedAt: string;
+    partial: boolean;
+    error?: string;
+    history?: { checked: number; total: number; error?: string };
+  };
 }
 export interface ActivityEvent {
   id: string;

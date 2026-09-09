@@ -1,6 +1,7 @@
 import type { Branch, GitRef, IntegrationState, Repository } from '../../src/domain/types';
 import { titleFromBranch } from '../../src/domain/branches';
 import type { RemoteSnapshot } from './reader';
+import { historyKey, publishedTargets } from './history';
 
 /** Git remains the source for working files and local ancestry. GitHub adds a
  * separate observed remote tip; a new tip never inherits old ancestry. */
@@ -9,20 +10,48 @@ export function enrichRepository(repository: Repository, sources: RemoteSnapshot
   const branches: Branch[] = repository.branches.map((branch) => ({
     ...branch,
     pullRequest: undefined,
+    publishedHistory: undefined,
   }));
-  const unknown = () =>
-    Object.fromEntries(
-      repository.targets.map((target) => [target.name, 'unknown' as IntegrationState]),
-    );
-  const stateFor = (sha: string) => {
-    for (const branch of repository.branches) {
-      if (branch.local?.sha === sha) return branch.integration;
-      if (branch.remote?.sha === sha)
-        return branch.local ? (branch.remoteIntegration ?? unknown()) : branch.integration;
+  const targets = [...repository.targets];
+  // A local target always keeps its identity. GitHub supplies a missing target
+  // from origin (or the sole configured GitHub source), never a fork at random.
+  const primary =
+    sources.find((source) => source.remoteName === 'origin') ??
+    (sources.length === 1 ? sources[0] : undefined);
+  if (primary)
+    for (const target of publishedTargets(primary.branches)) {
+      if (!targets.some((existing) => existing.name === target.name))
+        targets.push({ ...target, source: 'github', remote: primary.remoteName });
     }
-    return unknown();
-  };
+  const localStates = new Map<string, Record<string, IntegrationState>>();
+  for (const branch of repository.branches) {
+    if (branch.local) localStates.set(branch.local.sha, branch.integration);
+  }
+  for (const branch of repository.branches) {
+    if (branch.remote && !localStates.has(branch.remote.sha))
+      localStates.set(
+        branch.remote.sha,
+        branch.local ? (branch.remoteIntegration ?? {}) : branch.integration,
+      );
+  }
   for (const source of sources) {
+    const checks = new Map(
+      source.history?.checks.map((check) => [historyKey(check.branchSha, check.targetSha), check]),
+    );
+    const stateFor = (sha: string) =>
+      Object.fromEntries(
+        targets.map((target) => {
+          const local = localStates.get(sha)?.[target.name];
+          return [
+            target.name,
+            sha === target.sha
+              ? 'integrated'
+              : local && local !== 'unknown'
+                ? local
+                : (checks.get(historyKey(sha, target.sha))?.state ?? 'unknown'),
+          ];
+        }),
+      ) as Record<string, IntegrationState>;
     const live = new Map(source.branches.map((ref) => [ref.name, ref]));
     for (const branch of branches) {
       if (branch.remote?.remote === source.remoteName && !live.has(branch.remote.name)) {
@@ -52,8 +81,10 @@ export function enrichRepository(repository: Repository, sources: RemoteSnapshot
       };
       if (branch) {
         branch.remote = remote;
-        if (branch.local) branch.remoteIntegration = stateFor(ref.sha);
-        else {
+        if (branch.local) {
+          branch.integration = stateFor(branch.local.sha);
+          branch.remoteIntegration = stateFor(ref.sha);
+        } else {
           branch.integration = stateFor(ref.sha);
           branch.updatedAt = remote.updatedAt;
         }
@@ -73,6 +104,24 @@ export function enrichRepository(repository: Repository, sources: RemoteSnapshot
         };
         branches.push(branch);
       }
+      branch.publishedHistory = {
+        repository: source.repository,
+        remoteName: source.remoteName,
+        branchSha: ref.sha,
+        checkedAt: source.checkedAt,
+        unavailable: !!source.error,
+        partial: !source.branchesComplete,
+        targets: publishedTargets(source.branches).map((target) => {
+          const check = checks.get(historyKey(ref.sha, target.sha));
+          return {
+            ...target,
+            state: check?.state ?? 'unknown',
+            checkedAt: check?.checkedAt,
+            source: check?.source,
+          };
+        }),
+        error: source.history?.error,
+      };
       // Open PRs can still be relevant when the local branch has advanced.
       // Closed/merged PRs are attached only to an exactly matching commit.
       const related = sources
@@ -95,11 +144,28 @@ export function enrichRepository(repository: Repository, sources: RemoteSnapshot
   }
   return {
     ...repository,
+    targets,
     branches,
     github: {
       checkedAt: sources.map((s) => s.checkedAt).sort()[0],
       partial: sources.some((s) => !s.branchesComplete || !s.pullHistoryComplete),
       error: sources.find((s) => s.error)?.error,
+      history: {
+        checked: sources.reduce(
+          (count, source) =>
+            count +
+            (source.history?.checks.filter((check) => check.state !== 'unknown').length ?? 0),
+          0,
+        ),
+        total: sources.reduce(
+          (count, source) =>
+            count +
+            new Set(source.branches.map((branch) => branch.sha)).size *
+              new Set(publishedTargets(source.branches).map((target) => target.sha)).size,
+          0,
+        ),
+        error: sources.find((source) => source.history?.error)?.history?.error,
+      },
     },
   };
 }

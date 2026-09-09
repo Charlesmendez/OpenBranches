@@ -4,6 +4,8 @@
 
 Public GitHub reading is available in Settings without sign-in. It only reads remotes of repositories you selected; GitHub's unauthenticated rate limits apply. Private repositories require GitHub App authorization.
 
+The inspector separates local and published branch history. GitHub comparisons load incrementally and reuse exact commit evidence. Pending counts and saved snapshot times remain visible; repositories with many uncached commits may need multiple refreshes. See [history checks and their limits](GITHUB_HISTORY.md).
+
 Maintainers must register a public GitHub App before distributing sign-in-enabled builds:
 
 - Enable device flow.

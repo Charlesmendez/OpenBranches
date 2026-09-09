@@ -70,6 +70,21 @@ function factsFor(repository: Repository, branch: Branch, now: number): AdvisorB
         }
       : null,
   );
+  if (branch.publishedHistory)
+    add('published-history', {
+      repository: text(branch.publishedHistory.repository, 200),
+      remote: text(branch.publishedHistory.remoteName, 100),
+      tip: validSha(branch.publishedHistory.branchSha),
+      checkedAt: timestamp(branch.publishedHistory.checkedAt),
+      unavailable: branch.publishedHistory.unavailable,
+      targets: branch.publishedHistory.targets.map((target) => ({
+        name: text(target.name, 100),
+        tip: validSha(target.sha),
+        state: target.state,
+        source: target.source ?? 'unknown',
+        checkedAt: timestamp(target.checkedAt),
+      })),
+    });
   add('last-commit', {
     at: timestamp(branch.updatedAt),
     subject: text((branch.local ?? branch.remote)?.subject ?? '', 160),

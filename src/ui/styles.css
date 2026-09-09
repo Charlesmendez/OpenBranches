@@ -1536,6 +1536,58 @@ code {
   line-height: 1.75;
   margin-top: 4px;
 }
+.history-sources {
+  display: flex;
+  padding: 3px;
+  gap: 3px;
+  background: #13191d;
+  border: 1px solid #303e45;
+  border-radius: 7px;
+  margin: -5px 0 14px;
+}
+.history-sources button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  flex: 1;
+  border-radius: 4px;
+  min-height: 31px;
+  font-size: 11px;
+  color: #95a7af;
+}
+.history-sources button[aria-pressed='true'] {
+  background: #30403f;
+  color: #d1e4da;
+}
+.history-caption,
+.history-freshness {
+  font-size: 10px;
+  color: #a1b0b9;
+  line-height: 1.7;
+  margin-bottom: 10px;
+}
+.history-commit {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: #a1b0b9;
+  margin-bottom: 19px;
+}
+.history-commit code {
+  color: #c0d2d9;
+}
+.path-step .history-target {
+  color: #93a6ae;
+  margin: 2px 0 12px;
+}
+.history-progress {
+  flex-shrink: 0;
+  margin: 0 28px 10px;
+  color: #a3b7c0;
+  font-size: 11px;
+  line-height: 1.7;
+}
 .location-detail {
   display: flex;
   align-items: flex-start;

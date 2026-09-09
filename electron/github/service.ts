@@ -10,6 +10,7 @@ export class GitHubService {
   private closed = false;
   private generation = 0;
   private job?: { generation: number; promise: Promise<void> };
+  private refreshOffset = 0;
   private timer: ReturnType<typeof setInterval>;
 
   constructor(
@@ -98,35 +99,47 @@ export class GitHubService {
     return job.promise;
   }
   private async refreshAll(generation: number) {
-    for (const repository of this.current().repositories) {
-      for (const remote of repository.remotes) {
-        if (this.closed || !this.enabled || generation !== this.generation) return;
-        const slug = githubRepository(remote.url);
-        if (!slug) continue;
-        const key = `${repository.id}:${remote.name}:${slug}`;
-        try {
-          if (!this.selectedKeys().has(key)) continue;
-          const fresh = await this.read(this.auth.http, slug, remote.name);
-          if (this.closed || generation !== this.generation) return;
-          if (!this.selectedKeys().has(key)) continue;
-          this.sources[key] = fresh;
-        } catch (error) {
-          if (this.closed || generation !== this.generation) return;
-          if (!this.selectedKeys().has(key)) continue;
-          const previous = this.sources[key] ?? {
-            repository: slug,
-            remoteName: remote.name,
-            branches: [],
-            pulls: [],
-            checkedAt: '',
-            branchesComplete: false,
-            pullHistoryComplete: false,
-          };
-          this.sources[key] = {
-            ...previous,
-            error: error instanceof Error ? error.message : 'GitHub could not refresh this source.',
-          };
-        }
+    const sources = this.current().repositories.flatMap((repository) =>
+      repository.remotes.map((remote) => ({ repository, remote })),
+    );
+    const offset = this.refreshOffset++ % Math.max(1, sources.length);
+    const budget = { remaining: 12, milliseconds: 30_000 };
+    for (const { repository, remote } of [...sources.slice(offset), ...sources.slice(0, offset)]) {
+      if (this.closed || !this.enabled || generation !== this.generation) return;
+      const slug = githubRepository(remote.url);
+      if (!slug) continue;
+      const key = `${repository.id}:${remote.name}:${slug}`;
+      try {
+        if (!this.selectedKeys().has(key)) continue;
+        const fresh = await this.read(this.auth.http, slug, remote.name, {
+          previous: this.sources[key]?.history,
+          local: repository,
+          budget,
+          isCurrent: () =>
+            !this.closed &&
+            this.enabled &&
+            generation === this.generation &&
+            this.selectedKeys().has(key),
+        });
+        if (this.closed || generation !== this.generation) return;
+        if (!this.selectedKeys().has(key)) continue;
+        this.sources[key] = fresh;
+      } catch (error) {
+        if (this.closed || generation !== this.generation) return;
+        if (!this.selectedKeys().has(key)) continue;
+        const previous = this.sources[key] ?? {
+          repository: slug,
+          remoteName: remote.name,
+          branches: [],
+          pulls: [],
+          checkedAt: '',
+          branchesComplete: false,
+          pullHistoryComplete: false,
+        };
+        this.sources[key] = {
+          ...previous,
+          error: error instanceof Error ? error.message : 'GitHub could not refresh this source.',
+        };
       }
     }
     if (!this.closed && generation === this.generation) {

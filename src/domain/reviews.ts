@@ -22,6 +22,18 @@ export function recommendationRevision(repository: Repository, branch: Branch): 
     ref(branch.remote),
     sorted(branch.integration),
     sorted(branch.remoteIntegration),
+    branch.publishedHistory
+      ? [
+          branch.publishedHistory.repository,
+          branch.publishedHistory.remoteName,
+          branch.publishedHistory.branchSha,
+          branch.publishedHistory.unavailable,
+          branch.publishedHistory.partial ?? false,
+          branch.publishedHistory.targets
+            .map((target) => [target.name, target.state])
+            .sort(([a], [b]) => compare(a, b)),
+        ]
+      : null,
     repository.targets
       .map((target) => [target.name, target.source])
       .sort(([a], [b]) => compare(a, b)),

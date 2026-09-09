@@ -278,6 +278,15 @@ export function App() {
             <button onClick={() => void refresh()}>Retry</button>
           </div>
         )}
+        {repository?.github?.history &&
+          repository.github.history.checked < repository.github.history.total &&
+          !repository.github.error && (
+            <div className="history-progress" role="status">
+              GitHub history · {repository.github.history.checked} of{' '}
+              {repository.github.history.total} comparisons checked.{' '}
+              {repository.github.history.error ?? 'More load with each refresh as GitHub allows.'}
+            </div>
+          )}
         <div className="page-body">
           {loading ? (
             <EmptyState
