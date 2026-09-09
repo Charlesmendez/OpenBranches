@@ -1,7 +1,21 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { CodexStatus, DesktopApi, GitHubStatus, Snapshot } from '../src/domain/types';
+import type {
+  CodexStatus,
+  DesktopApi,
+  GitHubStatus,
+  GitStatus,
+  Snapshot,
+} from '../src/domain/types';
 
 const api: DesktopApi = {
+  checkGit: () => ipcRenderer.invoke('git:check'),
+  installGit: () => ipcRenderer.invoke('git:install'),
+  openGitSetupGuide: () => ipcRenderer.invoke('git:guide'),
+  onGit: (callback) => {
+    const listener = (_event: Electron.IpcRendererEvent, status: GitStatus) => callback(status);
+    ipcRenderer.on('git:updated', listener);
+    return () => ipcRenderer.removeListener('git:updated', listener);
+  },
   getSnapshot: () => ipcRenderer.invoke('snapshot:get'),
   addRepository: () => ipcRenderer.invoke('repository:add'),
   removeRepository: (id) => ipcRenderer.invoke('repository:remove', id),

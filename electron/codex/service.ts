@@ -5,6 +5,7 @@ import { findCodex, type CodexExecutable } from './executable';
 import { CodexInspectionClient } from './transport';
 import { indexSchema, readTaskIndex, type CodexIndex } from './reader';
 import { linkRepository } from './associations';
+import { readCodexAccount } from './account';
 
 const emptyIndex = (): CodexIndex => ({ tasks: [], checkedAt: '', partial: false });
 type DiscoveryClient = Pick<CodexInspectionClient, 'initialize' | 'request' | 'close'>;
@@ -151,6 +152,8 @@ export class CodexService {
       this.index = fresh;
       this.forgetUnselected();
       this.statusValue = { ...this.statusValue, state: 'ready', error: undefined };
+      const account = await readCodexAccount(client);
+      if (valid()) this.statusValue = { ...this.statusValue, account };
     } catch (error) {
       if (!valid()) return;
       this.statusValue = {

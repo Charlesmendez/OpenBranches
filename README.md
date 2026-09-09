@@ -9,19 +9,21 @@ OpenBranches brings local Git and GitHub into one workspace: a grouped branch ma
 ## What works now
 
 - Add local Git repositories through a native folder picker. Shared worktrees are inspected together.
+- Detect Apple and Homebrew Git installations automatically. If Git needs setup, follow the in-app guide, open Apple’s installer explicitly, and explore the demo while it finishes.
 - Browse hundreds of branches in collapsed groups; expand a group into readable pages or search the full inventory with ⌘K.
 - See local and remote copies, uncommitted work, integration history, and the evidence behind each result.
 - Watch local changes while the app is running; refresh connected GitHub sources every two minutes.
 - Read public GitHub branches and pull requests without signing in. Private-repository sign-in is implemented using GitHub App device authorization but requires the release app registration.
 - Review deterministic findings about work that may deserve attention.
 - Connect local Codex task history, including archived tasks. Inspect the evidence for each branch association; multiple tasks can belong to a branch. This connection reads saved metadata and does not run AI.
+- See the existing Codex account’s shared usage allowance. The advisor’s budget and evidence validators are implemented; [model execution remains gated](docs/ADVISOR.md).
 - Explore a fictional demo with 403 branch entries, independent of your real repositories.
 
 Repository inspection is read-only. OpenBranches does not fetch into your repositories, push, merge, delete branches, or remove worktrees. An absent commit in a target's ancestry is not presented as proof that a squash-equivalent change is missing.
 
 ## Installation
 
-The intended release experience is **download the DMG, drag OpenBranches into Applications, open it, choose your projects**. End users will not need Node.js or a terminal. Git is required for local inspection; guided prerequisite detection remains on the roadmap.
+The intended release experience is **download the DMG, drag OpenBranches into Applications, open it, choose your projects**. End users will not need Node.js or a terminal. Git 2.36 or newer is required for local inspection. The app detects it and provides a guided setup when needed; see [Mac setup](docs/INSTALLATION.md).
 
 Current installers are **unsigned developer previews**, not normal public releases. Signed and notarized downloads for Apple Silicon and Intel Macs are a release gate. We do not recommend changing macOS security settings to install a preview.
 

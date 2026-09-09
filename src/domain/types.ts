@@ -116,6 +116,19 @@ export interface GitHubStatus {
   error?: string;
   device?: { code: string; verificationUrl: string; expiresAt: number };
 }
+export interface CodexUsageBucket {
+  id: string;
+  available: boolean;
+  exhausted: boolean;
+  primary?: { usedPercent: number; resetsAt?: number; windowDurationMins?: number };
+  secondary?: { usedPercent: number; resetsAt?: number; windowDurationMins?: number };
+}
+export interface CodexAccount {
+  auth: 'chatgpt' | 'other' | 'signed-out' | 'unavailable';
+  checkedAt: string;
+  limits: CodexUsageBucket[];
+  error?: string;
+}
 export interface CodexStatus {
   installed: boolean;
   enabled: boolean;
@@ -125,12 +138,23 @@ export interface CodexStatus {
   partial?: boolean;
   taskCount?: number;
   error?: string;
+  account?: CodexAccount;
 }
 export interface ProviderStatus {
   codex: CodexStatus;
   github: GitHubStatus;
 }
+export interface GitStatus {
+  state: 'checking' | 'ready' | 'missing' | 'unsupported' | 'unavailable';
+  version?: string;
+  installAvailable: boolean;
+  message?: string;
+}
 export interface DesktopApi {
+  checkGit(): Promise<GitStatus>;
+  installGit(): Promise<void>;
+  openGitSetupGuide(): Promise<void>;
+  onGit(callback: (status: GitStatus) => void): () => void;
   getSnapshot(): Promise<Snapshot>;
   addRepository(): Promise<Repository | null>;
   removeRepository(id: string): Promise<void>;

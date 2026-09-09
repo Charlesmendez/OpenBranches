@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Check, LoaderCircle, Sparkles } from 'lucide-react';
 import type { CodexStatus } from '../../domain/types';
 import { relativeTime } from '../../domain/branches';
+import { CodexAllowance } from './CodexAllowance';
 
 export function CodexConnection({ status }: { status: CodexStatus }) {
   const [error, setError] = useState('');
@@ -100,6 +101,7 @@ export function CodexConnection({ status }: { status: CodexStatus }) {
             Try again
           </button>
         )}
+        {status.enabled && status.account && <CodexAllowance account={status.account} />}
       </div>
     </>
   );

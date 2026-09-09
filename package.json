@@ -15,6 +15,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "probe:advisor": "node scripts/probe-advisor.mjs",
     "package": "npm run build && OPENBRANCHES_SIGN_RELEASE=0 electron-forge package",
     "make": "npm run build && OPENBRANCHES_SIGN_RELEASE=0 electron-forge make && OPENBRANCHES_SIGN_RELEASE=0 node scripts/make-dmg.mjs",
     "make:release": "npm run build && OPENBRANCHES_SIGN_RELEASE=1 electron-forge make && OPENBRANCHES_SIGN_RELEASE=1 node scripts/make-dmg.mjs",
@@ -23,6 +24,7 @@
   },
   "dependencies": {
     "@xyflow/react": "^12.11.6",
+    "js-tiktoken": "^1.0.21",
     "lucide-react": "^1.43.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",

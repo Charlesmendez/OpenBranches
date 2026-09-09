@@ -5,26 +5,33 @@ import { resolve } from 'node:path';
 import { promisify } from 'node:util';
 import type { Branch, GitRef, Repository, Worktree } from '../../src/domain/types';
 import { titleFromBranch } from '../../src/domain/branches';
+import { gitEnvironment } from './installation';
 
 const exec = promisify(execFile);
 const REF_FORMAT =
   '%(refname)%00%(objectname)%00%(committerdate:iso-strict)%00%(subject)%00%(upstream)%00%(symref)';
-export async function git(path: string, args: string[]): Promise<string> {
-  const { stdout } = await exec(
-    'git',
-    ['--no-optional-locks', '-c', 'core.fsmonitor=false', '-C', path, ...args],
-    {
-      encoding: 'utf8',
-      timeout: 15_000,
-      maxBuffer: 16 * 1024 * 1024,
-      env: { ...process.env, GIT_TERMINAL_PROMPT: '0', GIT_OPTIONAL_LOCKS: '0' },
-    },
-  );
-  return stdout;
+function createGitRunner(executable: string) {
+  return async (path: string, args: string[]): Promise<string> => {
+    const { stdout } = await exec(
+      executable,
+      ['--no-optional-locks', '-c', 'core.fsmonitor=false', '-C', path, ...args],
+      {
+        encoding: 'utf8',
+        timeout: 15_000,
+        maxBuffer: 16 * 1024 * 1024,
+        env: gitEnvironment(),
+      },
+    );
+    return stdout;
+  };
 }
+export const git = createGitRunner('git');
 // Status can invoke repository-defined clean/process filters. Disable those
 // commands during inspection; Git's fsmonitor hook is disabled in the runner.
-async function readStatus(worktree: Worktree): Promise<string> {
+async function readStatus(
+  worktree: Worktree,
+  git: ReturnType<typeof createGitRunner>,
+): Promise<string> {
   let filterKeys = '';
   try {
     filterKeys = await git(worktree.path, [
@@ -134,7 +141,8 @@ function countStatusEntries(output: string): number {
   }
   return count;
 }
-export async function scanRepository(inputPath: string): Promise<Repository> {
+export async function scanRepository(inputPath: string, executable = 'git'): Promise<Repository> {
+  const git = createGitRunner(executable);
   const path = await realpath(
     (await git(inputPath, ['rev-parse', '--show-toplevel'])).replace(/\n$/, ''),
   );
@@ -157,7 +165,7 @@ export async function scanRepository(inputPath: string): Promise<Repository> {
         try {
           await access(worktree.path);
           worktree.available = true;
-          const status = await readStatus(worktree);
+          const status = await readStatus(worktree, git);
           worktree.changedFiles = countStatusEntries(status);
           worktree.dirty = worktree.changedFiles > 0;
         } catch {

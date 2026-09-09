@@ -1613,6 +1613,58 @@ code {
   justify-items: start;
   gap: 9px;
 }
+.codex-allowance {
+  width: 100%;
+  border-top: 1px solid #304047;
+  margin-top: 12px;
+  padding-top: 18px;
+}
+.codex-allowance h4 {
+  font-size: 12px;
+  color: #c3d1d3;
+  font-weight: 500;
+  margin: 0 0 14px;
+}
+.allowance-windows {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  margin-bottom: 10px;
+}
+.allowance-window {
+  flex: 1;
+  min-width: 180px;
+  max-width: 290px;
+}
+.allowance-window > div {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #92a8ae;
+  gap: 12px;
+}
+.allowance-window strong {
+  font-weight: 500;
+  color: #bbd9cf;
+}
+.allowance-window meter {
+  appearance: none;
+  display: block;
+  height: 5px;
+  width: 100%;
+  margin-top: 9px;
+  background: #35474b;
+  border-radius: 4px;
+}
+.allowance-window meter::-webkit-meter-bar {
+  border: 0;
+  background: #35474b;
+  border-radius: 4px;
+}
+.allowance-window meter::-webkit-meter-optimum-value {
+  background: #84b9a3;
+  border-radius: 4px;
+}
 .task-detail svg {
   color: #789bab;
   margin-top: 2px;
@@ -2008,6 +2060,121 @@ code {
 }
 .full-activity .activity-row {
   padding: 20px 4px;
+}
+.git-setup {
+  width: min(580px, calc(100% - 64px));
+  margin: 42px auto;
+  padding: 32px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: radial-gradient(ellipse at top right, #65d6bb0a, transparent 65%), var(--surface);
+}
+.git-setup.compact {
+  width: auto;
+  margin: 0 0 22px;
+  padding: 24px;
+  border-radius: 12px;
+}
+.setup-symbol {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  margin-bottom: 24px;
+  border: 1px solid #66cfb72e;
+  border-radius: 15px;
+  background: #66cfb70d;
+  color: var(--teal);
+}
+.initial-setup .page-header {
+  display: none;
+}
+.initial-setup .page-body {
+  padding: 24px;
+}
+.initial-setup .git-setup {
+  margin: 0 auto;
+}
+.git-setup h1,
+.git-setup h2 {
+  max-width: 420px;
+  margin: 14px 0 12px;
+  font-size: 27px;
+  line-height: 1.2;
+  letter-spacing: -0.7px;
+  font-weight: 520;
+}
+.git-setup.compact h2 {
+  font-size: 22px;
+}
+.setup-description {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.setup-steps {
+  list-style: none;
+  padding: 0;
+  margin: 26px 0;
+}
+.setup-steps li {
+  display: flex;
+  gap: 13px;
+  margin: 20px 0;
+  align-items: flex-start;
+}
+.setup-steps li > span {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  color: var(--teal);
+  font-size: 11px;
+}
+.setup-steps strong {
+  font-size: 13px;
+  font-weight: 550;
+}
+.setup-steps p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.setup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 22px;
+}
+.setup-guide {
+  margin-top: 17px;
+  font-size: 12px;
+}
+.setup-demo {
+  display: flex;
+  margin-top: 28px;
+  padding-top: 22px;
+  border-top: 1px solid var(--line);
+  width: 100%;
+}
+.setup-progress {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--teal);
+  line-height: 1.6;
+}
+.setup-progress svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.git-setup .connection-error {
+  margin: 18px 0 0;
 }
 .welcome {
   display: flex;

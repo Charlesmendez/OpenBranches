@@ -1,6 +1,7 @@
 import { Worker } from 'node:worker_threads';
 import { join } from 'node:path';
 import type { Repository } from '../../src/domain/types';
+import type { GitInstallation } from './installation';
 
 interface Request {
   resolve(repository: Repository): void;
@@ -15,8 +16,10 @@ export class GitWorkerClient {
   private nextId = 0;
   private pending = new Map<number, Request>();
   private closed = false;
+  constructor(private git: Pick<GitInstallation, 'executable'>) {}
 
-  scan(path: string): Promise<Repository> {
+  async scan(path: string): Promise<Repository> {
+    const executable = await this.git.executable();
     if (this.closed) return Promise.reject(new Error('Repository scanner is closed'));
     const worker = this.worker ?? this.start();
     const id = ++this.nextId;
@@ -30,7 +33,7 @@ export class GitWorkerClient {
         150_000,
       );
       this.pending.set(id, { resolve, reject, timer });
-      worker.postMessage({ id, path });
+      worker.postMessage({ id, path, executable });
     });
   }
 

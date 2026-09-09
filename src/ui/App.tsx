@@ -25,6 +25,8 @@ import {
 } from '../domain/branches';
 import { useWorkspace } from './hooks/useWorkspace';
 import { useProviders } from './hooks/useProviders';
+import { useGit } from './hooks/useGit';
+import { GitSetup } from './components/GitSetup';
 import { Sidebar } from './components/Sidebar';
 import { Overview, ActivityList } from './components/Overview';
 import { BranchMap } from './components/BranchMap';
@@ -38,6 +40,8 @@ import { EmptyState, IconButton } from './components/Primitives';
 export function App() {
   const workspace = useWorkspace();
   const providers = useProviders();
+  const git = useGit();
+  const gitNeedsSetup = !!git.status && git.status.state !== 'ready';
   const { snapshot, mode, setMode, error, setError, loading, adding, add, refresh } = workspace;
   const [projectId, setProjectId] = useState<string | null>(null);
   const [view, setView] = useState<View>('map');
@@ -90,6 +94,10 @@ export function App() {
     setView(branchId ? 'inventory' : 'map');
   };
   const addRepository = async () => {
+    if (gitNeedsSetup) {
+      setView('settings');
+      return;
+    }
     const added = await add();
     if (added) {
       selectProject(added.id);
@@ -102,6 +110,12 @@ export function App() {
     setView('map');
   };
   const isProjectView = repository && ['map', 'inventory'].includes(view);
+  const firstSetup =
+    !loading &&
+    mode === 'live' &&
+    gitNeedsSetup &&
+    !snapshot.repositories.length &&
+    ['map', 'inventory'].includes(view);
   const title =
     view === 'settings'
       ? 'Make yourself at home.'
@@ -140,8 +154,10 @@ export function App() {
             <span className="demo-indicator">DEMO WORKSPACE</span>
           ) : (
             <span>
-              <i className={`status-dot ${snapshot.scanning ? 'pulsing' : ''}`} />
-              Local tracking
+              <i
+                className={`status-dot ${gitNeedsSetup ? 'muted' : snapshot.scanning ? 'pulsing' : ''}`}
+              />
+              {gitNeedsSetup ? 'Git setup needed' : 'Local tracking'}
             </span>
           )}
           <span className="status-divider" />
@@ -171,12 +187,13 @@ export function App() {
         view={view}
         attentionCount={recommendations.length}
         demo={mode === 'demo'}
+        gitNeedsSetup={gitNeedsSetup}
         onProject={selectProject}
         onView={setView}
         onAdd={() => void addRepository()}
         onMode={switchMode}
       />
-      <main className="main">
+      <main className={`main ${firstSetup ? 'initial-setup' : ''}`}>
         <div className="page-header">
           <div className="breadcrumb">
             <span>Workspace</span>
@@ -238,7 +255,19 @@ export function App() {
             </div>
           )}
         </div>
-        {repository?.error && (
+        {mode === 'live' &&
+          gitNeedsSetup &&
+          snapshot.repositories.length > 0 &&
+          view !== 'settings' && (
+            <div className="source-error">
+              <span>
+                Local inspection is paused until Git is ready. Your saved workspace is still
+                available.
+              </span>
+              <button onClick={() => setView('settings')}>Set up Git</button>
+            </div>
+          )}
+        {repository?.error && !gitNeedsSetup && (
           <div className="source-error">
             <span>Source unavailable. Showing the last snapshot.</span>
             <button onClick={() => void refresh()}>Retry</button>
@@ -258,7 +287,7 @@ export function App() {
               description="Loading your last snapshot…"
             />
           ) : view === 'settings' ? (
-            <Settings />
+            <Settings git={git} />
           ) : view === 'attention' ? (
             <Attention
               key={`${mode}:${projectId}`}
@@ -280,6 +309,14 @@ export function App() {
                 onSelect={navigateBranch}
               />
             </section>
+          ) : !snapshot.repositories.length && mode === 'live' && gitNeedsSetup ? (
+            <GitSetup
+              git={git}
+              onDemo={() => {
+                setMode('demo');
+                selectProject(null);
+              }}
+            />
           ) : !snapshot.repositories.length ? (
             <div className="welcome">
               <div className="welcome-map" aria-hidden="true">
@@ -392,7 +429,9 @@ export function App() {
             <i className={`status-dot ${mode === 'demo' ? 'muted' : ''}`} />
             {mode === 'demo'
               ? 'Fictional projects · explore freely'
-              : `${snapshot.repositories.length} repositories · watching while open`}
+              : gitNeedsSetup
+                ? 'Local inspection paused · finish Git setup in Settings'
+                : `${snapshot.repositories.length} repositories · watching while open`}
           </span>
           <span>Made for a clearer headspace.</span>
         </footer>

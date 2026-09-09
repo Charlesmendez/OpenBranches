@@ -13,13 +13,16 @@ export class AppStore {
     );
   }
   read<T>(key: string, fallback: T): T {
-    const row = this.db.prepare('SELECT value FROM state WHERE key = ?').get(key);
-    if (!row) return fallback;
     try {
-      return JSON.parse(String(row.value)) as T;
+      const value = this.readStrict(key);
+      return value === undefined ? fallback : (value as T);
     } catch {
       return fallback;
     }
+  }
+  readStrict(key: string): unknown {
+    const row = this.db.prepare('SELECT value FROM state WHERE key = ?').get(key);
+    return row ? JSON.parse(String(row.value)) : undefined;
   }
   write(key: string, value: unknown): void {
     this.db

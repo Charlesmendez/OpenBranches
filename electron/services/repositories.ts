@@ -2,10 +2,11 @@ import { watch, type FSWatcher } from 'node:fs';
 import type { ActivityEvent, Repository, Snapshot } from '../../src/domain/types';
 import { AppStore } from './store';
 import { GitWorkerClient } from '../git/client';
+import type { GitInstallation } from '../git/installation';
 
 export class RepositoryService {
   private snapshot: Snapshot;
-  private worker = new GitWorkerClient();
+  private worker: GitWorkerClient;
   private closed = false;
   private refreshing?: Promise<void>;
   private watchPaths = new Map<string, string>();
@@ -16,7 +17,9 @@ export class RepositoryService {
   constructor(
     private store: AppStore,
     private publish: (snapshot: Snapshot) => void,
+    git: Pick<GitInstallation, 'executable'>,
   ) {
+    this.worker = new GitWorkerClient(git);
     this.snapshot = { ...store.snapshot(), scanning: false };
     this.reconcile = setInterval(() => {
       void this.refresh();

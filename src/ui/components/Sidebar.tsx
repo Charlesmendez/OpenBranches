@@ -19,6 +19,7 @@ interface Props {
   view: View;
   attentionCount: number;
   demo: boolean;
+  gitNeedsSetup: boolean;
   onProject: (id: string | null) => void;
   onView: (view: View) => void;
   onAdd: () => void;
@@ -101,9 +102,16 @@ export function Sidebar(p: Props) {
         <div className="machine">
           <Laptop size={17} />
           <span>
-            This Mac<small>{p.demo ? 'Demo sources' : 'Local repositories'}</small>
+            This Mac
+            <small>
+              {p.demo
+                ? 'Demo sources'
+                : p.gitNeedsSetup
+                  ? 'Git setup needed'
+                  : 'Local repositories'}
+            </small>
           </span>
-          <span className={`status-dot ${p.demo ? 'muted' : ''}`} />
+          <span className={`status-dot ${p.demo || p.gitNeedsSetup ? 'muted' : ''}`} />
         </div>
         <button className="demo-switch" onClick={p.onMode}>
           <CircleDot size={14} />

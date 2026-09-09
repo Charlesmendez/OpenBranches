@@ -20,6 +20,7 @@ import { GitHubAuth } from './github/auth';
 import { GitHubService } from './github/service';
 import { createTokenVault } from './github/vault';
 import { CodexService } from './codex/service';
+import { GitInstallation, GIT_SETUP_GUIDE } from './git/installation';
 declare const __GITHUB_APP_CLIENT_ID__: string;
 
 protocol.registerSchemesAsPrivileged([
@@ -123,7 +124,8 @@ app.whenReady().then(() => {
     window?.webContents.send('snapshot:updated', snapshot());
     if (codex) window?.webContents.send('codex:updated', codex.status());
   };
-  service = new RepositoryService(store, publish);
+  const git = new GitInstallation((status) => window?.webContents.send('git:updated', status));
+  service = new RepositoryService(store, publish, git);
   githubAuth = new GitHubAuth(__GITHUB_APP_CLIENT_ID__, createTokenVault(store));
   github = new GitHubService(store, githubAuth, () => service.current(), publish);
   codex = new CodexService(
@@ -148,11 +150,20 @@ app.whenReady().then(() => {
     if (githubAuth.status().device) void pollGitHub();
   }, 5000);
   handle('snapshot:get', snapshot);
+  handle('git:check', async () => {
+    const before = git.status().state;
+    const status = await git.check(true);
+    if (before !== 'ready' && status.state === 'ready') void service.refresh();
+    return status;
+  });
+  handle('git:install', () => git.requestInstall());
+  handle('git:guide', () => shell.openExternal(GIT_SETUP_GUIDE));
   handle('snapshot:refresh', async () => {
     await service.refresh();
     await Promise.all([github!.refresh(), codex!.refresh()]);
   });
   handle('repository:add', async () => {
+    await git.executable();
     const result = await dialog.showOpenDialog(window!, {
       title: 'Choose a Git repository',
       properties: ['openDirectory'],

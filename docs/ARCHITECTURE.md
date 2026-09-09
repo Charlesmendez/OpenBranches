@@ -5,10 +5,11 @@ The renderer has no Node.js access. It talks through a narrow typed preload brid
 - `src/domain`: shared branch types, lifecycle classification, evidence labels, and deterministic recommendations.
 - `src/ui`: React views, reusable components, and workspace/provider hooks. React Flow renders bounded groups; the inventory virtualizes rows.
 - `src/data/demo.ts`: fictional example projects. Real and demo workspaces are separate.
-- `electron/git`: read-only Git commands, NUL-delimited parsing, bounded worktree inspection, and a worker client with terminal errors/timeouts.
+- `electron/git`: Git installation discovery and explicit Apple setup, read-only Git commands, NUL-delimited parsing, bounded worktree inspection, and a worker client with terminal errors/timeouts. Discovery supplies an absolute executable; inspection clears inherited Git repository/config overrides.
 - `electron/services`: SQLite persistence and repository watching/reconciliation. A Git failure retains the previous snapshot with an availability error.
 - `electron/github`: fixed-origin HTTP transport, GitHub App device authorization, encrypted credential vault, paginated metadata reading, source enrichment, and refresh scheduling.
 - `electron/codex`: executable/version detection, a stdio inspection client with a read-method allowlist, bounded task-index parsing, pure association rules, and a cancellable refresh/cache service.
+- `electron/advisor`: shared policy, persistent global allowance, bounded metadata preparation, evidence identifiers, and structured finding validation. Model execution and scheduling are not yet wired; see `docs/ADVISOR.md` for the execution gate.
 - `scripts`: reproducible builds, generated icons, and native macOS disk images. Local builds and release uploads use separate commands.
 - `vendor/extract-zip`: five-line CommonJS bridge to the maintained `@electron-internal/extract-zip` package, for older Forge consumers. No custom extraction implementation is maintained here.
 - `tests`: temporary Git fixtures and provider protocol/evidence tests.

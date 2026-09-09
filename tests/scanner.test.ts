@@ -1,9 +1,10 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { mkdtemp, writeFile, readFile, rm, access, realpath } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { scanRepository, parseWorktrees, sanitizeRemote } from '../electron/git/scanner';
+import { discoverGit } from '../electron/git/installation';
 
 const directories: string[] = [];
 function git(path: string, ...args: string[]) {
@@ -38,6 +39,31 @@ afterEach(async () => {
 });
 
 describe('read-only Git inspection', () => {
+  it('uses the discovered binary and selected repository despite inherited Git overrides and a limited PATH', async () => {
+    const root = await fixture();
+    const other = await fixture();
+    git(root, 'branch', 'codex/selected-project');
+    git(other, 'branch', 'codex/unrelated-project');
+    const { executable } = await discoverGit();
+    expect(executable).toBeDefined();
+    const before = await readFile(join(root, '.git/index'));
+    try {
+      vi.stubEnv('PATH', '/fixture/no-executables');
+      vi.stubEnv('GIT_DIR', join(other, '.git'));
+      vi.stubEnv('GIT_WORK_TREE', other);
+      vi.stubEnv('GIT_INDEX_FILE', join(other, '.git/index'));
+      const result = await scanRepository(root, executable!);
+      expect(result.path).toBe(await realpath(root));
+      expect(result.branches.some((branch) => branch.name === 'codex/selected-project')).toBe(true);
+      expect(result.branches.some((branch) => branch.name === 'codex/unrelated-project')).toBe(
+        false,
+      );
+      expect(result.worktrees[0].dirty).toBe(false);
+      expect(await readFile(join(root, '.git/index'))).toEqual(before);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
   it('tracks integration independently, preserves unpublished work, and never changes refs/index/files', async () => {
     const root = await fixture();
     git(root, 'checkout', '-b', 'codex/unfinished');

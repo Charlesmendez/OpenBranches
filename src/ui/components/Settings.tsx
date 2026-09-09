@@ -3,8 +3,10 @@ import { ArrowUpRight, Check, Cloud, Copy, Laptop, LoaderCircle, ShieldCheck } f
 import type { GitHubStatus } from '../../domain/types';
 import { useProviders } from '../hooks/useProviders';
 import { CodexConnection } from './CodexConnection';
+import { GitSetup } from './GitSetup';
+import type { GitSetupController } from '../hooks/useGit';
 
-export function Settings() {
+export function Settings({ git }: { git: GitSetupController }) {
   const providers = useProviders();
   const [github, setGitHub] = useState<GitHubStatus>(providers.github);
   const [busy, setBusy] = useState(false);
@@ -47,13 +49,22 @@ export function Settings() {
           </span>
           <div>
             <h3>This Mac</h3>
-            <p>Your selected Git repositories and worktrees. Files stay in place.</p>
+            <p>
+              {git.status?.state === 'ready'
+                ? `Git ${git.status.version} is ready. Your selected repositories and worktrees stay in place.`
+                : !git.status
+                  ? 'Connect local repositories in the desktop app.'
+                  : 'Finish Git setup to read your selected repositories and worktrees.'}
+            </p>
           </div>
-          <span className="pill teal">
-            <Check size={12} />
-            Local inspection
-          </span>
+          {git.status?.state === 'ready' && (
+            <span className="pill teal">
+              <Check size={12} />
+              Local inspection
+            </span>
+          )}
         </div>
+        <GitSetup git={git} compact />
         <div className="settings-row">
           <span className="settings-icon">
             <Cloud size={20} />

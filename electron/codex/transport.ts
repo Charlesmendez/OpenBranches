@@ -3,8 +3,14 @@ import { StringDecoder } from 'node:string_decoder';
 
 // This connection only exposes inspection. It cannot create/resume a thread,
 // start a model turn, execute a command, or change Codex settings.
-export type InspectionMethod = 'initialize' | 'thread/list' | 'account/read';
-const methods = new Set<InspectionMethod>(['initialize', 'thread/list', 'account/read']);
+export type InspectionMethod =
+  'initialize' | 'thread/list' | 'account/read' | 'account/rateLimits/read';
+const methods = new Set<InspectionMethod>([
+  'initialize',
+  'thread/list',
+  'account/read',
+  'account/rateLimits/read',
+]);
 const MAX_MESSAGE_BYTES = 8 * 1024 * 1024;
 type Pending = {
   resolve: (value: unknown) => void;
