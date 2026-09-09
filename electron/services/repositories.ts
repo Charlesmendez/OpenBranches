@@ -31,8 +31,21 @@ export class RepositoryService {
   current(): Snapshot {
     return this.snapshot;
   }
-  async add(path: string): Promise<Repository> {
+  add(path: string): Promise<Repository>;
+  add(path: string, accept: (repository: Repository) => boolean): Promise<Repository | null>;
+  async add(
+    path: string,
+    accept?: (repository: Repository) => boolean,
+  ): Promise<Repository | null> {
     const repository = await this.scan(path);
+    if (this.closed) throw new Error('Project monitoring has stopped.');
+    if (accept && !accept(repository)) return null;
+    // Discovery can encounter multiple saved roots for the same Git worktree
+    // family. Keep the user's existing project identity and primary folder.
+    if (accept) {
+      const existing = this.snapshot.repositories.find((item) => item.id === repository.id);
+      if (existing) return existing;
+    }
     this.replace(repository);
     return repository;
   }

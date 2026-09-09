@@ -2255,7 +2255,7 @@ code {
 .monitored-row button {
   flex-shrink: 0;
 }
-.monitored-search {
+.project-search {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -2265,9 +2265,127 @@ code {
   border-radius: 6px;
   color: var(--muted);
 }
-.monitored-search input {
+.project-search input {
   width: 100%;
+  min-width: 0;
   font-size: 12px;
+}
+.project-search > svg {
+  flex-shrink: 0;
+}
+.project-search button {
+  display: flex;
+  padding: 2px;
+  color: var(--muted);
+}
+.sidebar-project-tools {
+  margin: 0 12px 10px;
+}
+.sidebar-project-tools .project-search {
+  margin: 0 0 8px;
+  padding: 8px;
+  gap: 7px;
+  background: #171c1e;
+}
+.sidebar-project-tools .project-search input {
+  font-size: 11px;
+}
+.sidebar-project-tools > button {
+  padding: 4px 0;
+}
+.project-search-empty {
+  padding: 12px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.settings-section.project-discovery {
+  background: linear-gradient(120deg, #253933 0%, #1e292d 55%, #1b252a 100%);
+}
+.discovery-heading {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+.discovery-heading .section-kicker {
+  margin-bottom: 7px;
+  color: #9fc7b6;
+}
+.discovery-heading h2 {
+  font-size: 21px;
+  letter-spacing: -0.5px;
+}
+.discovery-icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  background: #375247;
+  color: #b2e3cf;
+  border: 1px solid #547362;
+}
+.discovery-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 20px 0 12px;
+}
+.discovery-status {
+  font-size: 12px;
+  color: #b6c8c1;
+  margin-bottom: 12px;
+}
+.discovered-projects {
+  margin-top: 18px;
+  font-size: 12px;
+}
+.discovered-projects summary {
+  cursor: pointer;
+  color: #b5d4c8;
+  padding: 6px 0;
+}
+.discovered-projects ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.discovered-projects li {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 13px 0;
+  border-bottom: 1px solid #34463f;
+}
+.discovered-projects li strong {
+  font-weight: 500;
+  font-size: 13px;
+}
+.discovered-projects li span {
+  color: #9dafa7;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.discovered-projects li small {
+  color: #e0bd85;
+}
+.discovery-excluded {
+  padding-top: 16px;
+  margin-top: 14px;
+  border-top: 1px solid #34463f;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+.discovery-excluded button {
+  margin-top: 8px;
+}
+.discovery-error {
+  margin-top: 14px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: #edbaad;
 }
 .monitored-empty {
   padding: 18px 0 4px;
@@ -2897,6 +3015,33 @@ code {
   height: auto;
 }
 @media (max-height: 820px) {
+  .sidebar {
+    padding-top: 16px;
+  }
+  .sidebar-brand {
+    padding-bottom: 14px;
+  }
+  .space-switch {
+    margin-bottom: 12px;
+  }
+  .primary-nav button {
+    min-height: 36px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+  .nav-section-heading {
+    margin-top: 16px;
+  }
+  .sidebar-bottom {
+    padding-top: 10px;
+  }
+  .machine {
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+  .demo-switch {
+    margin-bottom: 6px;
+  }
   .main:has(.map-content) .page-header {
     padding-top: 16px;
   }

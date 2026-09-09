@@ -1,7 +1,9 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import { ArrowUpRight, EyeOff, FolderGit2, LoaderCircle, Plus, Search } from 'lucide-react';
+import { ArrowUpRight, EyeOff, FolderGit2, LoaderCircle, Plus } from 'lucide-react';
 import type { Repository } from '../../domain/types';
 import { shortPath } from '../../domain/branches';
+import { projectMatches } from '../../domain/projects';
+import { ProjectSearch } from './ProjectSearch';
 
 export function MonitoredProjects({
   repositories,
@@ -19,22 +21,21 @@ export function MonitoredProjects({
   const [query, setQuery] = useState('');
   const [limit, setLimit] = useState(8);
   const [busy, setBusy] = useState<string | null>(null);
-  const [notice, setNotice] = useState('');
+  const [removed, setRemoved] = useState<Pick<Repository, 'id' | 'name'> | null>(null);
+  const notice =
+    removed && !repositories.some((repository) => repository.id === removed.id)
+      ? `Stopped monitoring ${removed.name}. Its files, branches, and worktrees stay on your Mac.`
+      : '';
   const heading = useRef<HTMLHeadingElement>(null);
   useLayoutEffect(() => {
     if (notice) heading.current?.focus({ preventScroll: true });
   }, [notice]);
-  const filtered = repositories.filter((repository) =>
-    `${repository.name} ${repository.path}`.toLocaleLowerCase().includes(query.toLocaleLowerCase()),
-  );
+  const filtered = repositories.filter((repository) => projectMatches(repository, query));
   const remove = async (repository: Repository) => {
     if (busy) return;
     setBusy(repository.id);
-    setNotice('');
-    if (await onRemove(repository.id))
-      setNotice(
-        `Stopped monitoring ${repository.name}. Its files, branches, and worktrees stay on your Mac.`,
-      );
+    setRemoved(null);
+    if (await onRemove(repository.id)) setRemoved({ id: repository.id, name: repository.name });
     setBusy(null);
   };
   return (
@@ -56,20 +57,14 @@ export function MonitoredProjects({
           ? 'These projects are fictional. Switch to your workspace to manage real project connections.'
           : 'Stop monitoring a project to remove it from OpenBranches. Its files, branches, and worktrees stay in place. Add it again whenever you need it.'}
       </p>
-      {(repositories.length > 5 || query) && (
-        <label className="monitored-search">
-          <Search size={14} />
-          <input
-            aria-label="Find a monitored project"
-            placeholder="Find a project or folder"
-            value={query}
-            onChange={(event) => {
-              setQuery(event.target.value);
-              setLimit(8);
-            }}
-          />
-        </label>
-      )}
+      <ProjectSearch
+        query={query}
+        label="Find a monitored project"
+        onChange={(value) => {
+          setQuery(value);
+          setLimit(8);
+        }}
+      />
       <div className="monitored-list">
         {filtered.slice(0, limit).map((repository) => (
           <div className="monitored-row" key={repository.id}>

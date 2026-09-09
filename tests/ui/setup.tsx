@@ -3,16 +3,18 @@
 import { createRoot } from 'react-dom/client';
 import { useState } from 'react';
 import { App } from '../../src/ui/App';
-import type { GitStatus, Snapshot } from '../../src/domain/types';
+import type { GitStatus, Snapshot, ProjectDiscoveryState } from '../../src/domain/types';
 import { createDemoSnapshot } from '../../src/data/demo';
 import '../../src/ui/styles.css';
 
+const discoveryFixture = new URLSearchParams(location.search).has('discovery');
 let status: GitStatus = {
   state: 'missing',
   installAvailable: true,
   message:
     'Git reads the branch history in your projects. Apple includes it in a free package called Command Line Tools.',
 };
+if (discoveryFixture) status = { state: 'ready', version: '2.53.0', installAvailable: false };
 let snapshot: Snapshot = {
   repositories: [],
   events: [],
@@ -22,6 +24,63 @@ let snapshot: Snapshot = {
 let failInstaller = false;
 const gitListeners = new Set<(status: GitStatus) => void>();
 const snapshotListeners = new Set<(snapshot: Snapshot) => void>();
+const discoveryListeners = new Set<(state: ProjectDiscoveryState) => void>();
+const excluded = new Set<string>();
+const names = [
+  'Atlas API',
+  'Relay',
+  'Studio',
+  'Café Backend',
+  'Beacon',
+  'Northstar',
+  'Marina',
+  'Orbit',
+  'Lighthouse',
+  'Compass',
+  'Harbor',
+  'Aurora',
+];
+const candidates = names.map((name, index) => ({
+  ...createDemoSnapshot().repositories[0],
+  id: `discovery-fixture-${index}`,
+  name,
+  path: `/fictional/projects/${name}`,
+  branches: [],
+  worktrees: [],
+}));
+let discovery: ProjectDiscoveryState = {
+  enabled: false,
+  scanning: false,
+  projects: discoveryFixture
+    ? candidates.map((repository) => ({
+        id: repository.id,
+        name: repository.name,
+        path: repository.path,
+        source: 'codex',
+        available: true,
+      }))
+    : [],
+  excludedCount: 0,
+  failedCount: 0,
+  pendingCount: 0,
+};
+function refreshDiscovery() {
+  discovery = { ...discovery, excludedCount: excluded.size, checkedAt: new Date().toISOString() };
+  if (discovery.enabled) {
+    const known = new Set(snapshot.repositories.map((repository) => repository.id));
+    snapshot = {
+      ...snapshot,
+      repositories: [
+        ...snapshot.repositories,
+        ...candidates.filter(
+          (repository) => !known.has(repository.id) && !excluded.has(repository.id),
+        ),
+      ],
+    };
+    snapshotListeners.forEach((listener) => listener(snapshot));
+  }
+  discoveryListeners.forEach((listener) => listener(discovery));
+}
 let installCalls = 0;
 let addCalls = 0;
 let guideCalls = 0;
@@ -33,6 +92,19 @@ const subscribe = <T,>(listeners: Set<(value: T) => void>, listener: (value: T) 
   };
 };
 window.openbranches = {
+  getDiscoveredProjects: async () => discovery,
+  followDiscoveredProjects: async (enabled) => {
+    discovery = { ...discovery, enabled };
+    refreshDiscovery();
+  },
+  refreshDiscoveredProjects: async () => {
+    refreshDiscovery();
+  },
+  restoreDiscoveredProjects: async () => {
+    excluded.clear();
+    refreshDiscovery();
+  },
+  onDiscoveredProjects: (listener) => subscribe(discoveryListeners, listener),
   openCodexTask: async () => 'not-linked',
   getReviews: async () => ({ decisions: [] }),
   decideReview: async () => ({ ok: false, state: { decisions: [] } }),
@@ -62,12 +134,14 @@ window.openbranches = {
     return repository;
   },
   removeRepository: async (id) => {
+    excluded.add(id);
     snapshot = {
       ...snapshot,
       repositories: snapshot.repositories.filter((repository) => repository.id !== id),
       events: snapshot.events.filter((event) => event.repositoryId !== id),
     };
     snapshotListeners.forEach((listener) => listener(snapshot));
+    refreshDiscovery();
   },
   refresh: async () => {},
   revealWorktree: async () => {},
@@ -113,40 +187,48 @@ function Fixture() {
           alignItems: 'center',
         }}
       >
-        <strong>Simulated setup</strong>
-        <button
-          onClick={() => change({ state: 'ready', version: '2.53.0', installAvailable: false })}
-        >
-          Finish installation
-        </button>
-        <button
-          onClick={() => {
-            failInstaller = true;
-            change({
-              state: 'missing',
-              installAvailable: true,
-              message: 'Git is missing. Install Apple’s Command Line Tools to get started.',
-            });
-          }}
-        >
-          Installer failure
-        </button>
-        <button
-          onClick={() =>
-            change({
-              state: 'unsupported',
-              version: '2.35.0',
-              installAvailable: false,
-              message:
-                'OpenBranches needs Git 2.36.0 or newer to read worktree paths reliably. Update Git or Apple’s Command Line Tools, then check again.',
-            })
-          }
-        >
-          Old Git
-        </button>
-        <output>
-          Installer: {installCalls} · Folders: {addCalls} · Guide: {guideCalls}
-        </output>
+        <strong>
+          {discoveryFixture
+            ? 'Simulated project discovery · fictional folders only'
+            : 'Simulated setup'}
+        </strong>
+        {!discoveryFixture && (
+          <>
+            <button
+              onClick={() => change({ state: 'ready', version: '2.53.0', installAvailable: false })}
+            >
+              Finish installation
+            </button>
+            <button
+              onClick={() => {
+                failInstaller = true;
+                change({
+                  state: 'missing',
+                  installAvailable: true,
+                  message: 'Git is missing. Install Apple’s Command Line Tools to get started.',
+                });
+              }}
+            >
+              Installer failure
+            </button>
+            <button
+              onClick={() =>
+                change({
+                  state: 'unsupported',
+                  version: '2.35.0',
+                  installAvailable: false,
+                  message:
+                    'OpenBranches needs Git 2.36.0 or newer to read worktree paths reliably. Update Git or Apple’s Command Line Tools, then check again.',
+                })
+              }
+            >
+              Old Git
+            </button>
+            <output>
+              Installer: {installCalls} · Folders: {addCalls} · Guide: {guideCalls}
+            </output>
+          </>
+        )}
       </aside>
     </>
   );

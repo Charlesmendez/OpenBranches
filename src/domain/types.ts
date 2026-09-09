@@ -202,6 +202,11 @@ export interface GitStatus {
   message?: string;
 }
 export interface DesktopApi {
+  getDiscoveredProjects(): Promise<ProjectDiscoveryState>;
+  followDiscoveredProjects(enabled: boolean): Promise<void>;
+  refreshDiscoveredProjects(): Promise<void>;
+  restoreDiscoveredProjects(): Promise<void>;
+  onDiscoveredProjects(callback: (state: ProjectDiscoveryState) => void): () => void;
   getReviews(): Promise<ReviewState>;
   decideReview(command: ReviewCommand): Promise<ReviewResult>;
   resetReviews(repositoryId?: string): Promise<ReviewResult>;
@@ -227,6 +232,25 @@ export interface DesktopApi {
   onCodex(callback: (status: CodexStatus) => void): () => void;
   onGitHub(callback: (status: GitHubStatus) => void): () => void;
   onSnapshot(callback: (snapshot: Snapshot) => void): () => void;
+}
+
+export interface DiscoveredProject {
+  id: string;
+  path: string;
+  name: string;
+  source: 'codex';
+  available: boolean;
+}
+export interface ProjectDiscoveryState {
+  enabled: boolean;
+  scanning: boolean;
+  projects: DiscoveredProject[];
+  excludedCount: number;
+  checkedAt?: string;
+  error?: string;
+  failedCount: number;
+  pendingCount: number;
+  recoveryNeeded?: boolean;
 }
 
 declare global {

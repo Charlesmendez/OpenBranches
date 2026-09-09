@@ -6,9 +6,20 @@ import type {
   GitStatus,
   Snapshot,
   ReviewState,
+  ProjectDiscoveryState,
 } from '../src/domain/types';
 
 const api: DesktopApi = {
+  getDiscoveredProjects: () => ipcRenderer.invoke('discovery:get'),
+  followDiscoveredProjects: (enabled) => ipcRenderer.invoke('discovery:follow', enabled),
+  refreshDiscoveredProjects: () => ipcRenderer.invoke('discovery:refresh'),
+  restoreDiscoveredProjects: () => ipcRenderer.invoke('discovery:restore'),
+  onDiscoveredProjects: (callback) => {
+    const listener = (_event: Electron.IpcRendererEvent, state: ProjectDiscoveryState) =>
+      callback(state);
+    ipcRenderer.on('discovery:updated', listener);
+    return () => ipcRenderer.removeListener('discovery:updated', listener);
+  },
   getReviews: () => ipcRenderer.invoke('reviews:get'),
   decideReview: (command) => ipcRenderer.invoke('reviews:decide', command),
   resetReviews: (repositoryId) => ipcRenderer.invoke('reviews:reset', repositoryId),

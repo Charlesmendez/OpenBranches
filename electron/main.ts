@@ -21,6 +21,7 @@ import { GitHubService } from './github/service';
 import { createTokenVault } from './github/vault';
 import { CodexService } from './codex/service';
 import { openCodexTask } from './codex/openTask';
+import { ProjectDiscoveryService } from './discovery/service';
 import { GitInstallation, GIT_SETUP_GUIDE } from './git/installation';
 import { ReviewService } from './services/reviews';
 import { stopMonitoring } from './services/monitoring';
@@ -41,6 +42,7 @@ let service: RepositoryService;
 let store: AppStore;
 let github: GitHubService | undefined;
 let codex: CodexService | undefined;
+let discovery: ProjectDiscoveryService | undefined;
 let reviews: ReviewService;
 let githubAuth: GitHubAuth;
 let authTimer: ReturnType<typeof setInterval> | undefined;
@@ -141,6 +143,9 @@ app.whenReady().then(() => {
   reviews = new ReviewService(store, snapshot, (state) =>
     window?.webContents.send('reviews:updated', state),
   );
+  discovery = new ProjectDiscoveryService(store, service, (state) =>
+    window?.webContents.send('discovery:updated', state),
+  );
   const githubStatus = () => ({ ...githubAuth.status(), enabled: github!.isEnabled() });
   const pollGitHub = async () => {
     const wasConnected = githubAuth.status().connected;
@@ -157,6 +162,12 @@ app.whenReady().then(() => {
     if (githubAuth.status().device) void pollGitHub();
   }, 5000);
   handle('snapshot:get', snapshot);
+  handle('discovery:get', () => discovery!.state());
+  handle('discovery:follow', (enabled: unknown) =>
+    discovery!.setEnabled(z.boolean().parse(enabled)),
+  );
+  handle('discovery:refresh', () => discovery!.refresh());
+  handle('discovery:restore', () => discovery!.restore());
   handle('reviews:get', () => reviews.currentState());
   handle('reviews:decide', (command: unknown) => reviews.decide(command));
   handle('reviews:reset', (repositoryId: unknown) => reviews.reset(repositoryId));
@@ -185,7 +196,7 @@ app.whenReady().then(() => {
     return repository;
   });
   handle('repository:remove', (id: unknown) => {
-    stopMonitoring(z.string().parse(id), service, github!, codex!, reviews);
+    stopMonitoring(z.string().parse(id), service, github!, codex!, reviews, discovery);
     void github!.refresh();
     void codex!.refresh();
   });
@@ -241,6 +252,7 @@ app.whenReady().then(() => {
     return github!.refresh();
   });
   createWindow();
+  void discovery.refresh();
   // A monochrome template icon adapts to the system menu bar appearance.
   const icon = nativeImage
     .createFromPath(join(__dirname, '../assets/trayTemplate.png'))
@@ -294,6 +306,7 @@ app.on('before-quit', () => {
   if (authTimer) clearInterval(authTimer);
   github?.close();
   codex?.close();
+  discovery?.close();
   service?.close();
   store?.close();
 });

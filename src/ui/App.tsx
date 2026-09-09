@@ -454,13 +454,16 @@ export function App() {
                 title="Every branch has a story."
                 description="Bring your projects together. See where your work lives, what’s ready, and what deserves a second look."
               >
+                <button className="primary-button" onClick={() => setView('settings')}>
+                  Find my Codex projects
+                </button>
                 <button
-                  className="primary-button"
+                  className="secondary-button"
                   onClick={() => void addRepository()}
                   disabled={adding}
                 >
-                  {adding ? <LoaderCircle size={17} className="spin" /> : <Plus size={17} />}Add
-                  your first project
+                  {adding ? <LoaderCircle size={17} className="spin" /> : <Plus size={17} />}Choose
+                  a folder
                 </button>
                 <button className="text-button" onClick={switchMode}>
                   Take a look around first

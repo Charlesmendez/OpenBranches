@@ -6,6 +6,7 @@ import { CodexConnection } from './CodexConnection';
 import { GitSetup } from './GitSetup';
 import type { GitSetupController } from '../hooks/useGit';
 import { MonitoredProjects } from './MonitoredProjects';
+import { ProjectDiscovery } from './ProjectDiscovery';
 
 export function Settings({
   git,
@@ -54,6 +55,7 @@ export function Settings({
     });
   return (
     <div className="settings-content">
+      <ProjectDiscovery key={String(demo)} demo={demo} />
       <MonitoredProjects
         repositories={repositories}
         demo={demo}

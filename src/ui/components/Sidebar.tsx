@@ -11,6 +11,9 @@ import {
   Sparkles,
 } from 'lucide-react';
 import type { Repository, View } from '../../domain/types';
+import { useEffect, useState } from 'react';
+import { projectMatches } from '../../domain/projects';
+import { ProjectSearch } from './ProjectSearch';
 import { Brand } from './Primitives';
 
 interface Props {
@@ -26,6 +29,9 @@ interface Props {
   onMode: () => void;
 }
 export function Sidebar(p: Props) {
+  const [query, setQuery] = useState('');
+  useEffect(() => setQuery(''), [p.demo]);
+  const visible = p.repositories.filter((repository) => projectMatches(repository, query));
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
@@ -72,8 +78,14 @@ export function Sidebar(p: Props) {
           <Plus size={15} />
         </button>
       </div>
+      <div className="sidebar-project-tools">
+        <ProjectSearch query={query} onChange={setQuery} />
+        <button className="text-button" onClick={() => p.onView('settings')}>
+          Manage projects
+        </button>
+      </div>
       <nav className="project-nav" aria-label="Repositories">
-        {p.repositories.map((repo) => (
+        {visible.map((repo) => (
           <button
             key={repo.id}
             className={
@@ -91,6 +103,11 @@ export function Sidebar(p: Props) {
             <span className="project-count">{repo.branches.length}</span>
           </button>
         ))}
+        {!!p.repositories.length && !visible.length && (
+          <p className="project-search-empty" role="status">
+            No projects match.
+          </p>
+        )}
         {!p.repositories.length && (
           <button className="add-empty-project" onClick={p.onAdd}>
             <Plus size={16} />

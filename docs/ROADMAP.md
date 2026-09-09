@@ -1,11 +1,14 @@
 # First release: scope and acceptance
 
-The goal is a polished, simple, open-source Mac desktop app that explains where coding-agent work lives and how it relates to develop/dev/main/master, even across hundreds of branches. This scope must not be reduced to the existing demo or local-only prototype.
+The goal is a polished, simple, open-source Mac desktop app that explains where coding-agent work lives and how it relates to develop/dev/main/master, even across hundreds of branches. The user expanded the scope to automatic projects, multiple coding agents, and company workspaces with GitHub plus opted-in local work. This scope must not be reduced to the existing demo or local-only prototype. See [team workspaces](TEAM_WORKSPACES.md).
 
 ## Product contract
 
 - Electron desktop application for Apple Silicon and Intel, with a signed/notarized drag-to-Applications release.
-- Local Git repositories and their worktrees, plus published GitHub branches and pull requests. Other computers and unpublished cloud tasks are outside v1; the UI must explain this boundary.
+- Local Git repositories and their worktrees, plus published GitHub branches and pull requests. Team workspaces must also include unpublished local work voluntarily shared by teammates' connected devices. Unpublished cloud tasks need an explicit supported source; do not imply they are visible by default.
+- Discover saved coding-tool projects automatically, provide search across all projects, and allow removal with persistent exclusions that prevent automatic re-addition.
+- Support multiple coding tools with evidence-based icons and optional model identity. Codex, Claude Code, Grok integrations, and extensible provider adapters are required; unknown or unsupported sources must be labeled accurately.
+- Add personal/team separation, people/project/agent filters, PR and review alerts, an optional open-source shared service, authenticated device pairing, and explicit project sharing. Verify access isolation, revocation, unsharing, stale sources, and preservation of personal data across at least two real member devices.
 - Dark graphite interface with workspace overview, grouped map, expandable groups, searchable/virtualized inventory, focused inspector, activity, and recommendations. The demo contains fictional data only.
 - Automatic local updates and periodic remote refresh, with source provenance, freshness, partial results, and offline state visible.
 - Optional Codex integration through an installed, signed-in client. Link tasks using explicit evidence; distinguish verified links from possible associations. Core Git inspection must work without Codex or AI.
@@ -40,7 +43,11 @@ The goal is a polished, simple, open-source Mac desktop app that explains where 
 | Signed, notarized release and installation verification                | Pending                                       | Requires public GitHub App registration and Apple release credentials/authorization                                                                |
 | Dependency audit                                                       | Clean at this milestone                       | `npm audit` reports no known vulnerabilities                                                                                                       |
 
+Automatic project discovery, shared project search, and persistent removal exclusions are implemented. Service tests cover rotating imports, late results, restarts, transaction failures, and unreadable preferences; browser checks cover the management flow. The built Mac app detected saved Codex folders and verified native search, with following off. Real bulk-import and wider version checks remain. See [discovery evidence](PROJECT_DISCOVERY.md). Multi-agent attribution, team service/UI, opted-in sharing, and company alerts remain unimplemented.
+
 ## Remaining implementation and release work
+
+The latest requested work is tracked in `docs/TEAM_WORKSPACES.md`: finish and verify automatic project discovery and removal exclusions, multi-agent attribution, and the team service/UI for GitHub plus opted-in local work. These requirements extend the release gate; they do not remove any item below. Historical PR research identified a deleted-remote-branch association gap, but that fix and targeted older-PR lookup have not yet been implemented.
 
 1. Finish source semantics: combined native verification and broader overview presentation of live target comparisons, complete or explicitly bounded PR history, branch-copy counts, detached/missing worktrees, no-standard-target flow, source freshness, and watch/restart behavior. Git detection and guided setup are implemented; the actual Apple installation still needs a clean-Mac test.
 2. Finish interaction details: broader keyboard/VoiceOver and packaged-app checks, useful empty/error states, and broader performance verification. Durable project/view positions, startup recovery, synchronized inventory scrolling, full-list keyboard navigation, and a 1,000-branch browser fixture are implemented. Browser reopen and native process restart checks verify restoration; broader release checks remain. Evidence-bound review choices, accurate attention counts, paginated findings, and atomic monitoring removal are implemented; broader automated UI coverage remains.

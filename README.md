@@ -9,6 +9,7 @@ OpenBranches brings local Git and GitHub into one workspace: a grouped branch ma
 ## What works now
 
 - Add local Git repositories through a native folder picker. Shared worktrees are inspected together.
+- Follow saved Codex projects on this Mac with one setting. Search projects from the sidebar, manage monitored folders in Settings, and keep removed projects excluded from automatic additions. See [discovery and compatibility limits](docs/PROJECT_DISCOVERY.md).
 - Detect Apple and Homebrew Git installations automatically. If Git needs setup, follow the in-app guide, open Apple’s installer explicitly, and explore the demo while it finishes.
 - Browse hundreds of branches in collapsed groups; expand a group into readable pages or search the full inventory with ⌘K.
 - Reopen your last project, selected branch, map position, and inventory filters after a restart. Demo and real workspaces keep separate view histories.
@@ -26,7 +27,9 @@ Repository inspection is read-only. OpenBranches does not fetch into your reposi
 
 ## Installation
 
-The intended release experience is **download the DMG, drag OpenBranches into Applications, open it, choose your projects**. End users will not need Node.js or a terminal. Git 2.36 or newer is required for local inspection. The app detects it and provides a guided setup when needed; see [Mac setup](docs/INSTALLATION.md).
+The intended release experience is **download the DMG, drag OpenBranches into Applications, open it, follow discovered projects or choose a folder**. End users will not need Node.js or a terminal. Git 2.36 or newer is required for local inspection. The app detects it and provides a guided setup when needed; see [Mac setup](docs/INSTALLATION.md).
+
+Multi-agent attribution and team workspaces are part of the planned first release. Team mode will combine GitHub activity with local work that each member explicitly chooses to share through the Mac app and an optional open-source shared service. Claude/Grok attribution, that service, and local sharing are not implemented yet; see [team scope and privacy](docs/TEAM_WORKSPACES.md).
 
 Current installers are **unsigned developer previews**, not normal public releases. Signed and notarized downloads for Apple Silicon and Intel Macs are a release gate. We do not recommend changing macOS security settings to install a preview.
 
