@@ -1,3 +1,4 @@
+import { peoplePosition, type PeoplePosition } from './peopleNavigation';
 import type { Lifecycle, View } from '../domain/types';
 import type { MapPosition, ProjectPosition } from './navigation';
 
@@ -5,13 +6,14 @@ export type WorkspaceMode = 'live' | 'demo';
 export interface WorkspacePosition {
   projectId: string | null;
   view: View;
+  people?: PeoplePosition;
 }
 type StorageAccess = () => Pick<Storage, 'getItem' | 'setItem'>;
 export const NAVIGATION_STORAGE_KEY = 'ob-navigation-v1';
 const MAX_CHARACTERS = 2 * 1024 * 1024;
 const MAX_PROJECTS = 100;
 const lifecycles: Lifecycle[] = ['active', 'integrated', 'quiet', 'unverified'];
-const views: View[] = ['map', 'inventory', 'attention', 'activity', 'settings'];
+const views: View[] = ['map', 'inventory', 'people', 'attention', 'activity', 'settings'];
 const modes: WorkspaceMode[] = ['live', 'demo'];
 const emptyProject = (): ProjectPosition => ({ selectedId: null, group: 'active', maps: {} });
 const emptyWorkspace = (): WorkspacePosition => ({ projectId: null, view: 'map' });
@@ -115,6 +117,7 @@ export class NavigationMemory {
           this.routes[mode] = {
             projectId: id(route.projectId) ?? null,
             view: option(route.view, views, 'map'),
+            ...(route.people === undefined ? {} : { people: peoplePosition(route.people) }),
           };
         const entries = saved.projects[mode];
         if (Array.isArray(entries))
@@ -146,12 +149,21 @@ export class NavigationMemory {
       this.projects[mode].delete(this.projects[mode].keys().next().value!);
     this.changed();
   }
+  people(mode: WorkspaceMode): PeoplePosition {
+    return peoplePosition(this.routes[mode].people);
+  }
+  rememberPeople(mode: WorkspaceMode, value: PeoplePosition): void {
+    const people = peoplePosition(value);
+    if (JSON.stringify(this.routes[mode].people) === JSON.stringify(people)) return;
+    this.routes[mode] = { ...this.routes[mode], people };
+    this.changed();
+  }
   rememberWorkspace(mode: WorkspaceMode, position: WorkspacePosition): void {
     const old = this.routes[mode];
     if (this.mode === mode && old.projectId === position.projectId && old.view === position.view)
       return;
     this.mode = mode;
-    this.routes[mode] = position;
+    this.routes[mode] = { ...position, ...(old.people ? { people: old.people } : {}) };
     const current = position.projectId && this.projects[mode].get(position.projectId);
     if (current && position.projectId) {
       this.projects[mode].delete(position.projectId);

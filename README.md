@@ -16,6 +16,7 @@ OpenBranches brings local Git and GitHub into one workspace: a grouped branch ma
 - See local and remote copies, uncommitted work, integration history, and the evidence behind each result.
 - Watch local changes while the app is running; refresh connected GitHub sources every two minutes.
 - Read public GitHub branches and pull requests without signing in. Private-repository sign-in is implemented using GitHub App device authorization but requires the release app registration.
+- Browse People & PRs across connected GitHub projects. Search authors, requested reviewers, PRs, and recorded tools; filter open work, review requests, quiet drafts, and recent history. Filters survive branch inspection and restarts. See [collaboration scope and evidence](docs/COLLABORATION.md).
 - Review findings about work that may deserve attention. Snooze for seven days or dismiss; choices survive restarts and new evidence brings the finding back. The attention count includes only findings waiting for review.
 - Stop monitoring projects from Settings without changing their files, branches, or worktrees. Their valid cached connection metadata and review choices are removed together.
 - Connect local Codex task history, including archived tasks. Inspect the evidence for each branch association; multiple tasks can belong to a branch. This connection reads saved metadata and does not run AI.

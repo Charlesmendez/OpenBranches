@@ -7,7 +7,7 @@ The renderer has no Node.js access. It talks through a narrow typed preload brid
 - `src/data/demo.ts`: fictional example projects. Real and demo workspaces are separate.
 - `electron/git`: Git installation discovery and explicit Apple setup, read-only Git commands, NUL-delimited parsing, bounded worktree inspection, and a worker client with terminal errors/timeouts. Discovery supplies an absolute executable; inspection clears inherited Git repository/config overrides.
 - `electron/services`: SQLite persistence, repository watching/reconciliation, review decisions, and coordinated project monitoring. A Git failure retains the previous snapshot with an availability error.
-- `electron/github`: fixed-origin HTTP transport, GitHub App device authorization, encrypted credential vault, paginated metadata reading, bounded immutable-SHA comparisons, source enrichment, and refresh scheduling.
+- `electron/github`: fixed-origin HTTP transport, GitHub App device authorization, encrypted credential vault, paginated metadata reading, bounded immutable-SHA comparisons, source enrichment, and refresh scheduling. A separate PR module normalizes authors/review requests, lists open work independently, and retains labeled prior evidence on partial listings.
 - `electron/codex`: executable/version detection, a stdio inspection client with a read-method allowlist, bounded task-index parsing, a wrapper over shared association rules, and a cancellable refresh/cache service.
 - `electron/agents`: shared session associations and a provider-scoped local history service with opt-in state, bounded validation, cancellation, and transactional cache removal. Tool/model display and search share `src/domain/agents.ts`.
 - `electron/claude`: read-only, bounded local Claude session metadata extraction. Retains selected-folder/branch evidence and explicit titles/model IDs; discards transcript content. See [attribution](AGENT_ATTRIBUTION.md).
@@ -28,6 +28,8 @@ GitHub enrichment does not fetch into a repository. Exact local or cached ancest
 Review choices belong to a finding ID and a SHA-256 revision of its branch evidence. Observation timestamps and unrelated target-tip advances are excluded so normal refreshes do not undo choices. Native commands recheck the current finding before writing SQLite; the renderer cannot choose its own expiry time. The demo has an independent store and stable fictional evidence. See [review behavior](REVIEWS.md).
 
 Stopping monitoring prepares the next repository snapshot, GitHub/Codex/local-history/valid review caches, and automatic-discovery exclusion in one SQLite transaction. Services adopt the new memory state and stop watchers only after commit. A failed cache write rolls back every record. Local scans and provider refreshes from the previous monitoring session cannot replace data after removal/re-addition.
+
+The People & PRs view uses a repository-level PR collection independent of branch presence. Shared selectors deduplicate GitHub identities across clones, index branch links, and distinguish authors from requested reviewers. The existing navigation store persists its bounded filters and pages; reusable person/PR components serve the workspace and inspector. See [collaboration](COLLABORATION.md).
 
 ## Process boundaries
 

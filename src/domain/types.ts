@@ -1,6 +1,6 @@
 export type IntegrationState = 'integrated' | 'pending' | 'unknown';
 export type Lifecycle = 'active' | 'integrated' | 'quiet' | 'unverified';
-export type View = 'map' | 'inventory' | 'attention' | 'activity' | 'settings';
+export type View = 'map' | 'inventory' | 'people' | 'attention' | 'activity' | 'settings';
 
 export interface GitRef {
   name: string;
@@ -35,6 +35,27 @@ export interface PullRequest {
   base: string;
   headSha: string;
   updatedAt: string;
+  author?: GitHubActor;
+  requestedReviewers?: GitHubActor[];
+  requestedTeams?: GitHubTeam[];
+}
+export interface GitHubActor {
+  id: string;
+  login: string;
+  kind: 'user' | 'bot' | 'organization' | 'unknown';
+}
+export interface GitHubTeam {
+  id: string;
+  name: string;
+  slug: string;
+}
+export interface GitHubPullRequest extends PullRequest {
+  repository: string;
+  headName: string;
+  headRepository: string | null;
+  observedAt: string;
+  retained?: boolean;
+  sourceError?: string;
 }
 export type CodingTool = 'codex' | 'claude-code' | 'cursor' | 'other' | 'unknown';
 export interface ModelIdentity {
@@ -114,6 +135,8 @@ export interface Repository {
     checkedAt: string;
     partial: boolean;
     error?: string;
+    pulls?: GitHubPullRequest[];
+    openPullsComplete?: boolean;
     history?: { checked: number; total: number; error?: string };
   };
 }

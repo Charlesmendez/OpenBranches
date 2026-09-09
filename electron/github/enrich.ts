@@ -1,4 +1,11 @@
-import type { Branch, GitRef, IntegrationState, Repository } from '../../src/domain/types';
+import type {
+  Branch,
+  GitHubPullRequest,
+  GitRef,
+  IntegrationState,
+  Repository,
+} from '../../src/domain/types';
+import { preferPullEvidence, pullKey } from '../../src/domain/collaboration';
 import { titleFromBranch } from '../../src/domain/branches';
 import type { RemoteSnapshot } from './reader';
 import { historyKey, publishedTargets } from './history';
@@ -122,31 +129,60 @@ export function enrichRepository(repository: Repository, sources: RemoteSnapshot
         }),
         error: source.history?.error,
       };
-      // Open PRs can still be relevant when the local branch has advanced.
-      // Closed/merged PRs are attached only to an exactly matching commit.
-      const related = sources
-        .flatMap((s) => s.pulls)
-        .filter(
-          (pr) =>
-            pr.headRepository.toLowerCase() === source.repository.toLowerCase() &&
-            pr.headName === ref.name &&
-            (pr.state === 'open'
-              ? pr.headSha === ref.sha
-              : pr.headSha === (branch!.local?.sha ?? ref.sha)),
-        )
-        .sort(
-          (a, b) =>
-            Number(b.state === 'open') - Number(a.state === 'open') ||
-            b.updatedAt.localeCompare(a.updatedAt),
-        );
-      branch.pullRequest = related[0];
     }
+  }
+  const indexedPulls = new Map<string, GitHubPullRequest>();
+  for (const source of sources) {
+    for (const pr of source.pulls) {
+      const pull = {
+        ...pr,
+        repository: source.repository,
+        observedAt: pr.observedAt ?? source.checkedAt,
+        sourceError: source.error,
+      };
+      const key = pullKey(pull);
+      if (preferPullEvidence(pull, indexedPulls.get(key))) indexedPulls.set(key, pull);
+    }
+  }
+  const pulls = [...indexedPulls.values()];
+  const byHead = new Map<string, GitHubPullRequest[]>();
+  for (const pull of pulls) {
+    if (!pull.headRepository) continue;
+    const key = pull.headRepository.toLowerCase() + ':' + pull.headName;
+    const related = byHead.get(key) ?? [];
+    related.push(pull);
+    byHead.set(key, related);
+  }
+  // PR metadata survives a deleted remote branch. Assign only when repository,
+  // branch name, and current commit evidence identify the same work.
+  for (const branch of branches) {
+    const remoteName =
+      branch.remote?.remote ?? branch.local?.upstream?.match(/^refs\/remotes\/([^/]+)\//)?.[1];
+    const identities = sources
+      .filter((source) => (remoteName ? source.remoteName === remoteName : source === primary))
+      .map((source) => source.repository.toLowerCase());
+    branch.pullRequest = identities
+      .flatMap((identity) => byHead.get(identity + ':' + branch.name) ?? [])
+      .filter((pr) =>
+        pr.state === 'open'
+          ? [branch.local?.sha, branch.remote?.sha].includes(pr.headSha)
+          : pr.headSha === (branch.local?.sha ?? branch.remote?.sha),
+      )
+      .sort(
+        (a, b) =>
+          Number(b.state === 'open') - Number(a.state === 'open') ||
+          b.updatedAt.localeCompare(a.updatedAt),
+      )[0];
   }
   return {
     ...repository,
     targets,
     branches,
     github: {
+      pulls,
+      openPullsComplete: sources.every(
+        (source) => source.openPullsComplete === true && !source.error,
+      ),
       checkedAt: sources.map((s) => s.checkedAt).sort()[0],
       partial: sources.some((s) => !s.branchesComplete || !s.pullHistoryComplete),
       error: sources.find((s) => s.error)?.error,

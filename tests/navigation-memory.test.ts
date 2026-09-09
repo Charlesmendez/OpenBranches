@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { NavigationMemory, NAVIGATION_STORAGE_KEY } from '../src/ui/navigationMemory';
+import { peoplePosition, updatePeoplePosition } from '../src/ui/peopleNavigation';
 import { initialInventory } from '../src/ui/navigation';
 
 function storage(initial?: string) {
@@ -15,6 +16,45 @@ function storage(initial?: string) {
 afterEach(() => vi.useRealTimers());
 
 describe('saved workspace positions', () => {
+  it('restores people filters across branch navigation and restarts, isolated from the demo', () => {
+    const disk = storage();
+    const memory = new NavigationMemory(() => disk);
+    const position = peoplePosition({
+      query: 'review sharing',
+      person: '20',
+      project: 'example/project',
+      tool: 'claude-code',
+      filter: 'requested',
+      page: 3,
+      peoplePage: 1,
+    });
+    memory.rememberPeople('live', position);
+    memory.rememberWorkspace('live', { projectId: 'branch-project', view: 'inventory' });
+    memory.rememberWorkspace('live', { projectId: null, view: 'people' });
+    memory.flush();
+    const restored = new NavigationMemory(() => disk);
+    expect(restored.workspace('live').view).toBe('people');
+    expect(restored.people('live')).toEqual(position);
+    expect(restored.people('demo').query).toBe('');
+    expect(updatePeoplePosition(position, { person: null })).toMatchObject({
+      page: 0,
+      peoplePage: 1,
+    });
+    expect(updatePeoplePosition(position, { query: 'new search' })).toMatchObject({
+      page: 0,
+      peoplePage: 0,
+    });
+    expect(
+      peoplePosition({
+        page: Infinity,
+        peoplePage: -1,
+        query: 'x'.repeat(3000),
+        filter: 'invalid',
+        tool: 'future-tool',
+      }),
+    ).toMatchObject({ page: 0, peoplePage: 0, query: '', filter: 'open', tool: 'unknown' });
+  });
+
   it('restores the workspace, selection, inventory, and separate map groups after a new instance', () => {
     const disk = storage();
     const first = new NavigationMemory(() => disk);

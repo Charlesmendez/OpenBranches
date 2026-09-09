@@ -1,3 +1,4 @@
+import { withDemoPeople } from './demoPeople';
 import type { Branch, Repository, Snapshot } from '../domain/types';
 import { DAY } from '../domain/branches';
 
@@ -171,18 +172,21 @@ function makeRepository(
           : undefined,
     };
   });
-  return {
-    id,
-    name,
-    path: `/demo/${name}`,
-    commonDir: `/demo/${name}/.git`,
-    branches,
-    targets: targetNames.map((name) => ({ name, sha: 'a'.repeat(40), source: 'github' })),
-    worktrees: branches.flatMap((b) => b.worktrees),
-    remotes: [{ name: 'origin', url: `https://github.com/example/${name}.git` }],
-    scannedAt: new Date(referenceTime).toISOString(),
-    shallow: false,
-  };
+  return withDemoPeople(
+    {
+      id,
+      name,
+      path: `/demo/${name}`,
+      commonDir: `/demo/${name}/.git`,
+      branches,
+      targets: targetNames.map((name) => ({ name, sha: 'a'.repeat(40), source: 'github' })),
+      worktrees: branches.flatMap((b) => b.worktrees),
+      remotes: [{ name: 'origin', url: `https://github.com/example/${name}.git` }],
+      scannedAt: new Date(referenceTime).toISOString(),
+      shallow: false,
+    },
+    referenceTime,
+  );
 }
 export function createDemoSnapshot(referenceTime = now): Snapshot {
   return {

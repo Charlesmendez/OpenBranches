@@ -1,4 +1,5 @@
 import { AgentBadges } from './AgentBadges';
+import { PullPeople } from './PullPeople';
 import { ArrowUpRight, Check, Copy, FolderOpen, GitBranch, Cloud, Laptop, X } from 'lucide-react';
 import type { Branch, Repository } from '../../domain/types';
 import { relativeTime, shortPath } from '../../domain/branches';
@@ -82,6 +83,14 @@ export function Inspector({
         />
       </div>
       <AgentBadges branch={branch} />
+      {branch.pullRequest &&
+      (branch.pullRequest.author ||
+        branch.pullRequest.requestedReviewers?.length ||
+        branch.pullRequest.requestedTeams?.length) ? (
+        <div className="inspector-pr-people">
+          <PullPeople pull={branch.pullRequest} />
+        </div>
+      ) : null}
       <IntegrationEvidence key={`history:${branch.id}`} branch={branch} repository={repository} />
       <section className="inspector-section">
         <h3>Where it lives</h3>

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { GitHubHttp } from './http';
+import { cachedPullSchema, readPulls } from './pulls';
 import { historySchema, readHistory, type HistoryOptions } from './history';
 
 export function githubRepository(remoteUrl: string): string | undefined {
@@ -22,43 +23,13 @@ const branchSchema = z.object({
   name: z.string(),
   commit: z.object({ sha: z.string().regex(/^[a-f\d]{40,64}$/i) }),
 });
-const pullSchema = z.object({
-  number: z.number().int(),
-  title: z.string(),
-  html_url: z.string(),
-  state: z.enum(['open', 'closed']),
-  draft: z.boolean().optional(),
-  merged_at: z.string().nullable(),
-  updated_at: z.string(),
-  base: z.object({ ref: z.string() }),
-  head: z.object({
-    ref: z.string(),
-    sha: z.string(),
-    repo: z.object({ full_name: z.string() }).nullable(),
-  }),
-});
-
 const cachedText = z.string().max(8192);
 export const remoteSnapshotSchema = z.object({
   repository: cachedText,
   remoteName: cachedText,
   branches: z.array(z.object({ name: cachedText, sha: cachedText })).max(5000),
-  pulls: z
-    .array(
-      z.object({
-        number: z.number().int().positive(),
-        title: cachedText,
-        url: cachedText,
-        state: z.enum(['open', 'closed', 'merged']),
-        draft: z.boolean().optional(),
-        base: cachedText,
-        headSha: cachedText,
-        updatedAt: cachedText,
-        headName: cachedText,
-        headRepository: cachedText,
-      }),
-    )
-    .max(300),
+  pulls: z.array(cachedPullSchema).max(5300),
+  openPullsComplete: z.boolean().optional(),
   checkedAt: cachedText,
   branchesComplete: z.boolean(),
   pullHistoryComplete: z.boolean(),
@@ -83,9 +54,7 @@ export async function readRemote(
   };
   const prefix = `/repos/${repository.split('/').map(encodeURIComponent).join('/')}`;
   const branches: RemoteSnapshot['branches'] = [];
-  const pulls: RemoteSnapshot['pulls'] = [];
   let branchesComplete = false;
-  let pullHistoryComplete = false;
   for (let page = 1; page <= 50; page++) {
     assertCurrent();
     const response = await http.get(`${prefix}/branches?per_page=100&page=${page}`);
@@ -100,49 +69,14 @@ export async function readRemote(
       break;
     }
   }
-  for (let page = 1; page <= 3; page++) {
-    assertCurrent();
-    const response = await http.get(
-      `${prefix}/pulls?state=all&sort=updated&direction=desc&per_page=100&page=${page}`,
-    );
-    pulls.push(
-      ...z
-        .array(pullSchema)
-        .parse(response.body)
-        .flatMap((pr) =>
-          pr.head.repo
-            ? [
-                {
-                  number: pr.number,
-                  title: pr.title,
-                  // Construct links from the trusted origin and repository instead of using
-                  // arbitrary URLs in metadata returned by a remote service.
-                  url: `https://github.com/${repository}/pull/${pr.number}`,
-                  state: pr.merged_at ? ('merged' as const) : pr.state,
-                  draft: pr.draft,
-                  base: pr.base.ref,
-                  headSha: pr.head.sha,
-                  updatedAt: pr.updated_at,
-                  headName: pr.head.ref,
-                  headRepository: pr.head.repo.full_name,
-                },
-              ]
-            : [],
-        ),
-    );
-    if (!response.hasNext) {
-      pullHistoryComplete = true;
-      break;
-    }
-  }
+  const pullIndex = await readPulls(http, repository, () => options.isCurrent?.() !== false);
   const history = await readHistory(http, repository, branches, options);
   return {
     repository,
     remoteName,
     branches,
-    pulls,
+    ...pullIndex,
     branchesComplete,
-    pullHistoryComplete,
     checkedAt,
     history,
   };

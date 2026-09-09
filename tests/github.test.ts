@@ -139,6 +139,7 @@ describe('remote evidence', () => {
         }),
       )
       .mockResolvedValueOnce(response([{ name: 'codex/work', commit: { sha: hash } }]))
+      .mockResolvedValueOnce(response([]))
       .mockResolvedValueOnce(
         response([
           {

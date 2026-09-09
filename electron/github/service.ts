@@ -3,6 +3,7 @@ import type { AppStore } from '../services/store';
 import type { GitHubAuth } from './auth';
 import { githubRepository, readRemote, remoteSnapshotSchema, type RemoteSnapshot } from './reader';
 import { enrichRepository } from './enrich';
+import { retainPartialPulls } from './pulls';
 
 export class GitHubService {
   private sources: Record<string, RemoteSnapshot>;
@@ -123,7 +124,7 @@ export class GitHubService {
         });
         if (this.closed || generation !== this.generation) return;
         if (!this.selectedKeys().has(key)) continue;
-        this.sources[key] = fresh;
+        this.sources[key] = retainPartialPulls(fresh, this.sources[key]);
       } catch (error) {
         if (this.closed || generation !== this.generation) return;
         if (!this.selectedKeys().has(key)) continue;

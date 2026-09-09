@@ -9,6 +9,7 @@ import {
   Plus,
   Settings2,
   Sparkles,
+  Users,
 } from 'lucide-react';
 import type { Repository, View } from '../../domain/types';
 import { useEffect, useState } from 'react';
@@ -71,6 +72,13 @@ export function Sidebar(p: Props) {
           <Activity size={17} />
           Activity
         </button>
+        <button
+          className={p.view === 'people' ? 'selected' : ''}
+          onClick={() => p.onView('people')}
+        >
+          <Users size={17} />
+          People &amp; PRs
+        </button>
       </nav>
       <div className="nav-section-heading">
         <span>PROJECTS</span>
@@ -89,7 +97,8 @@ export function Sidebar(p: Props) {
           <button
             key={repo.id}
             className={
-              p.selectedId === repo.id && !['attention', 'activity', 'settings'].includes(p.view)
+              p.selectedId === repo.id &&
+              !['people', 'attention', 'activity', 'settings'].includes(p.view)
                 ? 'selected'
                 : ''
             }

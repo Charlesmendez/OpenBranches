@@ -4,6 +4,8 @@
 
 Public GitHub reading is available in Settings without sign-in. It only reads remotes of repositories you selected; GitHub's unauthenticated rate limits apply. Private repositories require GitHub App authorization.
 
+People & PRs reads authors and requested reviewers/teams from the same selected GitHub repositories. Open PRs and recent closed history are listed separately, with bounded coverage and retained-state labels. No company membership or new write permission is inferred; see [collaboration behavior](COLLABORATION.md).
+
 The inspector separates local and published branch history. GitHub comparisons load incrementally and reuse exact commit evidence. Pending counts and saved snapshot times remain visible; repositories with many uncached commits may need multiple refreshes. See [history checks and their limits](GITHUB_HISTORY.md).
 
 Maintainers must register a public GitHub App before distributing sign-in-enabled builds:

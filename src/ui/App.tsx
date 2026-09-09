@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowUpRight,
   Command,
@@ -34,6 +34,10 @@ import { Attention } from './components/Attention';
 import { SearchDialog } from './components/SearchDialog';
 import { Settings } from './components/Settings';
 import { EmptyState, IconButton } from './components/Primitives';
+
+const People = lazy(() =>
+  import('./components/People').then((module) => ({ default: module.People })),
+);
 
 export function App() {
   const [positions] = useState(() => new NavigationMemory(() => window.localStorage));
@@ -209,27 +213,31 @@ export function App() {
     !snapshot.repositories.length &&
     ['map', 'inventory'].includes(view);
   const title =
-    view === 'settings'
-      ? 'Make yourself at home.'
-      : view === 'attention'
-        ? 'A little less to keep in your head.'
-        : view === 'activity'
-          ? 'The work keeps moving.'
-          : repository
-            ? view === 'inventory'
-              ? 'Find your thread.'
-              : 'Your work, connected.'
-            : 'A pulse on every project.';
+    view === 'people'
+      ? 'The people behind the work.'
+      : view === 'settings'
+        ? 'Make yourself at home.'
+        : view === 'attention'
+          ? 'A little less to keep in your head.'
+          : view === 'activity'
+            ? 'The work keeps moving.'
+            : repository
+              ? view === 'inventory'
+                ? 'Find your thread.'
+                : 'Your work, connected.'
+              : 'A pulse on every project.';
   const subtitle =
-    view === 'settings'
-      ? 'Your connections, your data, your way of working.'
-      : view === 'attention'
-        ? 'Evidence first. A few useful next steps.'
-        : view === 'activity'
-          ? 'A running history of what changed across your projects.'
-          : repository
-            ? `${repository.name}  /  ${repository.branches.length} branch copies`
-            : 'One place to see what’s happening, and what happens next.';
+    view === 'people'
+      ? 'Pull requests and review requests across your connected projects.'
+      : view === 'settings'
+        ? 'Your connections, your data, your way of working.'
+        : view === 'attention'
+          ? 'Evidence first. A few useful next steps.'
+          : view === 'activity'
+            ? 'A running history of what changed across your projects.'
+            : repository
+              ? `${repository.name}  /  ${repository.branches.length} branch copies`
+              : 'One place to see what’s happening, and what happens next.';
   return (
     <div className={`app ${selected && isProjectView ? 'has-inspector' : ''}`}>
       <header className="titlebar">
@@ -289,7 +297,7 @@ export function App() {
         <div className="page-header">
           <div className="breadcrumb">
             <span>Workspace</span>
-            {repository && (
+            {repository && view !== 'people' && (
               <>
                 <span>/</span>
                 <button onClick={() => changeView('map')}>{repository.name}</button>
@@ -359,19 +367,20 @@ export function App() {
               <button onClick={() => setView('settings')}>Set up Git</button>
             </div>
           )}
-        {repository?.error && !gitNeedsSetup && (
+        {repository?.error && !gitNeedsSetup && view !== 'people' && (
           <div className="source-error">
             <span>Source unavailable. Showing the last snapshot.</span>
             <button onClick={() => void refresh()}>Retry</button>
           </div>
         )}
-        {repository?.github?.error && (
+        {repository?.github?.error && view !== 'people' && (
           <div className="source-error">
             <span>{repository.github.error} Showing the last GitHub snapshot.</span>
             <button onClick={() => void refresh()}>Retry</button>
           </div>
         )}
-        {repository?.github?.history &&
+        {view !== 'people' &&
+          repository?.github?.history &&
           repository.github.history.checked < repository.github.history.total &&
           !repository.github.error && (
             <div className="history-progress" role="status">
@@ -412,6 +421,26 @@ export function App() {
               onAdd={() => void addRepository()}
               onLive={switchMode}
             />
+          ) : view === 'people' ? (
+            <Suspense
+              fallback={
+                <EmptyState
+                  icon={LoaderCircle}
+                  title="Opening collaboration"
+                  description="Loading the people view…"
+                />
+              }
+            >
+              <People
+                key={mode}
+                navigation={positions}
+                mode={mode}
+                repositories={snapshot.repositories}
+                demo={mode === 'demo'}
+                onSelect={navigateBranch}
+                onSettings={() => setView('settings')}
+              />
+            </Suspense>
           ) : view === 'attention' ? (
             <Attention
               key={`${mode}:${projectId}`}
