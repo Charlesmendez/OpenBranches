@@ -5,14 +5,17 @@ import type { SharingPreview, TeamConnectionStatus, TeamDesktopApi } from '../..
 import { useAction } from '../hooks/useAction';
 import { ProjectSearch } from './ProjectSearch';
 import { projectMatches } from '../../domain/projects';
+import type { TeamSharingState } from '../../team/publishing';
 export function TeamSharingPreview({
   api,
   connection,
   repositories,
+  sharing,
 }: {
   api: TeamDesktopApi;
   connection: TeamConnectionStatus;
   repositories: Repository[];
+  sharing?: TeamSharingState;
 }) {
   const [query, setQuery] = useState(''),
     [repositoryId, setRepository] = useState(''),
@@ -20,9 +23,20 @@ export function TeamSharingPreview({
     [titles, setTitles] = useState(false),
     [summaries, setSummaries] = useState(false),
     [preview, setPreview] = useState<SharingPreview>();
+  const [approved, setApproved] = useState('');
   const action = useAction();
   const projects = connection.projects?.filter((p) => p.canShare) ?? [];
   const local = repositories.filter((repository) => projectMatches(repository, query));
+  const occupied = (id: string) =>
+    sharing?.shares.some(
+      (s) => s.connectionId === connection.id && s.projectId === id && s.state !== 'stopped',
+    );
+  const visiblePreview =
+    preview &&
+    repositories.some((r) => r.id === preview.repositoryId) &&
+    projects.some((p) => p.id === preview.projectId)
+      ? preview
+      : undefined;
   useEffect(() => {
     setPreview((previous) =>
       previous &&
@@ -104,8 +118,9 @@ export function TeamSharingPreview({
                 <option value={projectId}>Project access changed</option>
               )}
               {projects.map((project) => (
-                <option key={project.id} value={project.id}>
+                <option key={project.id} value={project.id} disabled={occupied(project.id)}>
                   {project.name}
+                  {occupied(project.id) ? ' · already selected for sharing' : ''}
                 </option>
               ))}
             </select>
@@ -152,19 +167,26 @@ export function TeamSharingPreview({
           disabled={
             action.busy ||
             !repositories.some((r) => r.id === repositoryId) ||
-            !projects.some((p) => p.id === projectId)
+            !projects.some((p) => p.id === projectId) ||
+            occupied(projectId)
           }
         >
           <Eye size={15} />
           {action.busy ? 'Preparing…' : 'Preview shared metadata'}
         </button>
       </form>
+      {approved && (
+        <p className="mac-team-sharing-off" role="status">
+          <ShieldCheck size={15} />
+          Sharing approved for {approved}. Follow its upload status in Shared projects below.
+        </p>
+      )}
       {action.error && (
         <p className="connection-error" role="alert">
           {action.error}
         </p>
       )}
-      {preview && (
+      {visiblePreview && preview && (
         <div className="mac-payload-review">
           <div className="mac-preview-title">
             <GitBranch size={19} />
@@ -177,7 +199,7 @@ export function TeamSharingPreview({
                 {new Date(preview.snapshot.observedAt).toLocaleString()}
               </p>
             </div>
-            <span className="pill teal">Preview only</span>
+            <span className="pill teal">Ready for review</span>
           </div>
           {preview.snapshot.sourceError && (
             <p className="connection-error">
@@ -209,9 +231,25 @@ export function TeamSharingPreview({
           </details>
           <p className="mac-team-sharing-off">
             <ShieldCheck size={15} />
-            This preview stays on your Mac. Automatic sharing is not enabled in this development
-            build.
+            Approving keeps this project's branch metadata updated for authorized teammates while
+            OpenBranches runs. Only the task-text choices shown above are included. You can stop
+            sharing at any time.
           </p>
+          <button
+            className="primary-button"
+            disabled={action.busy || occupied(preview.projectId)}
+            onClick={() =>
+              void action.run(async () => {
+                await api.approveTeamSharing(preview.id);
+                setApproved(preview.repositoryName);
+                setPreview(undefined);
+                setProject('');
+              })
+            }
+          >
+            <ShieldCheck size={15} />
+            {action.busy ? 'Saving choice…' : 'Approve and start sharing'}
+          </button>
         </div>
       )}
     </section>

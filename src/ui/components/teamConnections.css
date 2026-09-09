@@ -1,6 +1,68 @@
 .mac-teams {
   overflow: hidden;
 }
+.mac-shared-projects {
+  border-top: 1px solid var(--line);
+  margin-top: 28px;
+  padding-top: 25px;
+}
+.mac-shared-projects .mac-team-heading > svg {
+  color: var(--teal);
+  flex-shrink: 0;
+}
+.mac-shared-projects h3 {
+  margin: 8px 0 0;
+  font-weight: 560;
+}
+.mac-shared-list {
+  display: grid;
+  gap: 12px;
+  margin: 18px 0;
+}
+.mac-shared-project {
+  padding: 19px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.mac-shared-project header {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+.mac-shared-project header > div {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.mac-shared-project h4 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 560;
+  line-height: 1.6;
+}
+.mac-shared-project h4 span {
+  color: var(--faint);
+  padding: 0 7px;
+}
+.mac-shared-project header p {
+  margin: 5px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.mac-sharing-fields {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 15px 0;
+}
+.mac-sharing-fields span {
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  color: var(--muted);
+  font-size: 11px;
+}
 .mac-team-heading {
   display: flex;
   align-items: center;

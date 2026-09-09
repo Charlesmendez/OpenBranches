@@ -34,7 +34,16 @@ export class TeamSharing {
       );
       const epoch = Number(existing.rows[0]?.epoch ?? 0);
       if (epoch !== command.expectedEpoch) throw conflict();
-      if (!existing.rowCount) await projectAccess(client, principal, projectId, true);
+      if (!existing.rowCount && !command.enabled) {
+        // A device may cancel an uncertain first enable after losing project
+        // access. Create only its own empty disabled record, within this tenant,
+        // so a late enable with the old expected epoch cannot restore sharing.
+        const project = await client.query(
+          'SELECT id FROM ob_projects WHERE workspace_id=$1 AND id=$2',
+          [workspaceId, projectId],
+        );
+        if (!project.rowCount) throw denied();
+      }
       const next = epoch + 1;
       const consent = command.enabled
         ? command.consent

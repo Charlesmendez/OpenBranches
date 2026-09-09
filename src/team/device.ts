@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { consentSchema, sequence, teamId, sharedSnapshotSchema } from './protocol';
 import { teamProjectSchema, teamWorkspaceSchema } from './responses';
+import type { TeamPublishingApi } from './publishing';
 export const deviceSecret = z.string().regex(/^obd_[\w-]{43}$/);
 export const pairingResponse = z.strictObject({
   pairingSecret: deviceSecret,
@@ -28,6 +29,13 @@ export const deviceShareSchema = z.strictObject({
   enabled: z.boolean(),
   consent: consentSchema,
   receivedAt: z.iso.datetime().nullable(),
+});
+export const sharingChangedResponse = deviceShareSchema.omit({ receivedAt: true }).extend({
+  revision: z.string().regex(/^\d+$/),
+});
+export const snapshotPublishedResponse = z.strictObject({
+  sequence: sequence.positive(),
+  revision: z.string().regex(/^\d+$/),
 });
 export const companionResponse = z.strictObject({
   workspace: teamWorkspaceSchema,
@@ -75,7 +83,7 @@ export interface TeamConnectionsState {
   allowLoopback: boolean;
   error?: string;
 }
-export interface TeamDesktopApi {
+export interface TeamDesktopApi extends TeamPublishingApi {
   getTeamConnections(): Promise<TeamConnectionsState>;
   connectTeam(input: { origin: string; deviceName: string }): Promise<TeamConnectionsState>;
   refreshTeamConnections(): Promise<TeamConnectionsState>;

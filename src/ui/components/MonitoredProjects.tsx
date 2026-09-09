@@ -24,7 +24,7 @@ export function MonitoredProjects({
   const [removed, setRemoved] = useState<Pick<Repository, 'id' | 'name'> | null>(null);
   const notice =
     removed && !repositories.some((repository) => repository.id === removed.id)
-      ? `Stopped monitoring ${removed.name}. Its files, branches, and worktrees stay on your Mac.`
+      ? `Stopped monitoring ${removed.name}. Its files, branches, and worktrees stay on your Mac. Any team withdrawal is tracked in Shared projects.`
       : '';
   const heading = useRef<HTMLHeadingElement>(null);
   useLayoutEffect(() => {
@@ -55,7 +55,7 @@ export function MonitoredProjects({
       <p className="muted-note">
         {demo
           ? 'These projects are fictional. Switch to your workspace to manage real project connections.'
-          : 'Stop monitoring a project to remove it from OpenBranches. Its files, branches, and worktrees stay in place. Add it again whenever you need it.'}
+          : 'Stop monitoring a project to remove it from OpenBranches and stop its team sharing. Files, branches, and worktrees stay in place. Add it again whenever you need it.'}
       </p>
       <ProjectSearch
         query={query}

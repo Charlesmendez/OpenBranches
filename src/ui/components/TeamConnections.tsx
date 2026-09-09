@@ -12,9 +12,11 @@ import {
 } from 'lucide-react';
 import type { Repository } from '../../domain/types';
 import type { TeamConnectionStatus, TeamDesktopApi } from '../../team/device';
-import { useTeams } from '../hooks/useTeams';
+import { useTeams, useTeamSharing } from '../hooks/useTeams';
 import { useAction } from '../hooks/useAction';
 import { TeamSharingPreview } from './TeamSharingPreview';
+import { SharedProjects } from './SharedProjects';
+import type { TeamSharingState } from '../../team/publishing';
 import './teamConnections.css';
 
 export function TeamConnectionsPanel({
@@ -26,6 +28,7 @@ export function TeamConnectionsPanel({
 }) {
   const api = demo ? undefined : window.openbranches?.teams;
   const { state, error } = useTeams(api);
+  const sharing = useTeamSharing(api);
   const [adding, setAdding] = useState(false),
     [origin, setOrigin] = useState(''),
     [deviceName, setDeviceName] = useState('My Mac');
@@ -112,7 +115,7 @@ export function TeamConnectionsPanel({
             Name for this Mac
             <input
               required
-              maxLength={100}
+              maxLength={80}
               value={deviceName}
               onChange={(event) => setDeviceName(event.target.value)}
             />
@@ -152,9 +155,18 @@ export function TeamConnectionsPanel({
               api={api}
               connection={connection}
               repositories={repositories}
+              sharing={sharing.state}
             />
           ))}
       </div>
+      {api && (
+        <SharedProjects
+          api={api}
+          sharing={sharing.state}
+          connections={state}
+          error={sharing.error}
+        />
+      )}
       {!!state?.connections.length && (
         <p className="muted-note mac-team-footnote">
           <ShieldCheck size={14} />
@@ -169,10 +181,12 @@ function ConnectionCard({
   api,
   connection,
   repositories,
+  sharing,
 }: {
   api: TeamDesktopApi;
   connection: TeamConnectionStatus;
   repositories: Repository[];
+  sharing?: TeamSharingState;
 }) {
   const action = useAction(),
     [copied, setCopied] = useState(false),
@@ -243,7 +257,8 @@ function ConnectionCard({
       {connected && (
         <p className="mac-team-sharing-off">
           <ShieldCheck size={15} />
-          Local sharing is off. Review a project's metadata before sharing becomes available.
+          Only projects you approve are shared. Review the metadata and task-text choices for each
+          project.
         </p>
       )}
       {connection.state === 'removing' && (
@@ -351,7 +366,12 @@ function ConnectionCard({
         </div>
       )}
       {preview && connected && (
-        <TeamSharingPreview api={api} connection={connection} repositories={repositories} />
+        <TeamSharingPreview
+          api={api}
+          connection={connection}
+          repositories={repositories}
+          sharing={sharing}
+        />
       )}
     </article>
   );

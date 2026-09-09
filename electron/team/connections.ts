@@ -46,6 +46,13 @@ const savedState = z.strictObject({
   connections: z.array(savedConnection).max(10),
 });
 type Connection = z.infer<typeof savedConnection>;
+export interface TeamSession {
+  profile: Companion;
+  client: TeamDeviceClient;
+  key(value: string): string;
+  current(): boolean;
+}
+type SharingReview = Omit<SharingPreview, 'snapshot'> & { expectedEpoch: number };
 
 /** Main-process-only connection coordinator. Public state deliberately excludes
  * bearer credentials and HMAC secrets; pairing does not enable publication. */
@@ -60,11 +67,16 @@ export class TeamConnections {
   private closed = false;
   private abort = new AbortController();
   private timer?: ReturnType<typeof setInterval>;
+  private reviews = new Map<string, SharingReview>();
   constructor(
     private vault: SecretVault,
     private snapshot: () => Snapshot,
     private publish: (value: TeamConnectionsState) => void,
-    private options: { allowLoopback?: boolean; request?: typeof fetch } = {},
+    private options: {
+      allowLoopback?: boolean;
+      request?: typeof fetch;
+      onRevoked?: (id: string) => void;
+    } = {},
   ) {
     this.read();
   }
@@ -234,6 +246,7 @@ export class TeamConnections {
           }
         }
         if (this.closed) return;
+        this.options.onRevoked?.(connection.id);
         this.replace(connection.id);
         this.profiles.delete(connection.id);
         this.errors.delete(connection.id);
@@ -307,10 +320,16 @@ export class TeamConnections {
   browserAddress(id: string) {
     return this.get(id).origin + '/';
   }
-  async preview(input: unknown): Promise<SharingPreview> {
-    const command = localPreviewRequest.parse(input);
-    await this.run(command.connectionId, true);
-    const connection = this.get(command.connectionId),
+  connected(id: string) {
+    return (
+      !this.closed &&
+      !this.storageError &&
+      this.connections.some((c) => c.id === id && c.state === 'connected')
+    );
+  }
+  async session(id: string): Promise<TeamSession> {
+    await this.run(id, true);
+    const connection = this.get(id),
       profile = this.profiles.get(connection.id);
     if (
       connection.state !== 'connected' ||
@@ -318,28 +337,60 @@ export class TeamConnections {
       this.errors.has(connection.id) ||
       Date.now() - profile.checkedAt > 60000
     )
-      throw new Error('Refresh the team connection before reviewing sharing.');
-    const project = profile.value.projects.find((p) => p.id === command.projectId && p.canShare);
+      throw new Error(this.errors.get(id) ?? 'Refresh the team connection before continuing.');
+    return {
+      profile: profile.value,
+      client: this.client(connection),
+      key: (value) =>
+        createHmac('sha256', Buffer.from(connection.opaqueSecret, 'hex'))
+          .update(value)
+          .digest('hex'),
+      current: () => this.connected(id),
+    };
+  }
+  async preview(input: unknown): Promise<SharingPreview> {
+    const command = localPreviewRequest.parse(input);
+    const session = await this.session(command.connectionId);
+    const project = session.profile.projects.find((p) => p.id === command.projectId && p.canShare);
     if (!project) throw new Error('This account cannot share into the selected team project.');
     const repository = this.snapshot().repositories.find((r) => r.id === command.repositoryId);
     if (!repository) throw new Error('This local project is no longer monitored.');
-    const snapshot = prepareSharedSnapshot(repository, command.consent, (value) =>
-      createHmac('sha256', Buffer.from(connection.opaqueSecret, 'hex')).update(value).digest('hex'),
-    );
-    return {
+    const remote = session.profile.shares.find((s) => s.projectId === command.projectId);
+    if (!remote && !session.profile.complete.shares)
+      throw new Error(
+        'The team sharing list is incomplete. Refresh before reviewing this project.',
+      );
+    const snapshot = prepareSharedSnapshot(repository, command.consent, session.key);
+    const review = {
       ...command,
       id: randomUUID(),
       expiresAt: Date.now() + 300000,
       repositoryName: repository.name,
       projectName: project.name,
-      teamName: profile.value.workspace.name,
-      snapshot,
+      teamName: session.profile.workspace.name,
     };
+    for (const [id, value] of this.reviews)
+      if (value.expiresAt <= Date.now()) this.reviews.delete(id);
+    if (this.reviews.size >= 10) this.reviews.delete(this.reviews.keys().next().value!);
+    this.reviews.set(review.id, { ...review, expectedEpoch: remote?.epoch ?? 0 });
+    return { ...review, snapshot };
+  }
+  review(id: string): SharingReview {
+    const review = this.reviews.get(teamId.parse(id));
+    if (!review || review.expiresAt <= Date.now() || !this.connected(review.connectionId))
+      throw new Error('Prepare a new metadata preview before enabling sharing.');
+    if (!this.snapshot().repositories.some((r) => r.id === review.repositoryId))
+      throw new Error('This local project is no longer monitored.');
+    return review;
+  }
+  consumeReview(id: string) {
+    this.reviews.delete(id);
   }
   close() {
     this.closed = true;
     this.abort.abort();
     if (this.timer) clearInterval(this.timer);
     this.profiles.clear();
+    this.reviews.clear();
   }
 }

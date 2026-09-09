@@ -31,6 +31,7 @@ import { stopMonitoring } from './services/monitoring';
 import { createSecretVault } from './services/secretVault';
 import { TeamConnections } from './team/connections';
 import { registerTeamHandlers } from './team/ipc';
+import { TeamPublisher } from './team/publisher';
 declare const __GITHUB_APP_CLIENT_ID__: string;
 
 protocol.registerSchemesAsPrivileged([
@@ -50,6 +51,7 @@ let github: GitHubService | undefined;
 let codex: CodexService | undefined;
 let discovery: ProjectDiscoveryService | undefined;
 let teams: TeamConnections | undefined;
+let teamPublisher: TeamPublisher | undefined;
 const localHistories = new Map<string, LocalHistoryService>();
 const refreshHistories = () =>
   Promise.all([...localHistories.values()].map((history) => history.refresh()));
@@ -192,9 +194,15 @@ app.whenReady().then(() => {
     createSecretVault(store, 'team.credentials', safeStorage),
     snapshot,
     (state) => window?.webContents.send('team:updated', state),
-    { allowLoopback: !app.isPackaged },
+    { allowLoopback: !app.isPackaged, onRevoked: (id) => teamPublisher?.confirmedRevocation(id) },
   );
-  registerTeamHandlers(handle, teams, (url) => shell.openExternal(url));
+  teamPublisher = new TeamPublisher(
+    createSecretVault(store, 'team.sharing', safeStorage),
+    teams,
+    snapshot,
+    (state) => window?.webContents.send('team:sharing-updated', state),
+  );
+  registerTeamHandlers(handle, teams, (url) => shell.openExternal(url), teamPublisher);
   handle('agents:enable', (tool: unknown, enabled: unknown) =>
     localHistories
       .get(z.literal('claude-code').parse(tool))!
@@ -235,9 +243,16 @@ app.whenReady().then(() => {
     return repository;
   });
   handle('repository:remove', (id: unknown) => {
-    stopMonitoring(z.string().parse(id), service, github!, codex!, reviews, discovery, [
-      ...localHistories.values(),
-    ]);
+    stopMonitoring(
+      z.string().parse(id),
+      service,
+      github!,
+      codex!,
+      reviews,
+      discovery,
+      [...localHistories.values()],
+      teamPublisher,
+    );
     void github!.refresh();
     void codex!.refresh();
     void refreshHistories();
@@ -299,6 +314,7 @@ app.whenReady().then(() => {
   });
   createWindow();
   teams.start();
+  teamPublisher.start();
   void discovery.refresh();
   void refreshHistories();
   // A monochrome template icon adapts to the system menu bar appearance.
@@ -356,6 +372,7 @@ app.on('before-quit', () => {
   codex?.close();
   discovery?.close();
   teams?.close();
+  teamPublisher?.close();
   for (const history of localHistories.values()) history.close();
   service?.close();
   store?.close();

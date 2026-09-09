@@ -1,57 +1,74 @@
-# Mac team connection and metadata preview
+# Mac team sharing
 
-The Mac app now connects to an optional OpenBranches team service from Settings. It requests a code, opens the selected service in the browser, waits for the signed-in member to approve this Mac, and displays the resulting team/account/device identity. Connecting does not share projects.
+The Mac app connects to an optional OpenBranches team service from Settings. The member approves a device code in the browser, then explicitly selects local projects and team destinations on the Mac. **Pairing alone shares nothing.** Approving the metadata preview enables continuing updates within the selected field choices.
 
-This milestone includes pairing, permission-aware project discovery, a local metadata preview, cancellation, disconnection, and forgetting an unavailable connection. **Background publication is not implemented yet.** The preview is labeled accordingly and never uploads a snapshot. The browser workspace and service remain developer previews; see [team scope](TEAM_WORKSPACES.md).
+Pairing, project approval, publication, upload status, Stop sharing, and disconnection are implemented. Actual Electron/browser checks with fictional data cover automatic commit updates, process restarts, and an unavailable service. These are not two real member devices or real GitHub authorization. Team mode remains a developer preview; see [the full scope](TEAM_WORKSPACES.md).
 
-## Connection and storage
+## Connection and credentials
 
-`electron/team/` owns the connection coordinator, fixed-route HTTP client, origin validation, and narrow IPC handlers. Device credentials and the secret used to derive opaque branch/task keys remain in the main process. The renderer receives only public connection state and sanitized previews.
+The connection coordinator owns pairing, device/account verification, project permissions, and temporary metadata reviews. The fixed-route HTTP client and narrow IPC bridge keep credentials in the main process. The renderer cannot supply a bearer token, arbitrary upload URL, snapshot payload, or replacement approval fields.
 
-`electron/services/secretVault.ts` is shared with the existing GitHub vault. It stores encrypted bytes in the app's SQLite preferences using Electron `safeStorage`; on macOS, the encryption key is protected through Keychain. It does not store plaintext credentials or fall back to plaintext when encryption is unavailable. The GitHub storage key remains unchanged. Unreadable saved team state fails closed and can be retried after unlocking Keychain. Signed-app upgrade and credential migration checks remain release requirements.
+The shared secret vault stores encrypted bytes in SQLite preferences using Electron safeStorage; on macOS, Keychain protects the encryption key. Device credentials, opaque-key secrets, and sharing choices use separate app-owned records. GitHub credentials retain their existing key. There is no plaintext fallback. Signed-app upgrade and credential migration checks remain release requirements.
 
-Users enter the team origin themselves. Packaged builds require HTTPS and reject paths, query strings, account details, and redirects. Explicit loopback HTTP is allowed only for development. Device requests omit browser cookies, have a 15-second timeout, and accept at most 2 MB of validated response JSON. Arbitrary server error bodies are not displayed. Pairing codes expire after ten minutes; manual refresh cannot bypass the server's polling interval.
+Users enter the origin themselves. Packaged builds require HTTPS and reject paths, query strings, account details, and redirects. Loopback HTTP is allowed only in development. Requests omit browser cookies, have a 15-second timeout, and accept at most 2 MB of validated JSON. Arbitrary server error bodies are not displayed. Pairing expires after ten minutes; manual refresh cannot bypass its polling interval.
 
-The service's device-only companion endpoint returns the verified account/device, accessible projects, and that device's sharing state. It does not return other members' snapshots. A response must match the paired workspace, member, and device. Lists expose incomplete coverage.
+The device-only companion endpoint returns the verified account/device, accessible projects, and its own sharing state. Responses must match the paired workspace, member, and device. An absent record is never assumed when the sharing list is incomplete.
 
-## Review before sharing
+## Review and approval
 
-The member searches their monitored local projects, explicitly chooses a team destination, and prepares a preview. Display names never automatically join local and team projects. Task titles and summaries have separate choices, both off initially. Changing either choice or destination clears the preview. Removing the local project or losing project sharing permission also clears it.
+The member searches monitored projects and explicitly chooses a team-issued destination. Display names never join projects automatically. Task titles and summaries have independent choices, both initially off. Changing choices or destinations clears the preview. Removing the local project or losing sharing permission also invalidates the displayed review.
 
-Preview preparation rechecks current service access and the monitored repository, then calls the shared field whitelist in `src/team/prepareSnapshot.ts`. The summary shows branch report counts, observation time, omitted entries, and scan errors, with expandable complete JSON. Branch and task keys are derived from a per-connection HMAC secret; raw local IDs and paths are excluded. Names and commit IDs can still disclose work and are visible for review.
+The shared snapshot preparation module supplies preview and publication with the same field whitelist. The preview shows branch counts, observation time, omitted entries, scan errors, and complete JSON. Per-connection HMAC keys replace raw branch/task IDs. Paths, remote URLs, prompts, source, diffs, commit subjects, and arbitrary evidence are excluded. Branch names and commit IDs can still disclose work and are visible for review.
 
-The displayed preview ID and expiry are not a saved authorization to publish. The future publisher must bind approval to the exact connection, local repository, team project, and text choices, and recheck permissions before sending. No scan or timer currently publishes local metadata.
+The main process retains a short-lived, single-use review of the exact connection, repository, destination, choices, and observed sharing epoch. It does not persist the preview snapshot. Approval accepts only that review ID, rechecks access, expiry, monitoring and epoch, and saves the binding before any enabling request. Later snapshots use the currently monitored repository within those field choices. The UI explicitly explains that approval permits continuing updates.
 
-## Disconnect and recovery
+One device maps at most one local repository into a given team destination. Stop its existing share before replacing that mapping or its text choices. There are at most 200 sharing records across ten connections; stopped records can be removed. Renaming a local or team project updates its label without changing the identity binding.
 
-Disconnect persists the local removal intent before making the remote request. It waits for earlier connection work and retries cancellation if browser approval raced it. A late pairing response cannot restore a locally canceled connection. Offline removal remains pending across restarts until the service acknowledges it. Successful device revocation withdraws that device's shared reports through the existing service transaction.
+## Background publication
 
-An expired or revoked credential becomes unavailable. Forgetting is a separate reviewed action: it removes the saved local connection but cannot guarantee remote withdrawal. The UI directs the member to the team owner if remote removal is still needed. None of these actions modifies Git refs, worktrees, files, or local project monitoring.
+The publisher coordinates reviewed bindings and network work; its separate sharing registry owns persistence and prepared transaction writes. Five-second passes process at most four due projects, rotate fairly, and coalesce concurrent refreshes. A project normally has at least 30 seconds between automatic attempts. Projects in a pass share one fresh companion read per connection. Failures back off to at most five minutes; an explicit status refresh can retry sooner.
+
+Unchanged metadata is not resent for two minutes. New observations or commits can be sent on the next due pass. Observation time remains the scanner's time: a recent upload never makes an old scan look current. The server separately validates freshness, size, choices, permissions, and credentials. The Mac shows the last acknowledged upload and its observation time; the team browser labels outdated reports.
+
+A lost enable reply is reconciled against the expected next consent epoch and identical choices. Upload sequences are reserved before sending and advance beyond both the local reservation and the server's received sequence after interruption. Old requests cannot overwrite newer sequences. A changed or withdrawn share pauses; restoring permission does not automatically re-enable it.
+
+The publisher persists bindings, choices, ordering, content digests, and acknowledgement times. It does not save a queue of snapshot payloads. Each attempt prepares current approved metadata again and rechecks monitoring and connection state after asynchronous work. Closing or disconnecting prevents late responses from starting another upload.
+
+## Stop sharing and removal
+
+Stop sharing first saves the withdrawal intent and cancels in-flight work. Remote withdrawal retries across restarts. Reports may remain visible until acknowledgement, so the Mac explicitly shows Withdrawal pending. A disabled epoch also fences an uncertain first enable that has not reached the service yet; observing an absent share alone would not suffice. A device may create only its own empty withdrawal record for a project in its workspace after losing access. This grants no permission to enable or publish.
+
+If saving Stop sharing fails, this running process pauses uploads and shows that the stop is unsaved. Persistence is retried, and the UI tells the user to keep the app open and retry before restarting. Durable cancellation cannot be promised when the storage write itself failed.
+
+Stopping local monitoring prepares withdrawal for all of that repository's shares in the same SQLite transaction as removal and cache cleanup. Memory, watchers, and publisher cancellation change only after commit. Unreadable sharing choices prevent removal until resolved, so re-adding a project cannot silently revive an approval whose cancellation was never saved. Stop sharing alone keeps local monitoring active. Neither action modifies Git refs, indexes, files, or worktrees.
+
+Disconnecting persists its removal intent before contacting the service and survives approval/cancellation races and outages. Confirmed revocation withdraws device reports and marks its sharing records stopped. Forgetting an unavailable connection or sharing record is a separate reviewed action; it cannot guarantee remote withdrawal. The UI directs the member to the owner for device revocation when needed.
 
 ## Verification
 
-Automated connection checks exercise origin and redirect boundaries, cookie/credential isolation, malformed and oversized responses, identity mismatches, non-JSON authorization failures, polling limits, approval/cancellation races, offline removal restart, storage failure, revoked devices, permission-checked previews, stable opaque keys after restart, and encryption failure without plaintext fallback. The companion database test checks account/device scoping, project permissions, browser denial, and device revocation. Regression suites contain 208 desktop/domain/client tests and 29 team tests at this milestone.
+This milestone has 223 desktop/domain/client tests and 30 PostgreSQL/HTTP team tests, with both builds, type checks, formatting, and diff checks required. Publisher checks cover live/expired/changed reviews, field choices, failed persistence, lost replies, upload order, late cancellation, offline withdrawal, wrong-project acknowledgements, permission restoration without re-enabling, unsaved Stop recovery, atomic removal, corrupt choices, label changes, explicit retry, fair bounded passes, and refresh coalescing. The database test verifies withdrawal after access loss, rejection of a late enable, and tenant isolation.
 
-An actual Electron window and Chrome browser were verified against the isolated fictional team service:
+Actual Electron/Chrome checks with isolated fictional data verified:
 
-- The Mac requested a code; the member inspected the account/team/device and approved that code in the browser.
-- The Mac displayed the paired identity and permitted projects.
-- Selecting the fictional `atlas-api` project and `Atlas Web` destination produced 229 branch reports with both task-text choices off. The complete-preview control was inspected through native accessibility; automated whitelist checks cover the payload fields.
-- The browser continued to show no received report, confirming that pairing and preview did not publish a snapshot.
-- Changing a task-text choice cleared the previous preview.
-- Disconnecting removed the native connection card and changed the browser device to Revoked.
+- Code approval under the expected team/member/device, followed by a 229-branch preview and publication. The browser gained those reports automatically.
+- Branch details under the reporting Mac, separate tools/models, task text absent by default, and titles present with summaries off when selected.
+- Stop sharing changed the Mac to Stopped and removed both the searched branch and its open browser details.
+- A simulated commit updated the browser without manually refreshing publication.
+- A real Electron-process restart preserved the project, credential, choices, opaque branch identity, and upload status. Another simulated commit was published after restart.
+- Pausing the owned service left withdrawal pending. Restarting the Mac while it was paused preserved that intent. Resuming the service completed withdrawal automatically and removed the report.
+- Shared-project search, clearing search, disconnection, and removing a stopped record worked. Temporary app/data directories, the browser tab, and the owned database were cleaned up afterward.
 
-This used fictional repositories, a temporary app identity and data directory, and a disposable PostgreSQL instance. It did not authorize real GitHub accounts, publish personal work, or exercise two physical Macs. It is not the required real two-member/device acceptance test.
+These checks used fictional accounts and repositories on one physical Mac. They did not authorize a real GitHub App, share personal data, or satisfy real two-member/device acceptance. Transactional project removal and revoked-permission recovery have automated evidence; broader native scenarios, accessibility, and load testing remain required.
 
-To reproduce on macOS with Node.js 24, the root/team dependencies, and Docker installed, run these commands in separate terminals:
+## Reproduce the native fixture
 
-```sh
-npm run team:preview
-npm run team:preview:mac
-```
+With macOS, Node.js 24, root/team dependencies, and Docker, run these in separate terminals:
 
-Enter the first command's loopback address in the native window. The native script copies the installed Electron runtime into its own temporary bundle, gives it a distinct development identity, and uses production connection, IPC, and encryption code with fictional repositories. It does not change the installed runtime or the regular app's data. Closing the fixture or stopping its process removes its owned temporary data. The production build excludes the fixture entry points.
+    npm run team:preview
+    npm run team:preview:mac
 
-## Remaining publisher requirements
+Enter the service's printed loopback address in the Mac window. The native fixture uses production connection, publisher, IPC, and encryption code with fictional repositories. Its separate preload adds simulated-commit and real-process-restart controls. The parent launcher retains its private data for requested restarts; closing the fixture or stopping its launcher removes its temporary bundle and data. Installed Electron and the regular app's storage remain unchanged. Fixture entry points are excluded from production bundles.
 
-Implement durable explicit project bindings and review approval; consent epochs and monotonic upload sequences; bounded/coalesced background publication; uncertain-response reconciliation; immediate durable local Stop sharing with offline withdrawal; permission/revocation recovery without automatic re-enabling; and coordination with stopping local monitoring. Verify these through the native UI and the service before enabling publication. GitHub installation/organization ingestion, company alerts, real member/device checks, native accessibility, and signed distribution remain separate release gates.
+## Remaining release gates
+
+Real GitHub authorization and two real member devices, native permission-revocation/project-removal scenarios, broader accessibility and load checks, GitHub installation/organization ingestion, company alerts, deployment upgrades/recovery, and signed distribution remain required. A green fictional flow alone is not a company release.

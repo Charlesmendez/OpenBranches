@@ -56,7 +56,7 @@ try {
     plist,
   ]);
   await build({
-    entryPoints: { main: 'tests/native/team.ts', preload: 'electron/preload.ts' },
+    entryPoints: { main: 'tests/native/team.ts', preload: 'tests/native/preload.ts' },
     outdir: directory,
     outExtension: { '.js': '.cjs' },
     platform: 'node',
@@ -75,18 +75,25 @@ try {
     'Native preview uses fictional repositories and its own temporary storage. Start team:preview separately, then enter its loopback address in the app.\n',
   );
   process.stdout.write('Native fixture application: ' + application + '\n');
-  child = spawn(join(application, 'Contents/MacOS/Electron'), [join(directory, 'main.cjs')], {
-    stdio: 'inherit',
-    env: {
-      ...process.env,
-      OPENBRANCHES_NATIVE_TEAM_FIXTURE: '1',
-      OPENBRANCHES_NATIVE_TEAM_UI: `http://127.0.0.1:${address.port}/tests/ui/team-native.html`,
-    },
-  });
-  process.exitCode = await new Promise((resolve, reject) => {
-    child.once('error', reject);
-    child.once('close', (code) => resolve(code ?? 0));
-  });
+  do {
+    checkRunning();
+    child = spawn(join(application, 'Contents/MacOS/Electron'), [join(directory, 'main.cjs')], {
+      stdio: 'inherit',
+      env: {
+        ...process.env,
+        OPENBRANCHES_NATIVE_TEAM_FIXTURE: '1',
+        OPENBRANCHES_NATIVE_TEAM_UI: `http://127.0.0.1:${address.port}/tests/ui/team-native.html`,
+      },
+    });
+    process.exitCode = await new Promise((resolve, reject) => {
+      child.once('error', reject);
+      child.once('close', (code) => resolve(code ?? 0));
+    });
+    if (process.exitCode === 75 && !stopping)
+      process.stdout.write(
+        'Restarting the fictional Mac process with the same isolated storage.\n',
+      );
+  } while (process.exitCode === 75 && !stopping);
 } catch (error) {
   if (!stopping) throw error;
 } finally {

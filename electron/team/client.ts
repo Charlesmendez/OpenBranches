@@ -1,10 +1,17 @@
 import { z } from 'zod';
-import { teamId, pairingStartSchema } from '../../src/team/protocol';
+import {
+  teamId,
+  pairingStartSchema,
+  sharingChangeSchema,
+  publishSchema,
+} from '../../src/team/protocol';
 import {
   deviceSecret,
   pairingResponse,
   pairingPollResponse,
   companionResponse,
+  sharingChangedResponse,
+  snapshotPublishedResponse,
 } from '../../src/team/device';
 import { readTeamResponse, TeamApiError } from '../../src/team/readResponse';
 import { teamOrigin } from './origin';
@@ -24,10 +31,13 @@ export class TeamDeviceClient {
     schema: z.ZodType<T>,
     method = 'GET',
     value?: unknown,
+    additionalSignal?: AbortSignal,
   ): Promise<T> {
-    const signal = this.options.signal
-      ? AbortSignal.any([this.options.signal, AbortSignal.timeout(15000)])
-      : AbortSignal.timeout(15000);
+    const signal = AbortSignal.any([
+      AbortSignal.timeout(15000),
+      ...(this.options.signal ? [this.options.signal] : []),
+      ...(additionalSignal ? [additionalSignal] : []),
+    ]);
     let response: Response;
     try {
       response = await this.request(new URL(path, this.origin), {
@@ -86,6 +96,42 @@ export class TeamDeviceClient {
     return this.json(
       '/api/workspaces/' + teamId.parse(workspace) + '/companion',
       companionResponse,
+    );
+  }
+  async changeSharing(workspace: string, project: string, input: unknown, signal?: AbortSignal) {
+    const command = sharingChangeSchema.parse(input);
+    const result = await this.json(
+      '/api/workspaces/' + teamId.parse(workspace) + '/shares/' + teamId.parse(project),
+      sharingChangedResponse,
+      'PUT',
+      command,
+      signal,
+    );
+    const consent = command.enabled ? command.consent : { taskTitles: false, taskSummaries: false };
+    if (
+      result.projectId !== project ||
+      result.epoch !== command.expectedEpoch + 1 ||
+      result.sequence !== 0 ||
+      result.enabled !== command.enabled ||
+      result.consent.taskTitles !== consent.taskTitles ||
+      result.consent.taskSummaries !== consent.taskSummaries
+    )
+      throw new Error(
+        'The team did not confirm this project and its sharing choices. Refresh and retry.',
+      );
+    return result;
+  }
+  publishSnapshot(workspace: string, project: string, input: unknown, signal?: AbortSignal) {
+    return this.json(
+      '/api/workspaces/' +
+        teamId.parse(workspace) +
+        '/shares/' +
+        teamId.parse(project) +
+        '/snapshots',
+      snapshotPublishedResponse,
+      'POST',
+      publishSchema.parse(input),
+      signal,
     );
   }
   revoke(workspace: string, device: string) {

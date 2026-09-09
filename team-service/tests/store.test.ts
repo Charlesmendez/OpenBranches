@@ -92,6 +92,41 @@ async function fixture() {
 }
 
 describe('PostgreSQL team authorization and sharing', () => {
+  it('fences a canceled first enable after access removal without permitting a late enable or crossing tenants', async () => {
+    const f = await fixture();
+    const project = await f.store.members.createProject(
+      f.owner,
+      f.workspace.id,
+      'Uncertain first share',
+    );
+    await f.store.members.grant(f.owner, f.workspace.id, project.id, f.memberId, true, true);
+    // The member approved an enable at epoch zero, then stopped before knowing
+    // whether that request reached the service. Access was also removed.
+    await f.store.members.grant(f.owner, f.workspace.id, project.id, f.memberId, false, false);
+    const stopped = await f.store.sharing.change(f.device.credential, f.workspace.id, project.id, {
+      expectedEpoch: 0,
+      enabled: false,
+      consent,
+    });
+    expect(stopped).toMatchObject({ epoch: 1, enabled: false, sequence: 0 });
+    await f.store.members.grant(f.owner, f.workspace.id, project.id, f.memberId, true, true);
+    await expect(
+      f.store.sharing.change(f.device.credential, f.workspace.id, project.id, {
+        expectedEpoch: 0,
+        enabled: true,
+        consent,
+      }),
+    ).rejects.toMatchObject({ status: 409 });
+    expect((await f.store.views.view(f.owner, f.workspace.id)).work).toEqual([]);
+    const other = await fixture();
+    await expect(
+      f.store.sharing.change(f.device.credential, f.workspace.id, other.project.id, {
+        expectedEpoch: 0,
+        enabled: false,
+        consent,
+      }),
+    ).rejects.toMatchObject({ status: 403 });
+  });
   it('gives a companion only its account, device, permitted projects and own sharing settings', async () => {
     const f = await fixture();
     const profile = await f.store.views.companion(f.device.credential, f.workspace.id);

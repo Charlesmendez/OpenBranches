@@ -1,83 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { TeamConnections } from '../electron/team/connections';
 import { TeamDeviceClient } from '../electron/team/client';
 import { teamOrigin } from '../electron/team/origin';
-import { createSecretVault, type SecretVault } from '../electron/services/secretVault';
-import { createDemoSnapshot } from '../src/data/demo';
-import type { Companion } from '../src/team/device';
+import { createSecretVault } from '../electron/services/secretVault';
+import { teamDeviceFixture as fixture } from './helpers/teamDeviceFixture';
 
 afterEach(() => vi.useRealTimers());
-function fixture() {
-  vi.useFakeTimers();
-  const identity = {
-    deviceId: randomUUID(),
-    workspaceId: randomUUID(),
-    memberId: randomUUID(),
-    deviceName: 'Fictional Mac',
-    workspaceName: 'Fictional team',
-    login: 'fictional-member',
-    expiresAt: new Date(Date.now() + 86400000).toISOString(),
-  };
-  const token = 'obd_' + 'x'.repeat(43);
-  const profile: Companion = {
-    workspace: { id: identity.workspaceId, name: identity.workspaceName, revision: '1' },
-    member: { id: identity.memberId, login: identity.login },
-    device: { id: identity.deviceId, name: identity.deviceName, expiresAt: identity.expiresAt },
-    projects: [
-      {
-        id: randomUUID(),
-        name: 'Fictional destination',
-        githubId: null,
-        githubSlug: null,
-        canShare: true,
-      },
-    ],
-    shares: [],
-    complete: { projects: true, shares: true },
-  };
-  let saved: string | undefined;
-  const vault: SecretVault = {
-    read: () => saved,
-    write: (value) => {
-      saved = value;
-    },
-  };
-  const request = vi.fn<typeof fetch>(async (url, options) => {
-    const path = new URL(String(url)).pathname;
-    if (path === '/api/pairings')
-      return Response.json({
-        pairingSecret: token,
-        userCode: 'ABCD-EFGH-JKLM',
-        interval: 5,
-        expiresIn: 600,
-      });
-    expect(options?.headers).toMatchObject({ Authorization: 'Bearer ' + token });
-    if (path.endsWith('/current')) return Response.json({ state: 'paired', ...identity });
-    if (path.endsWith('/companion')) return Response.json(profile);
-    if (path.endsWith('/cancel')) return Response.json({ cancelled: true });
-    if (options?.method === 'DELETE') return Response.json({ revision: '2' });
-    throw new Error('Unexpected fixture request');
-  });
-  const snapshot = createDemoSnapshot();
-  const service = () =>
-    new TeamConnections(
-      vault,
-      () => snapshot,
-      () => {},
-      { request },
-    );
-  const connect = async (connection = service()) => {
-    await connection.begin({
-      origin: 'https://team.example.test',
-      deviceName: identity.deviceName,
-    });
-    vi.setSystemTime(Date.now() + 5000);
-    await connection.refresh(true);
-    return connection;
-  };
-  return { identity, token, profile, vault, request, snapshot, service, connect };
-}
 describe('Mac team connection boundary', () => {
   it('accepts only a selected secure origin, with loopback limited to development', () => {
     expect(teamOrigin(' https://team.example.test/ ')).toBe('https://team.example.test');
