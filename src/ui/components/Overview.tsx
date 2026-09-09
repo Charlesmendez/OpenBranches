@@ -1,0 +1,186 @@
+import {
+  ArrowRight,
+  ArrowUpRight,
+  Check,
+  ChevronRight,
+  FolderGit2,
+  GitBranch,
+  GitCommitHorizontal,
+  GitMerge,
+  Laptop,
+  Plus,
+} from 'lucide-react';
+import type { ActivityEvent, Repository } from '../../domain/types';
+import { featureBranches, groupCounts, relativeTime } from '../../domain/branches';
+
+export function ActivityList({
+  events,
+  repositories,
+  onSelect,
+  limit,
+}: {
+  events: ActivityEvent[];
+  repositories: Repository[];
+  onSelect: (repositoryId: string, branchId?: string) => void;
+  limit?: number;
+}) {
+  if (!events.length)
+    return (
+      <div className="quiet-activity">
+        Changes will appear here as you work. Your first scan establishes the starting point.
+      </div>
+    );
+  return (
+    <div className="activity-list">
+      {events.slice(0, limit).map((event) => {
+        const Icon =
+          event.kind === 'commit'
+            ? GitCommitHorizontal
+            : event.kind === 'integration'
+              ? GitMerge
+              : GitBranch;
+        return (
+          <button
+            key={event.id}
+            className="activity-row"
+            onClick={() => onSelect(event.repositoryId, event.branchId)}
+          >
+            <span className="activity-time">{relativeTime(event.at)}</span>
+            <span className={`activity-icon ${event.kind}`}>
+              <Icon size={17} />
+            </span>
+            <strong>{event.title}</strong>
+            <span className="activity-detail">
+              {event.detail}
+              <i />
+              {repositories.find((r) => r.id === event.repositoryId)?.name}
+            </span>
+            <ChevronRight size={14} />
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+export function Overview({
+  repositories,
+  events,
+  onProject,
+  onActivity,
+  onSelect,
+  onAdd,
+}: {
+  repositories: Repository[];
+  events: ActivityEvent[];
+  onProject: (id: string) => void;
+  onActivity: () => void;
+  onSelect: (repositoryId: string, branchId?: string) => void;
+  onAdd: () => void;
+}) {
+  return (
+    <div className="overview-content">
+      <div className="section-kicker">
+        <span>YOUR PROJECTS</span>
+        <span>
+          {repositories.reduce((sum, r) => sum + r.branches.length, 0)} branches, in one place
+        </span>
+      </div>
+      <div className="project-cards">
+        {repositories.map((repo, index) => {
+          const branches = featureBranches(repo);
+          const counts = groupCounts(branches);
+          const active = branches
+            .filter((b) => b.pullRequest?.state === 'open' || b.worktrees.some((w) => w.dirty))
+            .slice(0, 2);
+          const previews = active.length ? active : branches.slice(0, 2);
+          return (
+            <button
+              key={repo.id}
+              className={`project-card project-tone-${index % 3}`}
+              onClick={() => onProject(repo.id)}
+            >
+              <div className="project-card-head">
+                <span className="project-emblem">
+                  <FolderGit2 size={21} strokeWidth={1.5} />
+                </span>
+                <div>
+                  <h2>{repo.name}</h2>
+                  <span>
+                    {counts.active} active <i /> {repo.branches.length} branch copies
+                  </span>
+                </div>
+                <span className="project-open">
+                  <ArrowUpRight size={17} />
+                </span>
+              </div>
+              <div className="project-route">
+                <div className="route-tasks">
+                  {previews.map((branch) => (
+                    <div key={branch.id} className="route-task">
+                      <span className={branch.pullRequest ? 'violet-dot' : 'teal-dot'} />
+                      <span>{branch.title}</span>
+                      {branch.pullRequest && <small>PR #{branch.pullRequest.number}</small>}
+                    </div>
+                  ))}
+                </div>
+                <div className="route-connector">
+                  <span />
+                  <ArrowRight size={15} />
+                </div>
+                <div className="route-targets">
+                  {repo.targets.slice(0, 2).map((target) => (
+                    <span
+                      key={target.name}
+                      className={`route-target ${target.name === 'master' || target.name === 'main' ? 'stable' : ''}`}
+                    >
+                      <GitBranch size={14} />
+                      {target.name}
+                    </span>
+                  ))}
+                  {!repo.targets.length && <span className="muted-note">No targets detected</span>}
+                </div>
+              </div>
+              <div className="project-card-foot">
+                <span>
+                  <Laptop size={13} />
+                  {repo.error ? 'Source unavailable' : 'Local repository'}
+                </span>
+                <span>
+                  {counts.integrated ? (
+                    <>
+                      <Check size={12} />
+                      {counts.integrated} integrated
+                    </>
+                  ) : (
+                    `${counts.quiet} quiet branches`
+                  )}
+                  <ChevronRight size={13} />
+                </span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+      <section className="activity-shelf">
+        <div className="section-kicker">
+          <span>
+            <i className="status-dot" />
+            JUST CHANGED
+          </span>
+          <button className="text-button" onClick={onActivity}>
+            All activity
+            <ArrowUpRight size={13} />
+          </button>
+        </div>
+        <ActivityList events={events} repositories={repositories} onSelect={onSelect} limit={4} />
+      </section>
+      <div className="overview-note">
+        <span>Your projects stay on your Mac. You choose what to connect.</span>
+        <button className="text-button" onClick={onAdd}>
+          <Plus size={13} />
+          Add a project
+        </button>
+      </div>
+    </div>
+  );
+}

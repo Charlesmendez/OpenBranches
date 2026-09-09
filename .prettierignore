@@ -1,0 +1,9 @@
+node_modules
+out
+dist
+dist-electron
+package-lock.json
+assets
+coverage
+test-results
+playwright-report

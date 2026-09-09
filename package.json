@@ -1,0 +1,60 @@
+{
+  "name": "openbranches",
+  "productName": "OpenBranches",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A local map of branches, worktrees, and the work behind them.",
+  "license": "MIT",
+  "author": "Carlos Mendez",
+  "main": "dist-electron/main.js",
+  "repository": "https://github.com/Charlesmendez/OpenBranches",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:web": "vite --host 127.0.0.1",
+    "build": "tsc --noEmit && node scripts/build.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "package": "npm run build && OPENBRANCHES_SIGN_RELEASE=0 electron-forge package",
+    "make": "npm run build && OPENBRANCHES_SIGN_RELEASE=0 electron-forge make && OPENBRANCHES_SIGN_RELEASE=0 node scripts/make-dmg.mjs",
+    "make:release": "npm run build && OPENBRANCHES_SIGN_RELEASE=1 electron-forge make && OPENBRANCHES_SIGN_RELEASE=1 node scripts/make-dmg.mjs",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "dependencies": {
+    "@xyflow/react": "^12.11.6",
+    "lucide-react": "^1.43.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@electron-forge/cli": "^7.11.2",
+    "@electron-forge/maker-zip": "^7.11.2",
+    "@electron-forge/plugin-fuses": "^7.11.2",
+    "@electron/fuses": "^1.8.0",
+    "@playwright/test": "^1.63.0",
+    "@resvg/resvg-js": "^2.6.2",
+    "@types/node": "^26.5.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "@vitejs/plugin-react": "^6.1.1",
+    "electron": "^44.3.0",
+    "esbuild": "^0.28.2",
+    "extract-zip": "2.0.99",
+    "prettier": "^3.9.6",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.2",
+    "vitest": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=24.14.0 <25"
+  },
+  "overrides": {
+    "tar": "^7.5.22",
+    "tmp": "^0.2.7"
+  },
+  "workspaces": [
+    "vendor/extract-zip"
+  ]
+}
