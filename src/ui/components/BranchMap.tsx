@@ -347,7 +347,6 @@ export function BranchMap({
           panOnScroll
           zoomOnDoubleClick={false}
           colorMode="dark"
-          proOptions={{ hideAttribution: true }}
           onNodeClick={(_event, node) => node.data.activate?.()}
         >
           <Background variant={BackgroundVariant.Dots} color="#30373b" gap={22} size={0.8} />

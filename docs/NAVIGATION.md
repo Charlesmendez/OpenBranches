@@ -27,3 +27,5 @@ Option positions and total counts describe the complete filtered result set. The
 The full demo was checked for cross-project map page/zoom restoration, inventory filter persistence, search navigation, Escape behavior, and inspector focus return. The final viewport remained identical after switching projects. These browser checks do not establish VoiceOver behavior or combined packaged-app verification; those remain release checks, together with durable view positions across restarts.
 
 Reference: [WAI-ARIA listbox pattern](https://www.w3.org/WAI/ARIA/apg/patterns/listbox/).
+
+The map keeps React Flow's default attribution. Its maintainers explain their request in the [attribution documentation](https://reactflow.dev/remove-attribution); hiding it is not part of OpenBranches' default configuration.
