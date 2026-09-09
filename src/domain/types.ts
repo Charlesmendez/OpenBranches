@@ -1,3 +1,5 @@
+import type { PullSignals } from './pullSignals';
+
 export type IntegrationState = 'integrated' | 'pending' | 'unknown';
 export type Lifecycle = 'active' | 'integrated' | 'quiet' | 'unverified';
 export type View = 'map' | 'inventory' | 'people' | 'attention' | 'activity' | 'settings';
@@ -38,6 +40,10 @@ export interface PullRequest {
   author?: GitHubActor;
   requestedReviewers?: GitHubActor[];
   requestedTeams?: GitHubTeam[];
+  signals?: PullSignals;
+  observedAt?: string;
+  retained?: boolean;
+  sourceError?: string;
 }
 export interface GitHubActor {
   id: string;
@@ -54,8 +60,6 @@ export interface GitHubPullRequest extends PullRequest {
   headName: string;
   headRepository: string | null;
   observedAt: string;
-  retained?: boolean;
-  sourceError?: string;
 }
 export type CodingTool = 'codex' | 'claude-code' | 'cursor' | 'other' | 'unknown';
 export interface ModelIdentity {

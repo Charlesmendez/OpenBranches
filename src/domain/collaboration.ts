@@ -1,5 +1,8 @@
 import type { Branch, CodingTool, GitHubActor, GitHubPullRequest, Repository } from './types';
 import { agentSearchText, branchTools } from './agents';
+import { hasFailedChecks } from './pullSignals';
+import { pullSourceStale } from './sourceFreshness';
+export { pullSourceStale } from './sourceFreshness';
 
 export interface PullWork {
   id: string;
@@ -14,7 +17,7 @@ export interface PersonWork {
   requested: number;
   drafts: number;
 }
-export type PullFilter = 'open' | 'requested' | 'quiet-drafts' | 'history';
+export type PullFilter = 'open' | 'requested' | 'failed-checks' | 'quiet-drafts' | 'history';
 export const pullKey = (pull: Pick<GitHubPullRequest, 'repository' | 'number'>) =>
   `${pull.repository.toLowerCase()}#${pull.number}`;
 export const reviewRequested = (pull: GitHubPullRequest) =>
@@ -25,12 +28,6 @@ export const quietDraft = (pull: GitHubPullRequest, now = Date.now()) =>
   !!pull.draft &&
   Number.isFinite(Date.parse(pull.updatedAt)) &&
   now - Date.parse(pull.updatedAt) >= 14 * 86_400_000;
-export const pullSourceStale = (pull: GitHubPullRequest, now = Date.now()) =>
-  !!pull.retained ||
-  !!pull.sourceError ||
-  !Number.isFinite(Date.parse(pull.observedAt)) ||
-  now - Date.parse(pull.observedAt) > 10 * 60_000;
-
 export const preferPullEvidence = (candidate: GitHubPullRequest, current?: GitHubPullRequest) =>
   !current ||
   candidate.observedAt > current.observedAt ||
@@ -39,6 +36,35 @@ export const preferPullEvidence = (candidate: GitHubPullRequest, current?: GitHu
       (!!current.retained === !!candidate.retained &&
         !!current.sourceError &&
         !candidate.sourceError)));
+
+/** PR metadata and check/review reads have independent clocks. A newer PR
+ * listing from another clone must not erase a useful exact-head observation. */
+export function mergePullEvidence(
+  candidate: GitHubPullRequest,
+  current?: GitHubPullRequest,
+): GitHubPullRequest {
+  const preferred = preferPullEvidence(candidate, current) ? candidate : current!;
+  const source = [candidate, current]
+    .filter(
+      (pull): pull is GitHubPullRequest =>
+        !!pull &&
+        pull.signals?.headSha === preferred.headSha &&
+        !!(pull.signals.checks || pull.signals.reviews),
+    )
+    .sort((a, b) => b.signals!.attemptedAt.localeCompare(a.signals!.attemptedAt))[0];
+  if (!source) return preferred;
+  const signals = source.signals!;
+  return {
+    ...preferred,
+    signals: source.sourceError
+      ? {
+          ...signals,
+          checks: signals.checks ? { ...signals.checks, error: source.sourceError } : undefined,
+          reviews: signals.reviews ? { ...signals.reviews, error: source.sourceError } : undefined,
+        }
+      : signals,
+  };
+}
 export const pullInvolvesPerson = (pull: GitHubPullRequest, person: string | null) =>
   person === null ||
   (pull.author?.id ?? 'unknown-author') === person ||
@@ -58,11 +84,10 @@ export function collaborationIndex(repositories: Repository[]): PullWork[] {
     for (const pull of repository.github?.pulls ?? []) {
       const id = pullKey(pull);
       const previous = work.get(id);
-      const preferred = preferPullEvidence(pull, previous?.pull);
       const links = branchLinks.get(pull.url + '#' + pull.number) ?? [];
       work.set(id, {
         id,
-        pull: previous && !preferred ? previous.pull : pull,
+        pull: mergePullEvidence(pull, previous?.pull),
         links: [...(previous?.links ?? []), ...links],
         projects: [...new Set([...(previous?.projects ?? []), repository.name])],
       });
@@ -139,9 +164,11 @@ export function matchingPulls(
         ? pull.state !== 'open'
         : options.filter === 'requested'
           ? reviewRequested(pull)
-          : options.filter === 'quiet-drafts'
-            ? quietDraft(pull, now)
-            : pull.state === 'open';
+          : options.filter === 'failed-checks'
+            ? hasFailedChecks(pull, now) && !pullSourceStale(pull, now)
+            : options.filter === 'quiet-drafts'
+              ? quietDraft(pull, now)
+              : pull.state === 'open';
     return (
       person &&
       filter &&

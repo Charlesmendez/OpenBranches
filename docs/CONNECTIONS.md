@@ -11,7 +11,7 @@ The inspector separates local and published branch history. GitHub comparisons l
 Maintainers must register a public GitHub App before distributing sign-in-enabled builds:
 
 - Enable device flow.
-- Request repository Metadata (read), Contents (read), and Pull requests (read). Do not grant write permissions.
+- Request repository Metadata (read), Contents (read), Pull requests (read), Checks (read), and Commit statuses (read). Do not grant write permissions. The two check-related permissions are required for [PR check evidence](PR_SIGNALS.md); unavailable access is labeled in the app.
 - Keep expiring user tokens enabled.
 - A webhook server is not needed for periodic desktop refresh; disable webhook delivery if none is configured.
 - Users choose the repositories that the app installation can access.

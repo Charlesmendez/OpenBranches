@@ -4,6 +4,7 @@ import type { GitHubAuth } from './auth';
 import { githubRepository, readRemote, remoteSnapshotSchema, type RemoteSnapshot } from './reader';
 import { enrichRepository } from './enrich';
 import { retainPartialPulls } from './pulls';
+import { limitSignalCache } from './signals';
 
 export class GitHubService {
   private sources: Record<string, RemoteSnapshot>;
@@ -26,7 +27,8 @@ export class GitHubService {
     if (cached && typeof cached === 'object' && !Array.isArray(cached)) {
       for (const [key, value] of Object.entries(cached)) {
         const parsed = remoteSnapshotSchema.safeParse(value);
-        if (parsed.success) this.sources[key] = parsed.data;
+        if (parsed.success)
+          this.sources[key] = { ...parsed.data, pulls: limitSignalCache(parsed.data.pulls) };
       }
     }
     this.enabled = store.read<boolean>('github.enabled', false) === true;
@@ -105,6 +107,7 @@ export class GitHubService {
     );
     const offset = this.refreshOffset++ % Math.max(1, sources.length);
     const budget = { remaining: 12, milliseconds: 30_000 };
+    const signalsBudget = { remaining: 6, milliseconds: 20_000 };
     for (const { repository, remote } of [...sources.slice(offset), ...sources.slice(0, offset)]) {
       if (this.closed || !this.enabled || generation !== this.generation) return;
       const slug = githubRepository(remote.url);
@@ -114,6 +117,8 @@ export class GitHubService {
         if (!this.selectedKeys().has(key)) continue;
         const fresh = await this.read(this.auth.http, slug, remote.name, {
           previous: this.sources[key]?.history,
+          previousPulls: this.sources[key]?.pulls,
+          signalsBudget,
           local: repository,
           budget,
           isCurrent: () =>
@@ -124,7 +129,8 @@ export class GitHubService {
         });
         if (this.closed || generation !== this.generation) return;
         if (!this.selectedKeys().has(key)) continue;
-        this.sources[key] = retainPartialPulls(fresh, this.sources[key]);
+        const retained = retainPartialPulls(fresh, this.sources[key]);
+        this.sources[key] = { ...retained, pulls: limitSignalCache(retained.pulls) };
       } catch (error) {
         if (this.closed || generation !== this.generation) return;
         if (!this.selectedKeys().has(key)) continue;

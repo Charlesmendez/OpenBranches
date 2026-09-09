@@ -1,4 +1,5 @@
 import type { GitHubActor, GitHubPullRequest, Repository } from '../domain/types';
+import { demoSignals } from './demoSignals';
 
 // Entirely fictional. These records exercise a shared GitHub view; no membership
 // or local sharing is inferred from the demo's author/reviewer records.
@@ -40,6 +41,7 @@ export function withDemoPeople(repository: Repository, now: number): Repository 
       draft: index === 3,
       updatedAt:
         index === 3 ? new Date(now - 18 * 86_400_000).toISOString() : branch.pullRequest.updatedAt,
+      signals: demoSignals(branch.pullRequest.headSha, index, person(seed + index + 2), now),
     };
     pulls.push(pull);
     return { ...branch, pullRequest: pull };
@@ -74,6 +76,12 @@ export function withDemoPeople(repository: Repository, now: number): Repository 
       author: person(seed + index),
       requestedReviewers: index < 7 && index % 2 === 0 ? [person(seed + index + 1)] : [],
       requestedTeams: [],
+      signals: demoSignals(
+        (index + 1).toString(16).padStart(40, '0'),
+        index,
+        person(seed + index + 1),
+        now,
+      ),
     });
   }
   return {

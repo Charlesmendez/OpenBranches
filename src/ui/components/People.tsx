@@ -12,6 +12,7 @@ import {
   type PullFilter,
 } from '../../domain/collaboration';
 import { toolNames } from '../../domain/agents';
+import { hasFailedChecks } from '../../domain/pullSignals';
 import { PersonAvatar } from './PullPeople';
 import { PeoplePullCard } from './PeoplePullCard';
 import './people.css';
@@ -36,6 +37,10 @@ export function People({
   const work = useMemo(() => collaborationIndex(repositories), [repositories]);
   const { position, update } = usePeoplePosition(navigation, mode);
   const { query, person, project, tool, filter, page, peoplePage } = position;
+  const observedNow = demo
+    ? work.reduce((latest, { pull }) => Math.max(latest, Date.parse(pull.observedAt) || 0), 0) +
+      60_000
+    : Date.now();
   const setQuery = (query: string) => update({ query });
   const setPerson = (person: string | null) => update({ person });
   const setProject = (project: string) => update({ project });
@@ -44,13 +49,18 @@ export function People({
   const setPage = (page: number) => update({ page });
   const setPeoplePage = (peoplePage: number) => update({ peoplePage });
   const scoped = useMemo(
-    () => matchingPulls(work, { query, person: null, project, tool, filter }),
-    [work, query, project, tool, filter],
+    () => matchingPulls(work, { query, person: null, project, tool, filter }, observedNow),
+    [work, query, project, tool, filter, observedNow],
   );
   const people = useMemo(() => peopleFor(scoped), [scoped]);
   const matches = useMemo(
-    () => matchingPulls(scoped, { query: '', person, project: 'all', tool: 'all', filter }),
-    [scoped, person, filter],
+    () =>
+      matchingPulls(
+        scoped,
+        { query: '', person, project: 'all', tool: 'all', filter },
+        observedNow,
+      ),
+    [scoped, person, filter, observedNow],
   );
   useEffect(() => {
     if (person && !people.some((item) => item.id === person)) setPerson(null);
@@ -87,6 +97,14 @@ export function People({
       label: 'Review requested',
       count: work.filter(({ pull }) => reviewRequested(pull)).length,
       hint: 'People or teams requested',
+    },
+    {
+      key: 'failed-checks',
+      label: 'Checks need attention',
+      count: work.filter(
+        ({ pull }) => hasFailedChecks(pull, observedNow) && !pullSourceStale(pull, observedNow),
+      ).length,
+      hint: 'Reported on the PR commit',
     },
     {
       key: 'quiet-drafts',
@@ -182,6 +200,12 @@ export function People({
       {filter === 'history' && (
         <p className="people-history-note">
           Recent history is a bounded snapshot. Older closed or merged PRs may not appear.
+        </p>
+      )}
+      {filter === 'failed-checks' && (
+        <p className="people-history-note">
+          Only recent failures on the observed PR commit appear here. Unread, partial, and outdated
+          sources can contain more. These results do not determine whether a PR can merge.
         </p>
       )}
       <div className="people-layout">

@@ -20,7 +20,7 @@ export function peoplePosition(value: unknown): PeoplePosition {
     typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 100000
       ? Math.floor(value)
       : 0;
-  const filters: PullFilter[] = ['open', 'requested', 'quiet-drafts', 'history'];
+  const filters: PullFilter[] = ['open', 'requested', 'failed-checks', 'quiet-drafts', 'history'];
   return {
     query: text(data.query, ''),
     person:

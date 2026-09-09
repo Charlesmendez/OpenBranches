@@ -5,6 +5,7 @@ import { pullSourceStale, quietDraft, type PullWork } from '../../domain/collabo
 import { relativeTime } from '../../domain/branches';
 import { AgentBadges } from './AgentBadges';
 import { PullPeople } from './PullPeople';
+import { PullSignals } from './PullSignals';
 export function PeoplePullCard({
   work,
   demo,
@@ -95,6 +96,16 @@ export function PeoplePullCard({
           </button>
         </div>
       </div>
+      {(pull.state === 'open' || pull.signals) && (
+        <PullSignals
+          headSha={pull.headSha}
+          signals={pull.signals}
+          demo={demo}
+          demoNow={Date.parse(pull.observedAt) + 60_000}
+          open={pull.state === 'open'}
+          unavailable={stale}
+        />
+      )}
       {pull.retained && (
         <p className="muted-note">
           Not seen in the latest partial listing. This is its last recorded PR state.

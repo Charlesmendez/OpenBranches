@@ -4,9 +4,13 @@ import { ArrowUpRight, Check, Copy, FolderOpen, GitBranch, Cloud, Laptop, X } fr
 import type { Branch, Repository } from '../../domain/types';
 import { relativeTime, shortPath } from '../../domain/branches';
 import { BranchStatus, IconButton } from './Primitives';
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { TaskDetails } from './TaskDetails';
 import { IntegrationEvidence } from './IntegrationEvidence';
+import { pullSourceStale } from '../../domain/sourceFreshness';
+const PullSignals = lazy(() =>
+  import('./PullSignals').then((module) => ({ default: module.PullSignals })),
+);
 
 export function Inspector({
   branch,
@@ -91,6 +95,24 @@ export function Inspector({
           <PullPeople pull={branch.pullRequest} />
         </div>
       ) : null}
+      {branch.pullRequest?.signals && (
+        <Suspense fallback={<p className="muted-note">Loading PR evidence…</p>}>
+          <PullSignals
+            headSha={branch.pullRequest.headSha}
+            signals={branch.pullRequest.signals}
+            demo={demo}
+            demoNow={Date.parse(repository.github?.checkedAt ?? '') + 60_000}
+            open={branch.pullRequest.state === 'open'}
+            unavailable={
+              !!repository.github?.error ||
+              pullSourceStale({
+                ...branch.pullRequest,
+                observedAt: branch.pullRequest.observedAt ?? repository.github?.checkedAt ?? '',
+              })
+            }
+          />
+        </Suspense>
+      )}
       <IntegrationEvidence key={`history:${branch.id}`} branch={branch} repository={repository} />
       <section className="inspector-section">
         <h3>Where it lives</h3>

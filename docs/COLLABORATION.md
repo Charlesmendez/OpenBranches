@@ -4,7 +4,7 @@ The Mac app now includes **People & PRs**, using GitHub metadata from connected 
 
 Search covers people, repository/project names, PR numbers and titles, branch names, requested teams, and recorded tool/model evidence. Project and tool filters combine with a person selection. Open PRs, requested reviews, quiet drafts, and recent history have separate views. Quiet drafts are open drafts with no recorded PR update for at least 14 days; this suggests a check-in, not abandonment. People pages contain at most eight entries; PR pages contain at most twelve cards. Branch inspection preserves the selected person, filters, and page, including across restarts. Real and demo navigation preferences remain separate.
 
-PR cards show their author, requested reviewers, branch/base, state, observation time, and related coding-tool evidence. Inspect branch is available only for a recorded association. PRs without a matching local branch still appear and can be opened on GitHub. The branch inspector also shows explicit PR authorship and review requests. Demo actions remain fictional.
+PR cards show their author, requested reviewers, branch/base, state, observation time, and related coding-tool evidence. Inspect branch is available only for a recorded association. PRs without a matching local branch still appear and can be opened on GitHub. The branch inspector also shows explicit PR authorship and review requests. Expandable check results, submitted reviews, and the Checks need attention filter are implemented with separate observation times and exact-commit evidence; see [PR signal behavior and limits](PR_SIGNALS.md). Demo actions remain fictional.
 
 ## GitHub source
 
@@ -35,4 +35,4 @@ The full suite passed **164 tests across 17 files**, with successful type checki
 
 This feature does not connect members' devices or upload local work. The authenticated company workspace, member/project permissions, device pairing, sharing preview, opt-in unpublished work, revocation/unsharing, and real two-member/device verification remain required. Company membership and PR authorship are separate data sources.
 
-CI/check results, submitted review decisions, company alerts integrated with snooze/dismiss, additional coding-tool ingestion, targeted historical PR lookup, broader performance/accessibility/native tests, and self-hosted service installation also remain. Review-request counts do not claim approval status or merge readiness. See [the team contract](TEAM_WORKSPACES.md) and [full release scope](ROADMAP.md).
+Company alerts integrated with snooze/dismiss, additional coding-tool ingestion, targeted historical PR lookup, broader performance/accessibility/native tests, and self-hosted service installation also remain. Review-request counts and recorded check/review results do not claim current approval status or merge readiness. See [the team contract](TEAM_WORKSPACES.md) and [full release scope](ROADMAP.md).

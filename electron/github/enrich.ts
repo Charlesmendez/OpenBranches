@@ -5,7 +5,7 @@ import type {
   IntegrationState,
   Repository,
 } from '../../src/domain/types';
-import { preferPullEvidence, pullKey } from '../../src/domain/collaboration';
+import { mergePullEvidence, pullKey } from '../../src/domain/collaboration';
 import { titleFromBranch } from '../../src/domain/branches';
 import type { RemoteSnapshot } from './reader';
 import { historyKey, publishedTargets } from './history';
@@ -141,7 +141,7 @@ export function enrichRepository(repository: Repository, sources: RemoteSnapshot
         sourceError: source.error,
       };
       const key = pullKey(pull);
-      if (preferPullEvidence(pull, indexedPulls.get(key))) indexedPulls.set(key, pull);
+      indexedPulls.set(key, mergePullEvidence(pull, indexedPulls.get(key)));
     }
   }
   const pulls = [...indexedPulls.values()];

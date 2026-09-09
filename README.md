@@ -75,6 +75,8 @@ Artifacts are written under `out/`. This command explicitly disables signing and
 
 Set `GITHUB_APP_CLIENT_ID` when building to enable GitHub App device sign-in. The client ID is public; no GitHub client secret is bundled. See [connection setup](docs/CONNECTIONS.md).
 
+PR cards now include expandable check results and submitted reviews, with a filter for recently reported failures. These are observed results rather than merge-readiness decisions; [coverage, refresh limits, and verification](docs/PR_SIGNALS.md) are documented.
+
 ## Contributing
 
 The integration branch is `develop`. Start one focused branch from the updated integration branch and open a pull request back to it. Keep Git inspection read-only, separate local and remote evidence, and test changes that could misclassify work or expose credentials.

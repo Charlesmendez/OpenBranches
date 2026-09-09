@@ -2,6 +2,13 @@ import { z } from 'zod';
 import type { GitHubHttp } from './http';
 import { cachedPullSchema, readPulls } from './pulls';
 import { historySchema, readHistory, type HistoryOptions } from './history';
+import { readPullSignals, type SignalsBudget } from './signals';
+import type { CachedPull } from './pulls';
+
+export interface RemoteOptions extends HistoryOptions {
+  previousPulls?: CachedPull[];
+  signalsBudget?: SignalsBudget;
+}
 
 export function githubRepository(remoteUrl: string): string | undefined {
   const scp = /^(?:git@)?github\.com:([^/]+\/[^/]+?)\/?$/.exec(remoteUrl);
@@ -44,7 +51,7 @@ export async function readRemote(
   http: GitHubHttp,
   repository: string,
   remoteName: string,
-  options: HistoryOptions = {},
+  options: RemoteOptions = {},
 ): Promise<RemoteSnapshot> {
   // A multi-page snapshot is observed over an interval, not atomically. Use
   // its earliest observation so slow comparisons never make old refs look new.
@@ -70,6 +77,15 @@ export async function readRemote(
     }
   }
   const pullIndex = await readPulls(http, repository, () => options.isCurrent?.() !== false);
+  if (options.signalsBudget)
+    pullIndex.pulls = await readPullSignals(
+      http,
+      repository,
+      pullIndex.pulls,
+      options.previousPulls ?? [],
+      options.signalsBudget,
+      () => options.isCurrent?.() !== false,
+    );
   const history = await readHistory(http, repository, branches, options);
   return {
     repository,

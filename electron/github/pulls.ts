@@ -1,18 +1,10 @@
 import { z } from 'zod';
 import type { GitHubHttp } from './http';
 import type { RemoteSnapshot } from './reader';
+import { actorSchema, parseActor, sourceActorSchema } from './actors';
+import { pullSignalsSchema } from './signalsSchema';
 
 const text = z.string().max(8192);
-const sourceActor = z.object({
-  id: z.number().int().positive().safe(),
-  login: z.string().min(1).max(200),
-  type: z.string().max(100).optional(),
-});
-export const actorSchema = z.object({
-  id: z.string().min(1).max(100),
-  login: z.string().min(1).max(200),
-  kind: z.enum(['user', 'bot', 'organization', 'unknown']),
-});
 export const teamSchema = z.object({ id: z.string().min(1).max(100), name: text, slug: text });
 const pullSchema = z.object({
   number: z.number().int().positive().safe(),
@@ -21,8 +13,8 @@ const pullSchema = z.object({
   draft: z.boolean().optional(),
   merged_at: z.string().nullable(),
   updated_at: text,
-  user: sourceActor.nullish(),
-  requested_reviewers: z.array(sourceActor).max(100).optional(),
+  user: sourceActorSchema.nullish(),
+  requested_reviewers: z.array(sourceActorSchema).max(100).optional(),
   requested_teams: z
     .array(z.object({ id: z.number().int().positive().safe(), name: text, slug: text }))
     .max(100)
@@ -50,20 +42,9 @@ export const cachedPullSchema = z.object({
   author: actorSchema.optional(),
   requestedReviewers: z.array(actorSchema).max(100).optional(),
   requestedTeams: z.array(teamSchema).max(100).optional(),
+  signals: pullSignalsSchema.optional(),
 });
 export type CachedPull = z.infer<typeof cachedPullSchema>;
-const actor = (value: z.infer<typeof sourceActor>): z.infer<typeof actorSchema> => ({
-  id: String(value.id),
-  login: value.login,
-  kind:
-    value.type === 'User'
-      ? 'user'
-      : value.type === 'Bot'
-        ? 'bot'
-        : value.type === 'Organization'
-          ? 'organization'
-          : 'unknown',
-});
 export function parsePulls(body: unknown, repository: string): CachedPull[] {
   return z
     .array(pullSchema)
@@ -80,8 +61,10 @@ export function parsePulls(body: unknown, repository: string): CachedPull[] {
       headName: pr.head.ref,
       headRepository: pr.head.repo?.full_name ?? null,
       updatedAt: pr.updated_at,
-      ...(pr.user ? { author: actor(pr.user) } : {}),
-      ...(pr.requested_reviewers ? { requestedReviewers: pr.requested_reviewers.map(actor) } : {}),
+      ...(pr.user ? { author: parseActor(pr.user) } : {}),
+      ...(pr.requested_reviewers
+        ? { requestedReviewers: pr.requested_reviewers.map(parseActor) }
+        : {}),
       ...(pr.requested_teams
         ? {
             requestedTeams: pr.requested_teams.map((team) => ({

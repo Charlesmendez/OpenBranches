@@ -98,9 +98,9 @@ export function Settings({
             <h3>GitHub</h3>
             <p>
               {github.connected
-                ? `Connected as ${github.login}. Reading branches and pull requests from your selected projects.`
+                ? `Connected as ${github.login}. Reading branches, PRs, reviews, and checks from your selected projects.`
                 : github.enabled
-                  ? 'Reading public branches and pull requests. Sign in to include private repositories.'
+                  ? 'Reading public branches, PRs, reviews, and checks. Sign in to include private repositories.'
                   : 'See published branches and pull requests alongside work on your Mac.'}
             </p>
           </div>
@@ -213,7 +213,8 @@ export function Settings({
             <h3>Source freshness</h3>
             <p>
               Local changes are watched while the app is running. Connected GitHub sources refresh
-              every two minutes. Without a connection, remote references reflect the last fetch you
+              every two minutes. Reviews and checks load in bounded batches and can take longer in
+              larger workspaces. Without a connection, remote references reflect the last fetch you
               made in Git.
             </p>
           </div>
