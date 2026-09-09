@@ -17,29 +17,29 @@ The goal is a polished, simple, open-source Mac desktop app that explains where 
 
 ## Current evidence
 
-| Capability                                                             | State                                        | Evidence                                                                                 |
-| ---------------------------------------------------------------------- | -------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| Local refs, shared worktrees, dirty state, independent target ancestry | Implemented                                  | `tests/scanner.test.ts`; real OpenBranches repository added through native folder picker |
-| Preserve refs, index, and working files; avoid executing clean filters | Implemented and tested                       | Read-only and configured-filter fixtures                                                 |
-| Grouped map, pagination, inventory, inspector, search, activity, demo  | Implemented; refinement ongoing              | Browser and packaged-app visual checks; full automated UI coverage remains               |
-| Changed remote tips never inherit old ancestry                         | Implemented and tested                       | `tests/github.test.ts`                                                                   |
-| Public GitHub branches and PRs                                         | Implemented and live verified                | Packaged app read origin/develop and showed fresh GitHub provenance                      |
-| Device authorization, encrypted token storage, refresh/backoff         | Implemented; actual authorization unverified | Protocol tests pass; needs registered public GitHub App                                  |
-| GitHub comparison for commits absent locally, historical PR lookup     | Incomplete                                   | Unknown ancestry is preserved rather than guessed                                        |
-| Deterministic recommendations                                          | Implemented; persistence refinement needed   | Domain tests; snoozing/dismissal currently in renderer storage                           |
-| Codex task discovery and verified associations                         | Not implemented                              | CLI detection only                                                                       |
-| Codex-powered AI and all usage/privacy bounds                          | Not implemented                              | Settings clearly state analysis is not enabled                                           |
-| Automatic Git prerequisite onboarding                                  | Not implemented                              | Git required currently                                                                   |
-| Apple Silicon unsigned packaging                                       | Built and launched                           | Local `npm run make`; packaged app opens and scans                                       |
-| Intel packaging and native validation                                  | Pending                                      | No Intel runtime verification yet                                                        |
-| Signed, notarized release and installation verification                | Pending                                      | Requires public GitHub App registration and Apple release credentials/authorization      |
-| Dependency audit                                                       | Clean at this milestone                      | `npm audit` reports no known vulnerabilities                                             |
+| Capability                                                             | State                                          | Evidence                                                                                                     |
+| ---------------------------------------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Local refs, shared worktrees, dirty state, independent target ancestry | Implemented                                    | `tests/scanner.test.ts`; real OpenBranches repository added through native folder picker                     |
+| Preserve refs, index, and working files; avoid executing clean filters | Implemented and tested                         | Read-only and configured-filter fixtures                                                                     |
+| Grouped map, pagination, inventory, inspector, search, activity, demo  | Implemented; refinement ongoing                | Browser and packaged-app visual checks; full automated UI coverage remains                                   |
+| Changed remote tips never inherit old ancestry                         | Implemented and tested                         | `tests/github.test.ts`                                                                                       |
+| Public GitHub branches and PRs                                         | Implemented and live verified                  | Packaged app read origin/develop and showed fresh GitHub provenance                                          |
+| Device authorization, encrypted token storage, refresh/backoff         | Implemented; actual authorization unverified   | Protocol tests pass; needs registered public GitHub App                                                      |
+| GitHub comparison for commits absent locally, historical PR lookup     | Incomplete                                     | Unknown ancestry is preserved rather than guessed                                                            |
+| Deterministic recommendations                                          | Implemented; persistence refinement needed     | Domain tests; snoozing/dismissal currently in renderer storage                                               |
+| Codex task discovery and verified associations                         | Implemented; task opening and summaries remain | Protocol, evidence, cancellation and 1,000-branch fixtures; live local index and desktop connection verified |
+| Codex-powered AI and all usage/privacy bounds                          | Not implemented                                | Settings clearly state analysis is not enabled                                                               |
+| Automatic Git prerequisite onboarding                                  | Not implemented                                | Git required currently                                                                                       |
+| Apple Silicon unsigned packaging                                       | Built and launched                             | Local `npm run make`; packaged app opens and scans                                                           |
+| Intel packaging and native validation                                  | Pending                                        | No Intel runtime verification yet                                                                            |
+| Signed, notarized release and installation verification                | Pending                                        | Requires public GitHub App registration and Apple release credentials/authorization                          |
+| Dependency audit                                                       | Clean at this milestone                        | `npm audit` reports no known vulnerabilities                                                                 |
 
 ## Remaining implementation and release work
 
 1. Finish source semantics: live target comparisons, complete or explicitly bounded PR history, branch-copy counts, detached/missing worktrees, no-standard-target flow, Git availability, source freshness, and watch/restart behavior.
 2. Finish interaction details: recommendation decisions tied to evidence revisions, accurate attention counts, monitoring removal, keyboard/focus behavior, map selection persistence, inventory horizontal scrolling, useful empty/error states, and 1,000+ branch performance.
-3. Implement the Codex app-server adapter with supported-version detection, authentication status, read-only task/history discovery, exact association rules, summaries, and open-task action.
+3. Finish the Codex connection: account status for optional AI, accessible summaries, a verified open-task action, useful handling of missing task titles/metadata, and wider supported-version testing. Read-only index discovery, version gating, multiple task associations, provenance, pagination bounds, and disconnect behavior are implemented.
 4. Implement the optional advisor with strict tool restrictions, bounded sanitized metadata, explicit diff permission, account/rate limits, budgets, structured validated output, grounded findings, snooze/dismissal, and failure/offline behavior. Verify that no repository-changing or external-action tools can run.
 5. Add relevant service, UI, restart, and packaged integration checks; review correctness/security against this full contract.
 6. Build and verify both Mac architectures. Complete signing/notarization, privacy and connection documentation, accessible onboarding, CI, third-party notices, and a reproducible public release.

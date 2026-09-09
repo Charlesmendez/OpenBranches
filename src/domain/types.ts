@@ -42,6 +42,10 @@ export interface TaskLink {
   status: 'active' | 'idle' | 'unknown';
   association: 'verified' | 'possible';
   summary?: string;
+  archived?: boolean;
+  updatedAt?: string;
+  checkedAt?: string;
+  evidence?: string[];
 }
 export interface Branch {
   id: string;
@@ -55,7 +59,7 @@ export interface Branch {
   integration: Record<string, IntegrationState>;
   remoteIntegration?: Record<string, IntegrationState>;
   pullRequest?: PullRequest;
-  task?: TaskLink;
+  tasks?: TaskLink[];
   codexNamed: boolean;
   detached: boolean;
 }
@@ -112,8 +116,18 @@ export interface GitHubStatus {
   error?: string;
   device?: { code: string; verificationUrl: string; expiresAt: number };
 }
+export interface CodexStatus {
+  installed: boolean;
+  enabled: boolean;
+  version?: string;
+  state: 'not-connected' | 'connecting' | 'ready' | 'unavailable' | 'error';
+  checkedAt?: string;
+  partial?: boolean;
+  taskCount?: number;
+  error?: string;
+}
 export interface ProviderStatus {
-  codex: { installed: boolean; version?: string; state: 'not-connected' | 'ready' | 'unavailable' };
+  codex: CodexStatus;
   github: GitHubStatus;
 }
 export interface DesktopApi {
@@ -128,6 +142,9 @@ export interface DesktopApi {
   pollGitHub(): Promise<GitHubStatus>;
   disconnectGitHub(): Promise<void>;
   enablePublicGitHub(): Promise<void>;
+  connectCodex(): Promise<void>;
+  disconnectCodex(): Promise<void>;
+  onCodex(callback: (status: CodexStatus) => void): () => void;
   onGitHub(callback: (status: GitHubStatus) => void): () => void;
   onSnapshot(callback: (snapshot: Snapshot) => void): () => void;
 }

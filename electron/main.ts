@@ -12,8 +12,6 @@ import {
 } from 'electron';
 import { join, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 import { access } from 'node:fs/promises';
 import { z } from 'zod';
 import { AppStore } from './services/store';
@@ -21,6 +19,7 @@ import { RepositoryService } from './services/repositories';
 import { GitHubAuth } from './github/auth';
 import { GitHubService } from './github/service';
 import { createTokenVault } from './github/vault';
+import { CodexService } from './codex/service';
 declare const __GITHUB_APP_CLIENT_ID__: string;
 
 protocol.registerSchemesAsPrivileged([
@@ -31,13 +30,13 @@ protocol.registerSchemesAsPrivileged([
 ]);
 const ownsLock = app.requestSingleInstanceLock();
 if (!ownsLock) app.quit();
-const exec = promisify(execFile);
 let window: BrowserWindow | null = null;
 let tray: Tray | undefined;
 let quitting = false;
 let service: RepositoryService;
 let store: AppStore;
 let github: GitHubService | undefined;
+let codex: CodexService | undefined;
 let githubAuth: GitHubAuth;
 let authTimer: ReturnType<typeof setInterval> | undefined;
 const devUrl = !app.isPackaged ? process.env.OPENBRANCHES_DEV_URL : undefined;
@@ -116,15 +115,23 @@ app.whenReady().then(() => {
     }
   });
   store = new AppStore(app.getPath('userData'));
+  const snapshot = () => {
+    const source = github?.enrich(service.current()) ?? service.current();
+    return codex?.enrich(source) ?? source;
+  };
   const publish = () => {
-    window?.webContents.send(
-      'snapshot:updated',
-      github?.enrich(service.current()) ?? service.current(),
-    );
+    window?.webContents.send('snapshot:updated', snapshot());
+    if (codex) window?.webContents.send('codex:updated', codex.status());
   };
   service = new RepositoryService(store, publish);
   githubAuth = new GitHubAuth(__GITHUB_APP_CLIENT_ID__, createTokenVault(store));
   github = new GitHubService(store, githubAuth, () => service.current(), publish);
+  codex = new CodexService(
+    store,
+    join(app.getPath('userData'), 'codex-inspection'),
+    () => github!.enrich(service.current()),
+    publish,
+  );
   const githubStatus = () => ({ ...githubAuth.status(), enabled: github!.isEnabled() });
   const pollGitHub = async () => {
     const wasConnected = githubAuth.status().connected;
@@ -140,10 +147,11 @@ app.whenReady().then(() => {
   authTimer = setInterval(() => {
     if (githubAuth.status().device) void pollGitHub();
   }, 5000);
-  handle('snapshot:get', () => github!.enrich(service.current()));
-  handle('snapshot:refresh', () =>
-    Promise.all([service.refresh(), github!.refresh()]).then(() => undefined),
-  );
+  handle('snapshot:get', snapshot);
+  handle('snapshot:refresh', async () => {
+    await service.refresh();
+    await Promise.all([github!.refresh(), codex!.refresh()]);
+  });
   handle('repository:add', async () => {
     const result = await dialog.showOpenDialog(window!, {
       title: 'Choose a Git repository',
@@ -152,9 +160,13 @@ app.whenReady().then(() => {
     if (result.canceled) return null;
     const repository = await service.add(result.filePaths[0]);
     void github!.refresh();
+    void codex!.refresh();
     return repository;
   });
-  handle('repository:remove', (id: unknown) => service.remove(z.string().parse(id)));
+  handle('repository:remove', (id: unknown) => {
+    service.remove(z.string().parse(id));
+    codex!.forgetUnselected();
+  });
   handle('worktree:reveal', async (id: unknown, branchId: unknown) => {
     const repository = service.current().repositories.find((r) => r.id === z.string().parse(id));
     if (!repository) throw new Error('Repository not found');
@@ -179,16 +191,11 @@ app.whenReady().then(() => {
     return shell.openExternal(url.toString());
   });
   handle('providers:status', async () => {
-    try {
-      const { stdout } = await exec('codex', ['--version'], { timeout: 3000 });
-      return {
-        codex: { installed: true, version: stdout.trim(), state: 'not-connected' },
-        github: githubStatus(),
-      };
-    } catch {
-      return { codex: { installed: false, state: 'unavailable' }, github: githubStatus() };
-    }
+    await codex!.detect();
+    return { codex: codex!.status(), github: githubStatus() };
   });
+  handle('codex:connect', () => codex!.connect());
+  handle('codex:disconnect', () => codex!.disconnect());
   handle('github:connect', async () => {
     await githubAuth.begin();
     return githubStatus();
@@ -246,6 +253,7 @@ app.whenReady().then(() => {
   );
   void service.refresh();
   void github.refresh();
+  void codex.refresh();
 });
 app.on('activate', () => {
   if (!window) createWindow();
@@ -256,6 +264,7 @@ app.on('before-quit', () => {
   quitting = true;
   if (authTimer) clearInterval(authTimer);
   github?.close();
+  codex?.close();
   service?.close();
   store?.close();
 });

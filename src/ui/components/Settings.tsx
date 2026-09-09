@@ -1,16 +1,8 @@
 import { useEffect, useState } from 'react';
-import {
-  ArrowUpRight,
-  Check,
-  Cloud,
-  Copy,
-  Laptop,
-  LoaderCircle,
-  ShieldCheck,
-  Sparkles,
-} from 'lucide-react';
+import { ArrowUpRight, Check, Cloud, Copy, Laptop, LoaderCircle, ShieldCheck } from 'lucide-react';
 import type { GitHubStatus } from '../../domain/types';
 import { useProviders } from '../hooks/useProviders';
+import { CodexConnection } from './CodexConnection';
 
 export function Settings() {
   const providers = useProviders();
@@ -155,22 +147,7 @@ export function Settings() {
             {error || github.error}
           </p>
         )}
-        <div className="settings-row">
-          <span className="settings-icon">
-            <Sparkles size={20} />
-          </span>
-          <div>
-            <h3>Codex</h3>
-            <p>
-              {providers.codex.installed
-                ? `${providers.codex.version} detected. AI analysis is not enabled.`
-                : 'Optional recommendations through an installed Codex client.'}
-            </p>
-          </div>
-          <span className="pill neutral">
-            {providers.codex.installed ? 'Detected' : 'Not connected'}
-          </span>
-        </div>
+        <CodexConnection status={providers.codex} />
       </section>
       <section className="settings-section">
         <div className="section-kicker">

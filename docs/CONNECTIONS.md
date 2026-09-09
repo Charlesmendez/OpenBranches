@@ -21,7 +21,19 @@ References: [GitHub device authorization](https://docs.github.com/en/apps/creati
 
 ## Codex
 
-Currently detected but not connected. The planned integration uses the installed Codex app-server and existing sign-in, not a bundled API key. Task discovery, AI recommendations, explicit diff consent, strict tool restrictions, and usage limits remain release work. See the roadmap.
+Connect **Codex tasks** in Settings to read saved task metadata from the installed Codex app-server. Version 0.144.4 is the oldest verified protocol; older, prerelease, and unknown major versions are not accepted. Discovery checks standard Mac installation locations and the inherited executable path. It does not require a separate API key or initiate sign-in.
+
+The inspection client uses a private stdio connection and only allows initialization, task listing, and account inspection. Discovery invokes task listing only, includes current and archived sources, and uses `useStateDbOnly` to avoid scanning and repairing conversation logs. It never starts or resumes a thread, starts a model turn, changes Codex settings, or approves a server-initiated action. Hooks, apps, plugins, shell tools, and multi-agent execution are disabled for this inspection process. These controls are specific to inspection; the AI advisor needs a separately verified execution boundary before it can be enabled.
+
+The local index is checked once per minute, with a 60-second pagination window, 15-second request timeouts, at most 5,000 current and 5,000 archived entries, and bounded protocol messages. The UI labels incomplete results. Initial prompts, conversation bodies, rollout paths, and runtime status are discarded. Origin URLs are reduced to GitHub repository identity, removing credentials and query strings. Only metadata associated with selected projects is retained in OpenBranches' local database.
+
+A verified saved link requires a matching repository/worktree path, branch name, and local or remote commit. A matching GitHub origin and branch in a missing or different worktree, or a changed commit, produces a possible association. Detached worktrees require the same path and commit. Branch names alone never prove a link. Multiple tasks can appear on one branch, including archived tasks; the inspector explains each match.
+
+Saved metadata is historical evidence, not proof that Codex is currently running or owns the branch now. Tasks without sufficient saved metadata may not appear. A separate inspection process cannot establish live activity in another Codex window. Unpublished cloud work and other computers are outside this local connection.
+
+Disconnect stops inspection and clears OpenBranches' task cache; it does not sign the user out of Codex or change their conversations. Opening an actual task, accessible task summaries, AI recommendations, explicit diff consent, advisor tool restrictions, and usage limits remain release work. See the roadmap.
+
+Protocol reference: [official Codex app-server documentation](https://learn.chatgpt.com/docs/app-server).
 
 ## Apple release signing
 

@@ -40,8 +40,8 @@ export function Inventory({
       .filter(
         (branch) =>
           (!needle ||
-            [branch.name, branch.title, branch.task?.title].some((v) =>
-              v?.toLowerCase().includes(needle),
+            [branch.name, branch.title, ...(branch.tasks?.map((task) => task.title) ?? [])].some(
+              (v) => v?.toLowerCase().includes(needle),
             )) &&
           (location === 'all' ||
             (location === 'local' && (branch.local || branch.detached)) ||

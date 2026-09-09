@@ -3,7 +3,7 @@ import type { ProviderStatus } from '../../domain/types';
 
 export function useProviders() {
   const [status, setStatus] = useState<ProviderStatus>({
-    codex: { installed: false, state: 'unavailable' },
+    codex: { installed: false, enabled: false, state: 'not-connected' },
     github: { configured: false, connected: false },
   });
   useEffect(() => {
@@ -17,9 +17,11 @@ export function useProviders() {
       })
       .catch(() => {});
     const off = api.onGitHub((github) => setStatus((previous) => ({ ...previous, github })));
+    const offCodex = api.onCodex((codex) => setStatus((previous) => ({ ...previous, codex })));
     return () => {
       mounted = false;
       off();
+      offCodex();
     };
   }, []);
   return status;

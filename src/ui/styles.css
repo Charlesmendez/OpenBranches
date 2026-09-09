@@ -1581,6 +1581,38 @@ code {
   gap: 11px;
   color: #95b8be;
 }
+.task-list {
+  display: grid;
+  gap: 18px;
+}
+.task-detail > svg {
+  flex-shrink: 0;
+}
+.task-detail > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.task-evidence {
+  margin-top: 9px;
+  font-size: 10px;
+  line-height: 1.6;
+  color: #829da5;
+}
+.task-evidence summary {
+  cursor: pointer;
+  color: #a3bebd;
+}
+.task-evidence ul {
+  padding-left: 14px;
+}
+.task-evidence p {
+  margin-top: 8px;
+}
+.codex-connection-detail {
+  display: grid;
+  justify-items: start;
+  gap: 9px;
+}
 .task-detail svg {
   color: #789bab;
   margin-top: 2px;

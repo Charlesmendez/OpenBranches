@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { DesktopApi, GitHubStatus, Snapshot } from '../src/domain/types';
+import type { CodexStatus, DesktopApi, GitHubStatus, Snapshot } from '../src/domain/types';
 
 const api: DesktopApi = {
   getSnapshot: () => ipcRenderer.invoke('snapshot:get'),
@@ -13,6 +13,13 @@ const api: DesktopApi = {
   pollGitHub: () => ipcRenderer.invoke('github:poll'),
   disconnectGitHub: () => ipcRenderer.invoke('github:disconnect'),
   enablePublicGitHub: () => ipcRenderer.invoke('github:public'),
+  connectCodex: () => ipcRenderer.invoke('codex:connect'),
+  disconnectCodex: () => ipcRenderer.invoke('codex:disconnect'),
+  onCodex: (callback) => {
+    const listener = (_event: Electron.IpcRendererEvent, status: CodexStatus) => callback(status);
+    ipcRenderer.on('codex:updated', listener);
+    return () => ipcRenderer.removeListener('codex:updated', listener);
+  },
   onGitHub: (callback) => {
     const listener = (_event: Electron.IpcRendererEvent, status: GitHubStatus) => callback(status);
     ipcRenderer.on('github:updated', listener);

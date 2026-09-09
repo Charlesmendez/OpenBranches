@@ -100,15 +100,58 @@ function makeRepository(
               updatedAt,
             }
           : undefined,
-      task:
+      tasks:
         i < active
-          ? {
-              id: `demo-task-${id}-${i}`,
-              title: `Improve ${title.toLowerCase()}`,
-              status: i === 0 ? 'active' : 'idle',
-              association: 'verified',
-              summary: `Implement and verify ${title.toLowerCase()}.`,
-            }
+          ? [
+              {
+                id: `demo-task-${id}-${i}`,
+                title: `Improve ${title.toLowerCase()}`,
+                status: i === 0 ? 'active' : 'idle',
+                association: 'verified',
+                summary: `Implement and verify ${title.toLowerCase()}.`,
+                updatedAt,
+                checkedAt: new Date().toISOString(),
+                evidence: [
+                  'Saved task folder belongs to this repository.',
+                  'Saved branch name and local commit match.',
+                ],
+              },
+              ...(i === 0
+                ? [
+                    {
+                      id: `demo-review-${id}`,
+                      title: `Review ${title.toLowerCase()}`,
+                      status: 'unknown' as const,
+                      association: 'verified' as const,
+                      updatedAt,
+                      evidence: ['Saved branch and commit match this local worktree.'],
+                    },
+                    {
+                      id: `demo-investigate-${id}`,
+                      title: `Investigate ${title.toLowerCase()}`,
+                      status: 'unknown' as const,
+                      association: 'possible' as const,
+                      archived: true,
+                      updatedAt,
+                      evidence: [
+                        'Saved branch name matches.',
+                        'The saved commit predates the current branch tip.',
+                      ],
+                    },
+                    {
+                      id: `demo-followup-${id}`,
+                      title: `Follow up on ${title.toLowerCase()}`,
+                      status: 'unknown' as const,
+                      association: 'possible' as const,
+                      updatedAt,
+                      evidence: [
+                        'Saved repository and branch name match.',
+                        'The saved worktree is no longer available.',
+                      ],
+                    },
+                  ]
+                : []),
+            ]
           : undefined,
     };
   });

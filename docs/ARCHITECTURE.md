@@ -8,6 +8,7 @@ The renderer has no Node.js access. It talks through a narrow typed preload brid
 - `electron/git`: read-only Git commands, NUL-delimited parsing, bounded worktree inspection, and a worker client with terminal errors/timeouts.
 - `electron/services`: SQLite persistence and repository watching/reconciliation. A Git failure retains the previous snapshot with an availability error.
 - `electron/github`: fixed-origin HTTP transport, GitHub App device authorization, encrypted credential vault, paginated metadata reading, source enrichment, and refresh scheduling.
+- `electron/codex`: executable/version detection, a stdio inspection client with a read-method allowlist, bounded task-index parsing, pure association rules, and a cancellable refresh/cache service.
 - `scripts`: reproducible builds, generated icons, and native macOS disk images. Local builds and release uploads use separate commands.
 - `vendor/extract-zip`: five-line CommonJS bridge to the maintained `@electron-internal/extract-zip` package, for older Forge consumers. No custom extraction implementation is maintained here.
 - `tests`: temporary Git fixtures and provider protocol/evidence tests.
@@ -24,4 +25,6 @@ GitHub enrichment does not fetch into a repository. New remote tips without avai
 
 Production content uses a restricted custom protocol, CSP, sandboxed renderer, context isolation, validated IPC senders, denied popups/permissions, and allowlisted external links. Git commands use argument arrays, have timeouts, disable fsmonitor and configured file-filter commands, and do not take optional index locks. SQLite stores snapshots; GitHub credentials use Electron safeStorage with a macOS Keychain-protected key, so the database stores ciphertext only.
 
-The future Codex adapter and advisor belong in separate provider/service modules. They must obey the full privacy, budget, and read-only contract in the roadmap before becoming user-accessible.
+Codex discovery uses a separate app-server process with no thread creation or model execution. Its request allowlist is independent of renderer IPC, and server-initiated requests are refused. Disconnect invalidates in-flight results before closing the process and clearing cached data. Metadata overlays never alter the underlying Git snapshot. Branch names index candidate tasks so a large history does not require matching every task against every branch.
+
+The future AI advisor must obey the full privacy, budget, and read-only contract in the roadmap before becoming user-accessible. Discovery's method restrictions do not establish the safety of model execution; that needs its own verified boundary.

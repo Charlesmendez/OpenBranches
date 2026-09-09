@@ -12,7 +12,7 @@ export function lifecycleOf(branch: Branch, now = Date.now()): Lifecycle {
   if (
     branch.pullRequest?.state === 'open' ||
     branch.worktrees.some((w) => w.dirty) ||
-    (branch.task?.association === 'verified' && branch.task.status === 'active') ||
+    branch.tasks?.some((task) => task.association === 'verified' && task.status === 'active') ||
     age < 14 * DAY
   )
     return 'active';

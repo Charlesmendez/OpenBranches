@@ -20,7 +20,7 @@ export function SearchDialog({
       repositories
         .flatMap((repo) => repo.branches.map((branch) => ({ repo, branch })))
         .filter(({ branch, repo }) =>
-          `${branch.name} ${branch.title} ${branch.task?.title ?? ''} ${repo.name}`
+          `${branch.name} ${branch.title} ${branch.tasks?.map((task) => task.title).join(' ') ?? ''} ${repo.name}`
             .toLowerCase()
             .includes(query.toLowerCase()),
         )

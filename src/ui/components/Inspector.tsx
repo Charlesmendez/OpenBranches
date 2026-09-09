@@ -1,18 +1,9 @@
-import {
-  ArrowUpRight,
-  Check,
-  Copy,
-  FolderOpen,
-  GitBranch,
-  Cloud,
-  Laptop,
-  Link2,
-  X,
-} from 'lucide-react';
+import { ArrowUpRight, Check, Copy, FolderOpen, GitBranch, Cloud, Laptop, X } from 'lucide-react';
 import type { Branch, Repository } from '../../domain/types';
 import { relativeTime, shortPath } from '../../domain/branches';
 import { BranchStatus, IconButton } from './Primitives';
 import { useState } from 'react';
+import { TaskDetails } from './TaskDetails';
 
 export function Inspector({
   branch,
@@ -189,22 +180,7 @@ export function Inspector({
           </div>
         )}
       </section>
-      {branch.task && (
-        <section className="inspector-section">
-          <h3>Codex task</h3>
-          <div className="task-detail">
-            <Link2 size={17} />
-            <div>
-              <strong>{branch.task.title}</strong>
-              <small>
-                {branch.task.association === 'verified'
-                  ? 'Linked to this branch'
-                  : 'Possible association'}
-              </small>
-            </div>
-          </div>
-        </section>
-      )}
+      <TaskDetails key={branch.id} tasks={branch.tasks ?? []} demo={demo} />
       <section className="inspector-section compact-section">
         <div className="last-checked">
           <span>Evidence checked</span>

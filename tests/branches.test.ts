@@ -31,7 +31,7 @@ describe('branch evidence', () => {
     const branch = createDemoSnapshot().repositories[0].branches[0];
     branch.updatedAt = '';
     branch.pullRequest = undefined;
-    branch.task = undefined;
+    branch.tasks = undefined;
     branch.worktrees = [];
     branch.integration = { main: 'unknown' };
     expect(lifecycleOf(branch)).toBe('unverified');
