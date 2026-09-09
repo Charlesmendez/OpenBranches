@@ -20,6 +20,7 @@ import { GitHubAuth } from './github/auth';
 import { GitHubService } from './github/service';
 import { createTokenVault } from './github/vault';
 import { CodexService } from './codex/service';
+import { openCodexTask } from './codex/openTask';
 import { GitInstallation, GIT_SETUP_GUIDE } from './git/installation';
 import { ReviewService } from './services/reviews';
 import { stopMonitoring } from './services/monitoring';
@@ -217,6 +218,13 @@ app.whenReady().then(() => {
   });
   handle('codex:connect', () => codex!.connect());
   handle('codex:disconnect', () => codex!.disconnect());
+  handle('codex:open-task', (input: unknown) =>
+    openCodexTask(input, {
+      isLinked: (command) => codex!.isTaskLinked(command),
+      applicationFor: (url) => app.getApplicationInfoForProtocol(url),
+      open: (url) => shell.openExternal(url),
+    }),
+  );
   handle('github:connect', async () => {
     await githubAuth.begin();
     return githubStatus();

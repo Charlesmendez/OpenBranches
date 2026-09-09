@@ -1644,9 +1644,13 @@ code {
   min-width: 0;
   overflow-wrap: anywhere;
 }
+.task-detail strong {
+  font-size: 12px;
+  line-height: 1.5;
+}
 .task-evidence {
   margin-top: 9px;
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.6;
   color: #829da5;
 }
@@ -1659,6 +1663,22 @@ code {
 }
 .task-evidence p {
   margin-top: 8px;
+}
+.task-open {
+  margin-top: 8px;
+}
+.task-open .text-button {
+  min-height: 32px;
+  font-size: 12px;
+}
+.task-open-message {
+  font-size: 11px;
+  line-height: 1.6;
+  color: #a3bebd;
+  margin: 5px 0 0;
+}
+.task-open-message:empty {
+  margin: 0;
 }
 .codex-connection-detail {
   display: grid;
@@ -1723,9 +1743,10 @@ code {
 }
 .task-detail small {
   display: block;
-  font-size: 9px;
+  font-size: 11px;
+  line-height: 1.5;
   margin-top: 5px;
-  color: #60818d;
+  color: #91a4ac;
 }
 .compact-section {
   padding: 16px 0;

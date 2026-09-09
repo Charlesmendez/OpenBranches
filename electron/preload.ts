@@ -38,6 +38,7 @@ const api: DesktopApi = {
   enablePublicGitHub: () => ipcRenderer.invoke('github:public'),
   connectCodex: () => ipcRenderer.invoke('codex:connect'),
   disconnectCodex: () => ipcRenderer.invoke('codex:disconnect'),
+  openCodexTask: (command) => ipcRenderer.invoke('codex:open-task', command),
   onCodex: (callback) => {
     const listener = (_event: Electron.IpcRendererEvent, status: CodexStatus) => callback(status);
     ipcRenderer.on('codex:updated', listener);

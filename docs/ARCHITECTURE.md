@@ -32,4 +32,6 @@ Production content uses a restricted custom protocol, CSP, sandboxed renderer, c
 
 Codex discovery uses a separate app-server process with no thread creation or model execution. Its request allowlist is independent of renderer IPC, and server-initiated requests are refused. Disconnect invalidates in-flight results before closing the process and clearing cached data. Metadata overlays never alter the underlying Git snapshot. Branch names index candidate tasks so a large history does not require matching every task against every branch.
 
+Task opening has a separate narrow IPC command. The main process validates IDs, checks current association evidence, resolves the OS protocol handler, and rechecks the association before constructing an existing-task-only Codex link. It never accepts a renderer URL or changes the inspection-method allowlist. The UI distinguishes system handoff from confirmed task loading. See [task-link checks and limits](TASK_LINKS.md).
+
 The future AI advisor must obey the full privacy, budget, and read-only contract in the roadmap before becoming user-accessible. Discovery's method restrictions do not establish the safety of model execution; that needs its own verified boundary.

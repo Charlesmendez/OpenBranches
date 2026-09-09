@@ -35,7 +35,9 @@ Saved metadata is historical evidence, not proof that Codex is currently running
 
 Account status and shared usage allowance are checked after task discovery and shown in Settings. Missing usage remains unknown; account emails, credentials, and reset-credit details are discarded. These checks do not run a model, and an account-limit failure does not disable task linking.
 
-Disconnect stops inspection and clears OpenBranches' task cache and in-memory account status; it does not sign the user out of Codex or change their conversations. Opening an actual task, accessible task summaries, AI execution, scheduling, explicit diff consent, and verification of the full model boundary remain release work. The budget and evidence-preparation modules are implemented but not connected to a model runner. See [advisor implementation](ADVISOR.md) and the roadmap.
+The inspector can send a saved task link to the registered desktop app through **Open in Codex**. It rechecks the current branch association before dispatch, reports missing or failed desktop handlers, and does not send a prompt or request a model turn. A successful handoff means macOS accepted the link; it does not confirm that the destination task loaded. See [task links and verification limits](TASK_LINKS.md).
+
+Disconnect stops inspection and clears OpenBranches' task cache and in-memory account status; it does not sign the user out of Codex or change their conversations. Complete task-destination verification, accessible task summaries, AI execution, scheduling, explicit diff consent, and verification of the full model boundary remain release work. The budget and evidence-preparation modules are implemented but not connected to a model runner. See [advisor implementation](ADVISOR.md) and the roadmap.
 
 Protocol reference: [official Codex app-server documentation](https://learn.chatgpt.com/docs/app-server).
 

@@ -130,7 +130,13 @@ export function Inspector({
           </div>
         )}
       </section>
-      <TaskDetails key={branch.id} tasks={branch.tasks ?? []} demo={demo} />
+      <TaskDetails
+        key={`${demo}:${repository.id}:${branch.id}`}
+        tasks={branch.tasks ?? []}
+        repositoryId={repository.id}
+        branchId={branch.id}
+        demo={demo}
+      />
       <section className="inspector-section compact-section">
         <div className="last-checked">
           <span>Evidence checked</span>

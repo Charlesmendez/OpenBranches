@@ -1,10 +1,10 @@
 import { mkdir } from 'node:fs/promises';
-import type { CodexStatus, Snapshot } from '../../src/domain/types';
+import type { CodexStatus, OpenTaskCommand, Snapshot } from '../../src/domain/types';
 import type { AppStore } from '../services/store';
 import { findCodex, type CodexExecutable } from './executable';
 import { CodexInspectionClient } from './transport';
 import { indexSchema, readTaskIndex, type CodexIndex } from './reader';
-import { linkRepository } from './associations';
+import { associateTask, linkRepository } from './associations';
 import { readCodexAccount } from './account';
 
 const emptyIndex = (): CodexIndex => ({ tasks: [], checkedAt: '', partial: false });
@@ -104,6 +104,19 @@ export class CodexService {
         linkRepository(r, this.index.tasks, this.index.checkedAt),
       ),
     };
+  }
+
+  isTaskLinked({ repositoryId, branchId, taskId }: OpenTaskCommand): boolean {
+    if (this.closed || !this.statusValue.enabled) return false;
+    const repository = this.current().repositories.find((r) => r.id === repositoryId);
+    const branch = repository?.branches.find((b) => b.id === branchId);
+    const task = this.index.tasks.find((t) => t.id === taskId);
+    return !!(
+      repository &&
+      branch &&
+      task &&
+      associateTask(repository, branch, task, this.index.checkedAt)
+    );
   }
 
   forgetUnselected() {

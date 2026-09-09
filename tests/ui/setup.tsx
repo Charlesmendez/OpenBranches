@@ -33,6 +33,7 @@ const subscribe = <T,>(listeners: Set<(value: T) => void>, listener: (value: T) 
   };
 };
 window.openbranches = {
+  openCodexTask: async () => 'not-linked',
   getReviews: async () => ({ decisions: [] }),
   decideReview: async () => ({ ok: false, state: { decisions: [] } }),
   resetReviews: async () => ({ ok: true, state: { decisions: [] } }),

@@ -18,6 +18,7 @@ OpenBranches brings local Git and GitHub into one workspace: a grouped branch ma
 - Review findings about work that may deserve attention. Snooze for seven days or dismiss; choices survive restarts and new evidence brings the finding back. The attention count includes only findings waiting for review.
 - Stop monitoring projects from Settings without changing their files, branches, or worktrees. Their valid cached connection metadata and review choices are removed together.
 - Connect local Codex task history, including archived tasks. Inspect the evidence for each branch association; multiple tasks can belong to a branch. This connection reads saved metadata and does not run AI.
+- Send a saved task to the desktop app with **Open in Codex**, with feedback for outdated associations and missing handlers. [Destination verification limits](docs/TASK_LINKS.md) remain explicit.
 - See the existing Codex account’s shared usage allowance. The advisor’s budget and evidence validators are implemented; [model execution remains gated](docs/ADVISOR.md).
 - Explore a fictional demo with 403 branch entries, independent of your real repositories.
 

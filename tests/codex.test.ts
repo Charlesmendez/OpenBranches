@@ -399,6 +399,39 @@ async function serviceFixture(read: () => Promise<CodexIndex>) {
 }
 
 describe('Codex connection lifecycle', () => {
+  it('checks task-opening evidence from the current index and repository, including possible and archived links', async () => {
+    const fixture = await serviceFixture(async () => ({
+      tasks: [
+        task(),
+        task({
+          id: 'archived',
+          archived: true,
+          gitInfo: { branch: 'codex/search', sha: 'b'.repeat(40) },
+        }),
+      ],
+      checkedAt,
+      partial: false,
+    }));
+    const command = { repositoryId: 'atlas', branchId: 'search', taskId: 'fixture-task' };
+    expect(fixture.service.isTaskLinked(command)).toBe(false);
+    await fixture.service.connect();
+    expect(fixture.service.isTaskLinked(command)).toBe(true);
+    expect(fixture.service.isTaskLinked({ ...command, taskId: 'archived' })).toBe(true);
+    for (const changed of [{ repositoryId: 'other' }, { branchId: 'other' }, { taskId: 'other' }]) {
+      expect(fixture.service.isTaskLinked({ ...command, ...changed })).toBe(false);
+    }
+    const branch = fixture.snapshot.repositories[0].branches[0];
+    branch.name = 'codex/moved';
+    expect(fixture.service.isTaskLinked(command)).toBe(false);
+    branch.name = 'codex/search';
+    const repositories = fixture.snapshot.repositories;
+    fixture.snapshot.repositories = [];
+    expect(fixture.service.isTaskLinked(command)).toBe(false);
+    fixture.snapshot.repositories = repositories;
+    expect(fixture.service.isTaskLinked(command)).toBe(true);
+    fixture.service.disconnect();
+    expect(fixture.service.isTaskLinked(command)).toBe(false);
+  });
   it('discards an old task refresh after stopping and re-adding project monitoring', async () => {
     let finish!: (index: CodexIndex) => void;
     let entered!: () => void;

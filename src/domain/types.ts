@@ -47,6 +47,12 @@ export interface TaskLink {
   checkedAt?: string;
   evidence?: string[];
 }
+export interface OpenTaskCommand {
+  repositoryId: string;
+  branchId: string;
+  taskId: string;
+}
+export type OpenTaskResult = 'sent' | 'not-linked' | 'invalid-link' | 'unavailable' | 'failed';
 export interface Branch {
   id: string;
   repositoryId: string;
@@ -217,6 +223,7 @@ export interface DesktopApi {
   enablePublicGitHub(): Promise<void>;
   connectCodex(): Promise<void>;
   disconnectCodex(): Promise<void>;
+  openCodexTask(command: OpenTaskCommand): Promise<OpenTaskResult>;
   onCodex(callback: (status: CodexStatus) => void): () => void;
   onGitHub(callback: (status: GitHubStatus) => void): () => void;
   onSnapshot(callback: (snapshot: Snapshot) => void): () => void;
