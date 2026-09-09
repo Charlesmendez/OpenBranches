@@ -3,7 +3,15 @@ import { sharedSnapshotSchema, teamId } from '../../src/team/protocol';
 import type { TeamPage } from '../../src/team/responses';
 import { denied } from './errors';
 import { TeamDatabase } from './db';
-import { requireOwner, workspaceAccess, type Credential } from './access';
+import {
+  requireOwner,
+  requireDevice,
+  workspaceAccess,
+  type Credential,
+  type Principal,
+} from './access';
+import type { PoolClient } from 'pg';
+import type { Companion } from '../../src/team/device';
 import { visibleShares, searchPattern } from './visible';
 const pageSchema = z.object({
   projectId: teamId.optional(),
@@ -11,6 +19,13 @@ const pageSchema = z.object({
   after: z.tuple([teamId, teamId]).optional(),
   query: z.string().max(160).optional(),
 });
+const visibleProjects = (client: PoolClient, principal: Principal) =>
+  client.query(
+    `SELECT p.id,p.name,p.github_id AS "githubId",p.github_slug AS "githubSlug",($3::boolean OR a.can_share) AS "canShare"
+  FROM ob_projects p LEFT JOIN ob_project_access a ON a.workspace_id=p.workspace_id AND a.project_id=p.id AND a.user_id=$2
+  WHERE p.workspace_id=$1 AND p.active AND ($3::boolean OR a.user_id IS NOT NULL) ORDER BY p.name,p.id LIMIT 1001`,
+    [principal.workspaceId, principal.userId, principal.role === 'owner'],
+  );
 
 export class TeamViews {
   constructor(private db: TeamDatabase) {}
@@ -26,12 +41,7 @@ export class TeamViews {
         `SELECT u.id,u.github_id AS "githubId",u.login,m.role FROM ob_members m JOIN ob_users u ON u.id=m.user_id WHERE m.workspace_id=$1 AND m.active ORDER BY u.login,u.id LIMIT 1001`,
         [workspaceId],
       );
-      const projects = await client.query(
-        `SELECT p.id,p.name,p.github_id AS "githubId",p.github_slug AS "githubSlug",($3::boolean OR a.can_share) AS "canShare"
-        FROM ob_projects p LEFT JOIN ob_project_access a ON a.workspace_id=p.workspace_id AND a.project_id=p.id AND a.user_id=$2
-        WHERE p.workspace_id=$1 AND p.active AND ($3::boolean OR a.user_id IS NOT NULL) ORDER BY p.name,p.id LIMIT 1001`,
-        [workspaceId, principal.userId, principal.role === 'owner'],
-      );
+      const projects = await visibleProjects(client, principal);
       const params = [
         workspaceId,
         principal.userId,
@@ -86,6 +96,35 @@ export class TeamViews {
         [workspaceId, principal.role === 'owner' && !principal.deviceId, principal.userId],
       );
       return { devices: result.rows.slice(0, 1000), complete: result.rows.length <= 1000 };
+    });
+  }
+  async companion(credential: Credential, workspaceId: string): Promise<Companion> {
+    return this.db.transaction(async (client) => {
+      const principal = await workspaceAccess(client, credential, workspaceId);
+      const deviceId = requireDevice(principal);
+      const projects = await visibleProjects(client, principal);
+      const device = await client.query(
+        'SELECT id,name,expires_at AS "expiresAt" FROM ob_devices WHERE id=$1 AND workspace_id=$2',
+        [deviceId, workspaceId],
+      );
+      const shares = await client.query(
+        `SELECT project_id AS "projectId",epoch::text,sequence::text,enabled,consent,received_at AS "receivedAt"
+        FROM ob_shares WHERE workspace_id=$1 AND device_id=$2 ORDER BY project_id LIMIT 1001`,
+        [workspaceId, deviceId],
+      );
+      return {
+        workspace: { id: workspaceId, name: principal.workspaceName, revision: principal.revision },
+        member: { id: principal.userId, login: principal.login },
+        device: { ...device.rows[0], expiresAt: device.rows[0].expiresAt.toISOString() },
+        projects: projects.rows.slice(0, 1000),
+        shares: shares.rows.slice(0, 1000).map((row) => ({
+          ...row,
+          epoch: Number(row.epoch),
+          sequence: Number(row.sequence),
+          receivedAt: row.receivedAt?.toISOString() ?? null,
+        })),
+        complete: { projects: projects.rows.length <= 1000, shares: shares.rows.length <= 1000 },
+      };
     });
   }
   async projectAccess(credential: Credential, workspaceId: string, projectId: string) {

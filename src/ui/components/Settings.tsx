@@ -1,5 +1,5 @@
 import { AgentHistoryConnection } from './AgentHistoryConnection';
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { ArrowUpRight, Check, Cloud, Copy, Laptop, LoaderCircle, ShieldCheck } from 'lucide-react';
 import type { GitHubStatus, Repository } from '../../domain/types';
 import { useProviders } from '../hooks/useProviders';
@@ -8,6 +8,9 @@ import { GitSetup } from './GitSetup';
 import type { GitSetupController } from '../hooks/useGit';
 import { MonitoredProjects } from './MonitoredProjects';
 import { ProjectDiscovery } from './ProjectDiscovery';
+const TeamConnectionsPanel = lazy(() =>
+  import('./TeamConnections').then((module) => ({ default: module.TeamConnectionsPanel })),
+);
 
 export function Settings({
   git,
@@ -64,6 +67,17 @@ export function Settings({
         onAdd={onAdd}
         onLive={onLive}
       />
+      {!demo && (
+        <Suspense
+          fallback={
+            <section className="settings-section" role="status">
+              Loading team connections…
+            </section>
+          }
+        >
+          <TeamConnectionsPanel demo={false} repositories={repositories} />
+        </Suspense>
+      )}
       <section className="settings-section">
         <div className="section-kicker">
           <span>CONNECTIONS</span>

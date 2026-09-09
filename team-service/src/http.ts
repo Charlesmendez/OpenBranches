@@ -212,7 +212,7 @@ export function createTeamServer(
       return;
     }
     const match =
-      /^\/api\/workspaces\/([^/]+)\/(view|devices|shares|members|projects|events)(?:\/([^/]+))?(?:\/(snapshots|access)(?:\/([^/]+))?)?$/.exec(
+      /^\/api\/workspaces\/([^/]+)\/(view|companion|devices|shares|members|projects|events)(?:\/([^/]+))?(?:\/(snapshots|access)(?:\/([^/]+))?)?$/.exec(
         path,
       );
     if (!match) throw new TeamError(404, 'not_found', 'This endpoint is unavailable.');
@@ -221,6 +221,10 @@ export function createTeamServer(
       id = match[3] ? teamId.parse(match[3]) : undefined,
       action = match[4],
       memberId = match[5] ? teamId.parse(match[5]) : undefined;
+    if (resource === 'companion' && method === 'GET' && !id) {
+      json(response, 200, await store.views.companion(auth, workspaceId));
+      return;
+    }
     if (resource === 'view' && method === 'GET' && !id) {
       const cursor = url.searchParams.get('cursor');
       json(

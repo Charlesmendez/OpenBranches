@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import { createTeamBridge } from './team/preload';
 import type {
   CodexStatus,
   DesktopApi,
@@ -11,6 +12,7 @@ import type {
 } from '../src/domain/types';
 
 const api: DesktopApi = {
+  teams: createTeamBridge(ipcRenderer),
   setAgentHistoryEnabled: (tool, enabled) => ipcRenderer.invoke('agents:enable', tool, enabled),
   onAgentHistory: (callback) => {
     const listener = (_event: Electron.IpcRendererEvent, statuses: AgentHistoryStatus[]) =>

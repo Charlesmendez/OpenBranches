@@ -6,6 +6,7 @@ import { TeamEvents } from '../src/events';
 import { secretHash } from '../src/secrets';
 import { teamViewSchema, projectAccessSchema } from '../../src/team/responses';
 import { searchPattern } from '../src/visible';
+import { companionResponse } from '../../src/team/device';
 import type { Credential } from '../src/access';
 import { sharedWorkStale, type SharedSnapshot } from '../../src/team/protocol';
 
@@ -91,6 +92,31 @@ async function fixture() {
 }
 
 describe('PostgreSQL team authorization and sharing', () => {
+  it('gives a companion only its account, device, permitted projects and own sharing settings', async () => {
+    const f = await fixture();
+    const profile = await f.store.views.companion(f.device.credential, f.workspace.id);
+    expect(companionResponse.safeParse(profile).success).toBe(true);
+    expect(profile.member.id).toBe(f.memberId);
+    expect(profile.device.id).toBe(f.device.deviceId);
+    expect(profile.projects.map((p) => p.id)).toEqual([f.project.id]);
+    expect(profile.shares).toHaveLength(1);
+    expect(JSON.stringify(profile)).not.toContain('snapshot');
+    await f.store.members.createProject(f.owner, f.workspace.id, 'Hidden project');
+    expect(
+      (await f.store.views.companion(f.device.credential, f.workspace.id)).projects,
+    ).toHaveLength(1);
+    await expect(f.store.views.companion(f.owner, f.workspace.id)).rejects.toMatchObject({
+      status: 403,
+    });
+    await f.store.members.grant(f.owner, f.workspace.id, f.project.id, f.memberId, false, false);
+    const removed = await f.store.views.companion(f.device.credential, f.workspace.id);
+    expect(removed.projects).toEqual([]);
+    expect(removed.shares[0].enabled).toBe(false);
+    await f.store.sharing.revokeDevice(f.member, f.workspace.id, f.device.deviceId);
+    await expect(
+      f.store.views.companion(f.device.credential, f.workspace.id),
+    ).rejects.toMatchObject({ status: 401 });
+  });
   it('pairs a member account to a specific device and shares only into an authorized project', async () => {
     const f = await fixture();
     await f.store.sharing.publish(f.device.credential, f.workspace.id, f.project.id, {

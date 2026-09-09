@@ -26,7 +26,8 @@
     "team:build": "npm run team:typecheck && node scripts/build-team.mjs",
     "team:start": "node team-service/dist/main.js",
     "test:team": "node scripts/test-team.mjs",
-    "team:preview": "npm run team:build && node scripts/preview-team.mjs"
+    "team:preview": "npm run team:build && node scripts/preview-team.mjs",
+    "team:preview:mac": "node scripts/preview-team-mac.mjs"
   },
   "dependencies": {
     "@noble/hashes": "^2.4.0",

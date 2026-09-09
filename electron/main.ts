@@ -7,6 +7,7 @@ import {
   nativeImage,
   net,
   protocol,
+  safeStorage,
   shell,
   Tray,
 } from 'electron';
@@ -27,6 +28,9 @@ import { createClaudeHistorySource } from './claude/reader';
 import { GitInstallation, GIT_SETUP_GUIDE } from './git/installation';
 import { ReviewService } from './services/reviews';
 import { stopMonitoring } from './services/monitoring';
+import { createSecretVault } from './services/secretVault';
+import { TeamConnections } from './team/connections';
+import { registerTeamHandlers } from './team/ipc';
 declare const __GITHUB_APP_CLIENT_ID__: string;
 
 protocol.registerSchemesAsPrivileged([
@@ -45,6 +49,7 @@ let store: AppStore;
 let github: GitHubService | undefined;
 let codex: CodexService | undefined;
 let discovery: ProjectDiscoveryService | undefined;
+let teams: TeamConnections | undefined;
 const localHistories = new Map<string, LocalHistoryService>();
 const refreshHistories = () =>
   Promise.all([...localHistories.values()].map((history) => history.refresh()));
@@ -183,6 +188,13 @@ app.whenReady().then(() => {
     if (githubAuth.status().device) void pollGitHub();
   }, 5000);
   handle('snapshot:get', snapshot);
+  teams = new TeamConnections(
+    createSecretVault(store, 'team.credentials', safeStorage),
+    snapshot,
+    (state) => window?.webContents.send('team:updated', state),
+    { allowLoopback: !app.isPackaged },
+  );
+  registerTeamHandlers(handle, teams, (url) => shell.openExternal(url));
   handle('agents:enable', (tool: unknown, enabled: unknown) =>
     localHistories
       .get(z.literal('claude-code').parse(tool))!
@@ -286,6 +298,7 @@ app.whenReady().then(() => {
     return github!.refresh();
   });
   createWindow();
+  teams.start();
   void discovery.refresh();
   void refreshHistories();
   // A monochrome template icon adapts to the system menu bar appearance.
@@ -342,6 +355,7 @@ app.on('before-quit', () => {
   github?.close();
   codex?.close();
   discovery?.close();
+  teams?.close();
   for (const history of localHistories.values()) history.close();
   service?.close();
   store?.close();

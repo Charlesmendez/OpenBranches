@@ -1,34 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { TeamApiError, type TeamClient, type TeamFilter } from '../../src/team/client';
 import { loadTeamView, type LoadedTeamView } from '../../src/team/loadView';
-export function useAction() {
-  const [busy, setBusy] = useState(false),
-    [error, setError] = useState('');
-  const alive = useRef(true),
-    running = useRef(false);
-  useEffect(() => {
-    alive.current = true;
-    return () => {
-      alive.current = false;
-    };
-  }, []);
-  const run = async (action: () => Promise<void>) => {
-    if (running.current) return;
-    running.current = true;
-    setBusy(true);
-    setError('');
-    try {
-      await action();
-    } catch (error) {
-      if (alive.current)
-        setError(error instanceof Error ? error.message : 'The action could not complete.');
-    } finally {
-      running.current = false;
-      if (alive.current) setBusy(false);
-    }
-  };
-  return { busy, error, run, clear: () => setError('') };
-}
+export { useAction } from '../../src/ui/hooks/useAction';
 export function useTeamData(client: TeamClient, workspace: string, filter: TeamFilter) {
   const [data, setData] = useState<LoadedTeamView>(),
     [error, setError] = useState(''),

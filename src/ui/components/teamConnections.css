@@ -1,0 +1,269 @@
+.mac-teams {
+  overflow: hidden;
+}
+.mac-team-heading {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+.mac-team-heading > div {
+  flex: 1;
+}
+.mac-team-heading h2 {
+  font-size: 21px;
+  font-weight: 560;
+  margin: 6px 0 0;
+  letter-spacing: -0.5px;
+}
+.mac-team-list {
+  display: grid;
+  gap: 15px;
+  margin-top: 22px;
+}
+.mac-team-form,
+.mac-sharing-preview {
+  border-top: 1px solid var(--line);
+  margin-top: 20px;
+  padding-top: 20px;
+}
+.mac-team-form {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 15px;
+}
+.mac-team-form > p,
+.mac-team-form > .mac-team-actions {
+  grid-column: 1 / -1;
+}
+.mac-team-form label,
+.mac-project-match label {
+  display: grid;
+  gap: 9px;
+  color: var(--muted);
+  font-size: 12px;
+  min-width: 0;
+}
+.mac-team-form input,
+.mac-project-match select {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 11px 12px;
+  min-width: 0;
+  width: 100%;
+}
+.mac-team-form .muted-note {
+  margin: 0;
+}
+.mac-team-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.mac-team-actions .text-button {
+  margin-left: auto;
+}
+.mac-team-card {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 21px;
+  background: linear-gradient(130deg, #79cdb808, transparent 65%), var(--surface);
+  min-width: 0;
+}
+.mac-team-card > header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.mac-team-card > header > div {
+  flex: 1;
+  min-width: 0;
+}
+.mac-team-card h3 {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 560;
+}
+.mac-team-origin {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.mac-team-code {
+  padding: 19px 0 8px;
+}
+.mac-team-code > div {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 12px;
+}
+.mac-team-code code {
+  font-size: 24px;
+  color: var(--teal);
+  letter-spacing: 3px;
+}
+.mac-team-sharing-off {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  color: var(--teal);
+  font-size: 12px;
+  line-height: 1.6;
+  background: #79cdb809;
+  border-radius: 7px;
+  padding: 11px 12px;
+}
+.mac-team-sharing-off svg {
+  flex: 0 0 15px;
+  margin-top: 2px;
+}
+.mac-team-confirm {
+  background: var(--bg);
+  padding: 17px;
+  border: 1px solid #e2c47d50;
+  border-radius: 9px;
+  margin-top: 16px;
+}
+.mac-team-confirm p {
+  line-height: 1.7;
+  color: var(--muted);
+}
+.mac-team-footnote {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.mac-team-footnote svg {
+  flex: 0 0 14px;
+  margin-top: 2px;
+}
+.mac-sharing-preview h3 {
+  font-size: 18px;
+  margin-top: 10px;
+}
+.mac-project-match {
+  display: grid;
+  grid-template-columns: 1fr 20px 1fr;
+  gap: 15px;
+  align-items: end;
+  margin: 17px 0;
+}
+.mac-project-match > svg {
+  align-self: center;
+  margin-top: 24px;
+  color: var(--faint);
+}
+.mac-consent-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin: 18px 0;
+}
+.mac-consent-options label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.mac-consent-options input {
+  accent-color: var(--teal);
+}
+.mac-payload-review {
+  margin-top: 20px;
+  padding: 18px;
+  border-radius: 10px;
+  border: 1px solid #79cdb835;
+  background: #79cdb806;
+}
+.mac-preview-title {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.mac-preview-title > div {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.mac-preview-title > svg {
+  color: var(--teal);
+  flex-shrink: 0;
+}
+.mac-preview-title p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+.mac-payload-review ul {
+  list-style: none;
+  padding: 0;
+  margin: 16px 0;
+}
+.mac-payload-review li {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+}
+.mac-payload-review li code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  font-size: 11px;
+}
+.mac-payload-review li svg {
+  color: var(--faint);
+  flex-shrink: 0;
+}
+.mac-payload-review li span {
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.mac-payload-review summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 10px 0;
+}
+.mac-payload-review summary:focus-visible,
+.mac-payload-review textarea:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 4px;
+}
+.mac-payload-review textarea {
+  display: block;
+  width: 100%;
+  height: 240px;
+  padding: 13px;
+  resize: vertical;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font:
+    11px/1.7 ui-monospace,
+    monospace;
+  white-space: pre;
+}
+@media (max-width: 1100px) {
+  .mac-team-heading {
+    flex-wrap: wrap;
+  }
+  .mac-team-heading > div {
+    flex-basis: calc(100% - 66px);
+  }
+  .mac-team-form {
+    grid-template-columns: 1fr;
+  }
+  .mac-team-actions {
+    gap: 8px;
+  }
+}

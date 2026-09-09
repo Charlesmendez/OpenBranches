@@ -246,6 +246,7 @@ export interface GitStatus {
   message?: string;
 }
 export interface DesktopApi {
+  teams?: import('../team/device').TeamDesktopApi;
   setAgentHistoryEnabled(tool: CodingTool, enabled: boolean): Promise<void>;
   onAgentHistory(callback: (statuses: AgentHistoryStatus[]) => void): () => void;
   getDiscoveredProjects(): Promise<ProjectDiscoveryState>;
