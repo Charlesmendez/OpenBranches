@@ -1,29 +1,48 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useSyncExternalStore } from 'react';
 import type { Repository } from '../../domain/types';
 import type { ProjectPosition } from '../navigation';
+import type { NavigationMemory } from '../navigationMemory';
 
-/** View position lives for this app session. Keep demo and real projects apart
- * and discard removed projects; no repository or provider state is written. */
+/** Bind saved view preferences to the current, authoritative project list. */
 export function useProjectMemory(
   mode: 'live' | 'demo',
   repositories: Repository[],
   loading: boolean,
+  memory: NavigationMemory,
 ) {
-  const memory = useRef(new Map<string, ProjectPosition>());
-  const allowed = useRef({ mode, ids: new Set(repositories.map((repository) => repository.id)) });
-  allowed.current = { mode, ids: new Set(repositories.map((repository) => repository.id)) };
-  const key = (id: string) => `${mode}:${id}`;
-  const read = (id: string): ProjectPosition =>
-    memory.current.get(key(id)) ?? { selectedId: null, group: 'active', maps: {} };
+  const ids = new Set(repositories.map((repository) => repository.id));
+  const allowed = useRef({ mode, ids, loading });
+  if (
+    allowed.current.mode !== mode ||
+    allowed.current.loading !== loading ||
+    allowed.current.ids.size !== ids.size ||
+    [...ids].some((id) => !allowed.current.ids.has(id))
+  )
+    allowed.current = { mode, ids, loading };
+  const permission = allowed.current;
+  const read = (id: string): ProjectPosition => memory.read(mode, id);
   const remember = (id: string, patch: Partial<ProjectPosition>) => {
-    if (allowed.current.mode !== mode || !allowed.current.ids.has(id)) return;
-    memory.current.set(key(id), { ...read(id), ...patch });
+    if (allowed.current !== permission || permission.loading || !permission.ids.has(id)) return;
+    memory.remember(mode, id, patch);
   };
   useEffect(() => {
     if (loading) return;
-    const selected = new Set(repositories.map((repository) => key(repository.id)));
-    for (const entry of memory.current.keys())
-      if (entry.startsWith(`${mode}:`) && !selected.has(entry)) memory.current.delete(entry);
+    memory.prune(mode, new Set(repositories.map((repository) => repository.id)));
   }, [mode, repositories, loading]);
-  return { read, remember };
+  useEffect(() => {
+    const hidden = () => {
+      if (document.visibilityState === 'hidden') memory.flush();
+    };
+    window.addEventListener('pagehide', memory.flush);
+    window.addEventListener('beforeunload', memory.flush);
+    document.addEventListener('visibilitychange', hidden);
+    return () => {
+      window.removeEventListener('pagehide', memory.flush);
+      window.removeEventListener('beforeunload', memory.flush);
+      document.removeEventListener('visibilitychange', hidden);
+      memory.flush();
+    };
+  }, [memory]);
+  const notice = useSyncExternalStore(memory.subscribe, memory.getNotice);
+  return { read, remember, notice, retrySave: memory.saveNow };
 }

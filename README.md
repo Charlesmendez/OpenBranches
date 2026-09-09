@@ -11,6 +11,7 @@ OpenBranches brings local Git and GitHub into one workspace: a grouped branch ma
 - Add local Git repositories through a native folder picker. Shared worktrees are inspected together.
 - Detect Apple and Homebrew Git installations automatically. If Git needs setup, follow the in-app guide, open Apple’s installer explicitly, and explore the demo while it finishes.
 - Browse hundreds of branches in collapsed groups; expand a group into readable pages or search the full inventory with ⌘K.
+- Reopen your last project, selected branch, map position, and inventory filters after a restart. Demo and real workspaces keep separate view histories.
 - See local and remote copies, uncommitted work, integration history, and the evidence behind each result.
 - Watch local changes while the app is running; refresh connected GitHub sources every two minutes.
 - Read public GitHub branches and pull requests without signing in. Private-repository sign-in is implemented using GitHub App device authorization but requires the release app registration.

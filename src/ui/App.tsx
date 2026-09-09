@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowUpRight,
   Command,
@@ -23,6 +23,7 @@ import { useGit } from './hooks/useGit';
 import { useReviews } from './hooks/useReviews';
 import { useProjectMemory } from './hooks/useProjectMemory';
 import { mapPositionFor, revealSelection } from './navigation';
+import { NavigationMemory, type WorkspaceMode } from './navigationMemory';
 import { GitSetup } from './components/GitSetup';
 import { Sidebar } from './components/Sidebar';
 import { Overview, ActivityList } from './components/Overview';
@@ -35,17 +36,29 @@ import { Settings } from './components/Settings';
 import { EmptyState, IconButton } from './components/Primitives';
 
 export function App() {
-  const workspace = useWorkspace();
+  const [positions] = useState(() => new NavigationMemory(() => window.localStorage));
+  const workspace = useWorkspace(positions.initialMode(!!window.openbranches));
   const providers = useProviders();
   const git = useGit();
   const gitNeedsSetup = !!git.status && git.status.state !== 'ready';
   const { snapshot, mode, setMode, error, setError, loading, adding, add, refresh } = workspace;
   const reviews = useReviews(mode === 'demo', snapshot.repositories);
-  const memory = useProjectMemory(mode, snapshot.repositories, loading);
-  const [projectId, setProjectId] = useState<string | null>(null);
-  const [view, setView] = useState<View>('map');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [group, setGroup] = useState<Lifecycle>('active');
+  const memory = useProjectMemory(
+    mode,
+    snapshot.repositories,
+    loading || !workspace.ready,
+    positions,
+  );
+  const initial = positions.workspace(mode);
+  const [projectId, setProjectId] = useState<string | null>(initial.projectId);
+  const [view, setView] = useState<View>(initial.view);
+  const [selectedId, setSelectedId] = useState<string | null>(() =>
+    initial.projectId ? positions.read(mode, initial.projectId).selectedId : null,
+  );
+  const [group, setGroup] = useState<Lifecycle>(() =>
+    initial.projectId ? positions.read(mode, initial.projectId).group : 'active',
+  );
+  const [restoredMode, setRestoredMode] = useState<WorkspaceMode | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [navigationRequest, setNavigationRequest] = useState(0);
   const selectionOrigin = useRef<HTMLElement | null>(null);
@@ -64,22 +77,52 @@ export function App() {
     [branches, group],
   );
   const selected = repository?.branches.find((branch) => branch.id === selectedId);
+  useLayoutEffect(() => {
+    if (loading || !workspace.ready || restoredMode === mode) return;
+    if (repository) {
+      const restored = revealSelection(
+        { ...memory.read(repository.id), selectedId: selected?.id ?? null },
+        branches,
+      );
+      memory.remember(repository.id, restored);
+      setSelectedId(restored.selectedId);
+      setGroup(restored.group);
+    } else {
+      setProjectId(null);
+      setSelectedId(null);
+      setGroup('active');
+    }
+    setRestoredMode(mode);
+  }, [loading, workspace.ready, mode, restoredMode, repository, selected, branches]);
   useEffect(() => {
     if (repository && selectedId && !selected) closeDetails();
   }, [repository, selectedId, selected]);
   useEffect(() => {
-    if (projectId) memory.remember(projectId, { selectedId, group });
-  }, [projectId, mode, selectedId, group]);
+    if (loading || !workspace.ready || restoredMode !== mode) return;
+    if (repository) memory.remember(repository.id, { selectedId: selected?.id ?? null, group });
+    positions.rememberWorkspace(mode, { projectId: repository?.id ?? null, view });
+  }, [
+    projectId,
+    mode,
+    selectedId,
+    group,
+    view,
+    loading,
+    workspace.ready,
+    restoredMode,
+    !!repository,
+  ]);
   useEffect(() => {
     if (
       !loading &&
+      workspace.ready &&
       projectId &&
       !snapshot.repositories.some((repository) => repository.id === projectId)
     ) {
       setProjectId(null);
       setSelectedId(null);
     }
-  }, [loading, projectId, snapshot.repositories]);
+  }, [loading, workspace.ready, projectId, snapshot.repositories]);
   useEffect(() => {
     const listener = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
@@ -141,9 +184,22 @@ export function App() {
     }
   };
   const switchMode = () => {
-    setMode(mode === 'demo' ? 'live' : 'demo');
-    selectProject(null);
-    setView('map');
+    const next = mode === 'demo' ? 'live' : 'demo';
+    if (next === 'live' && !window.openbranches) {
+      setError(
+        'Open the desktop app to connect your projects. This browser preview uses demo data.',
+      );
+      return;
+    }
+    if (workspace.ready) positions.rememberWorkspace(mode, { projectId, view });
+    const route = positions.workspace(next);
+    positions.rememberWorkspace(next, route);
+    const saved = route.projectId ? positions.read(next, route.projectId) : undefined;
+    setMode(next);
+    setProjectId(route.projectId);
+    setView(route.view);
+    setSelectedId(saved?.selectedId ?? null);
+    setGroup(saved?.group ?? 'active');
   };
   const isProjectView = repository && ['map', 'inventory'].includes(view);
   const firstSetup =
@@ -324,13 +380,29 @@ export function App() {
               {repository.github.history.error ?? 'More load with each refresh as GitHub allows.'}
             </div>
           )}
+        {memory.notice && (
+          <div className="source-error" role="status">
+            <span>{memory.notice}</span>
+            <button onClick={memory.retrySave}>Save current view</button>
+          </div>
+        )}
         <div className="page-body">
-          {loading ? (
+          {loading || (workspace.ready && restoredMode !== mode) ? (
             <EmptyState
               icon={LoaderCircle}
               title="Opening your workspace"
               description="Loading your last snapshot…"
             />
+          ) : !workspace.ready ? (
+            <EmptyState
+              icon={RefreshCw}
+              title="Your workspace couldn’t be loaded"
+              description="Your saved place is still here. Try loading the workspace again."
+            >
+              <button className="secondary-button" onClick={() => void workspace.reload()}>
+                Try again
+              </button>
+            </EmptyState>
           ) : view === 'settings' ? (
             <Settings
               git={git}
@@ -363,13 +435,7 @@ export function App() {
               />
             </section>
           ) : !snapshot.repositories.length && mode === 'live' && gitNeedsSetup ? (
-            <GitSetup
-              git={git}
-              onDemo={() => {
-                setMode('demo');
-                selectProject(null);
-              }}
-            />
+            <GitSetup git={git} onDemo={switchMode} />
           ) : !snapshot.repositories.length ? (
             <div className="welcome">
               <div className="welcome-map" aria-hidden="true">
@@ -396,13 +462,7 @@ export function App() {
                   {adding ? <LoaderCircle size={17} className="spin" /> : <Plus size={17} />}Add
                   your first project
                 </button>
-                <button
-                  className="text-button"
-                  onClick={() => {
-                    setMode('demo');
-                    selectProject(null);
-                  }}
-                >
+                <button className="text-button" onClick={switchMode}>
                   Take a look around first
                   <ArrowUpRight size={14} />
                 </button>

@@ -96,6 +96,9 @@ export function SearchDialog({
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Find any branch, task, or project…"
             aria-label="Search all projects"
+            spellCheck={false}
+            autoCapitalize="none"
+            autoCorrect="off"
           />
           <button onClick={close} aria-label="Close search">
             <X size={16} />

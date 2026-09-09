@@ -1,6 +1,8 @@
 # Keeping your place
 
-OpenBranches keeps each project's selected branch, lifecycle group, expanded map group, map page, viewport, inventory search, filters, cursor, and scroll position while the app remains open. Switching to another project or view restores that position. Demo and real projects use separate memory. Removed projects are discarded, and late callbacks cannot recreate their view memory. This UI memory is not yet saved across app restarts; persisted review decisions remain independent.
+OpenBranches restores the last workspace mode, project, and view after a restart. Each project's selected branch, lifecycle group, expanded map group, map page, viewport, inventory search, filters, cursor, and scroll position are saved locally. Demo and real projects have independent histories, including when they share a project identifier. Persisted review decisions remain separate.
+
+Startup waits for an authoritative snapshot before restoring branch context or pruning removed projects. A failed load preserves saved positions and offers a retry. A newer snapshot event supersedes an older in-flight read, so a delayed empty response cannot erase the current workspace. Removed projects are discarded after the renderer receives the updated project list. Callbacks captured before a mode or project-membership change cannot reintroduce an old position, including after removal and re-addition.
 
 Switching from the inventory to the map reveals the selected working branch in its current lifecycle group and six-branch page. An unchanged page retains its viewport. Explicit map group/page navigation clears the inspector selection, so an unrelated branch does not stay highlighted elsewhere. Incoming snapshot changes clear selections that no longer exist.
 
@@ -20,11 +22,21 @@ Option positions and total counts describe the complete filtered result set. The
 
 ## Implementation and checks
 
-`src/ui/navigation.ts` owns shared position types, map grouping/page selection, scroll anchoring, and keyboard index calculations. `useProjectMemory` scopes session state; `useInventoryNavigation` coordinates filtering, virtualization, cursor, scroll, and focus. Presentational components use those shared behaviors.
+`src/ui/navigation.ts` owns shared position types, map grouping/page selection, scroll anchoring, and keyboard index calculations. `navigationMemory.ts` owns versioned preference decoding, bounded storage, recency, and failure recovery. `useProjectMemory` binds that memory to the authoritative project list and flushes on page exit or hiding; `useInventoryNavigation` coordinates filtering, virtualization, cursor, scroll, and focus. Presentational components use those shared behaviors.
+
+View preferences use the renderer's local storage under the app's origin, not repository files or cloud storage. The document contains identifiers, search text, view choices, and coordinates. At most 100 recently used project positions are retained per workspace mode, and the serialized document is bounded to 2,097,152 characters. Values are decoded through explicit field allowlists and finite-number limits. Search text is limited to 2,048 characters; branch searches disable spellchecking and autocorrection for identifiers.
+
+Writes are coalesced for 250 milliseconds and flushed synchronously on page exit, hiding, or unmount. A forced process kill may lose the most recent unsaved change. Invalid or unavailable storage does not prevent browsing: the app keeps session state, explains the problem, and offers to save the current view again. Optional view preferences do not provide recovery for Git or provider data.
 
 `tests/navigation.test.ts` covers full-set keyboard bounds, insertion/removal anchoring, selected-branch group/page restoration, retained/reset viewports, and type-ahead wrapping. The development-only `/tests/ui/navigation.html` fixture contains 1,000 fictional branches and four target columns. Browser verification reached option 1,000 while only nine options were rendered, matched every header/value horizontal coordinate, preserved a visible branch's screen position after inserting newer work, and restored both axes after unmount/remount.
 
-The full demo was checked for cross-project map page/zoom restoration, inventory filter persistence, search navigation, Escape behavior, and inspector focus return. The final viewport remained identical after switching projects. These browser checks do not establish VoiceOver behavior or combined packaged-app verification; those remain release checks, together with durable view positions across restarts.
+The full demo was checked for cross-project map page/zoom restoration, inventory filter persistence, search navigation, Escape behavior, and inspector focus return. Reopening a fresh browser tab restored the selected Invoice polish 61 branch, the `invoice` query and local-location filter, and the exact 3,222-pixel vertical position. Another reopen retained the Integrated group, page 49–54, selected branch, and the exact map transform after two zoom-out steps.
+
+`tests/navigation-memory.test.ts` covers new-instance restoration, mode separation, pruning, coalescing/final flush, failed storage and retry, corrupt/oversized preferences, malformed fields, and bounded recency. The development-only `/tests/ui/persistence.html` fixture verifies failed initial loading, restoration while loading, a newer snapshot superseding an older empty response, and rejection of a callback captured before project removal/re-addition. It uses fictional snapshots and separately prefixed storage only.
+
+The native development app was quit and relaunched as a new process using the built renderer. It restored the real OpenBranches project, branch inventory, `openbranches` query, selected feature branch, and inspector. A native round trip through the demo's studio project restored the real workspace independently. These checks do not establish VoiceOver behavior, Intel behavior, or a signed packaged release; those remain release checks.
+
+The development entry unmounts its React root when Vite disposes the module. After controlled hot updates, the preview retained one app root, the selected branch, and the same map transform with no new warning/error logs.
 
 Reference: [WAI-ARIA listbox pattern](https://www.w3.org/WAI/ARIA/apg/patterns/listbox/).
 

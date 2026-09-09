@@ -51,6 +51,10 @@ export function Inventory({
         <input
           ref={searchRef}
           aria-label="Search branches"
+          maxLength={2048}
+          spellCheck={false}
+          autoCapitalize="none"
+          autoCorrect="off"
           value={query}
           onChange={(e) => filter({ query: e.target.value })}
           onKeyDown={(event) => {

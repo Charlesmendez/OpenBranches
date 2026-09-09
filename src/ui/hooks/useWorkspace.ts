@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createDemoSnapshot } from '../../data/demo';
 import type { Snapshot } from '../../domain/types';
 
@@ -20,33 +20,52 @@ function demoSnapshot() {
   }
 }
 const demo = demoSnapshot();
-export function useWorkspace() {
-  const [mode, setMode] = useState<'live' | 'demo'>(window.openbranches ? 'live' : 'demo');
+const loadError = 'Your saved workspace could not be loaded. Please try again.';
+export function useWorkspace(initialMode: 'live' | 'demo') {
+  const [mode, setMode] = useState(initialMode);
   const [live, setLive] = useState<Snapshot>(empty);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(!!window.openbranches);
+  const [ready, setReady] = useState(false);
   const [adding, setAdding] = useState(false);
+  const generation = useRef(0);
+  const reload = useCallback(async () => {
+    const api = window.openbranches;
+    if (!api) return;
+    const request = ++generation.current;
+    setLoading(true);
+    try {
+      const snapshot = await api.getSnapshot();
+      if (request === generation.current) {
+        setLive(snapshot);
+        setReady(true);
+        setError(null);
+      }
+    } catch {
+      if (request === generation.current) setError(loadError);
+    } finally {
+      if (request === generation.current) setLoading(false);
+    }
+  }, []);
   useEffect(() => {
     const api = window.openbranches;
     if (!api) return;
     let mounted = true;
-    api
-      .getSnapshot()
-      .then((snapshot) => {
-        if (mounted) setLive(snapshot);
-      })
-      .catch((error) => {
-        if (mounted) setError(String(error));
-      })
-      .finally(() => {
-        if (mounted) setLoading(false);
-      });
-    const off = api.onSnapshot((snapshot) => setLive(snapshot));
+    void reload();
+    const off = api.onSnapshot((snapshot) => {
+      if (!mounted) return;
+      generation.current++;
+      setLive(snapshot);
+      setReady(true);
+      setLoading(false);
+      setError((current) => (current === loadError ? null : current));
+    });
     return () => {
       mounted = false;
+      generation.current++;
       off();
     };
-  }, []);
+  }, [reload]);
   const add = useCallback(async () => {
     if (!window.openbranches) {
       setError(
@@ -93,7 +112,9 @@ export function useWorkspace() {
     setMode,
     error,
     setError,
-    loading,
+    loading: mode === 'live' && loading,
+    ready: mode === 'demo' || ready,
+    reload,
     adding,
     add,
     refresh,
