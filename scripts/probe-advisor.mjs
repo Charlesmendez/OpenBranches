@@ -2,12 +2,19 @@
 // goes to a loopback stub with a dummy token. No real model is called.
 import { execFileSync, spawn } from 'node:child_process';
 import { createServer } from 'node:http';
-import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { isAbsolute, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { StringDecoder } from 'node:string_decoder';
 import { auditModelRequest } from '../electron/advisor/requestAudit.mts';
+import {
+  executionScenarios,
+  createToolAttempt,
+  responseStream,
+  auditAttemptOutputs,
+  attemptToolLocation,
+} from './advisor/probeExecution.mts';
 
 const executable = process.env.OPENBRANCHES_PROBE_CODEX ?? 'codex';
 const catalog = process.env.OPENBRANCHES_PROBE_MODEL_CATALOG;
@@ -15,6 +22,14 @@ function unavailable(reason) {
   console.log(JSON.stringify({ readyForModelExecution: false, reason }));
   process.exit(1);
 }
+const scenario = process.argv[2]?.replace(/^--attempt=/, '');
+if (
+  process.argv.length > 3 ||
+  (process.argv.length === 3 && !scenario) ||
+  (scenario &&
+    (!process.argv[2].startsWith('--attempt=') || !executionScenarios.includes(scenario)))
+)
+  unavailable('Use --attempt=exec-marker, exec-read, exec-write, shell-marker, or question.');
 if (catalog && !isAbsolute(catalog)) unavailable('The probe catalog must be an absolute path.');
 if (process.env.OPENBRANCHES_PROBE_CODEX && !isAbsolute(executable))
   unavailable('The probe executable override must be an absolute path.');
@@ -43,6 +58,16 @@ const input = '{"repositories":[],"fixture":"public fictional metadata"}';
 const name = `openbranches_probe_${randomUUID().replaceAll('-', '')}`;
 const instructions = join(directory, 'instructions.md');
 await writeFile(instructions, base);
+const fixture = {
+  marker: `OPENBRANCHES_EXEC_${randomUUID()}`,
+  readCanary: `OPENBRANCHES_READ_${randomUUID()}`,
+  readPath: join(directory, 'read-canary.txt'),
+  writePath: join(directory, 'write-canary.txt'),
+};
+if (scenario) {
+  await writeFile(fixture.readPath, fixture.readCanary);
+  await writeFile(fixture.writePath, 'untouched');
+}
 const disabled = [
   'hooks',
   'apps',
@@ -72,9 +97,29 @@ const disabled = [
 let active;
 let settle;
 let configuredTools = [];
+let initialAudit;
+const execution = {
+  scenario,
+  modelRequests: 0,
+  attemptIssued: false,
+  serverRequests: [],
+  itemTypes: [],
+  turnStatus: 'not-observed',
+};
 const observed = new Promise((resolve) => {
   settle = resolve;
 });
+function finishExecution(reason) {
+  settle({
+    modelCalls: 'local stub only',
+    version,
+    configuredTools,
+    ...initialAudit,
+    ...(reason ? { reason } : {}),
+    execution: { ...execution },
+    readyForModelExecution: false,
+  });
+}
 const server = createServer((request, response) => {
   if (
     request.method === 'GET' &&
@@ -94,7 +139,7 @@ const server = createServer((request, response) => {
     settle({
       readyForModelExecution: false,
       reason: 'Unexpected stub request.',
-      method: request.method,
+      method: ['GET', 'POST'].includes(request.method) ? request.method : 'unrecognized',
       expectedPath: request.url === `/${name}/responses`,
       dummyAuthentication: request.headers.authorization === 'Bearer openbranches-fixture-token',
     });
@@ -110,12 +155,45 @@ const server = createServer((request, response) => {
   });
   request.on('end', () => {
     try {
-      settle({
-        modelCalls: 'local stub only',
-        version,
-        configuredTools,
-        ...auditModelRequest(JSON.parse(body), { base, developer, input }),
-      });
+      const payload = JSON.parse(body);
+      if (scenario) {
+        execution.modelRequests++;
+        if (execution.modelRequests === 1) {
+          initialAudit = auditModelRequest(payload, { base, developer, input });
+          const location = attemptToolLocation(payload, scenario);
+          execution.advertisedTool = location.advertised;
+          execution.toolNamespace = location.namespace ?? 'none';
+          execution.attemptIssued = true;
+          response.writeHead(200, { 'Content-Type': 'text/event-stream' });
+          response.end(responseStream(createToolAttempt(scenario, fixture, location.namespace), 1));
+          return;
+        }
+        if (execution.modelRequests === 2) {
+          Object.assign(execution, auditAttemptOutputs(payload, fixture));
+          response.writeHead(200, { 'Content-Type': 'text/event-stream' });
+          response.end(
+            responseStream(
+              {
+                id: 'msg_openbranches_probe',
+                type: 'message',
+                role: 'assistant',
+                phase: 'final_answer',
+                content: [{ type: 'output_text', text: '{"findings":[]}', annotations: [] }],
+              },
+              2,
+            ),
+          );
+          return;
+        }
+        finishExecution('Unexpected additional model request.');
+      } else {
+        settle({
+          modelCalls: 'local stub only',
+          version,
+          configuredTools,
+          ...auditModelRequest(payload, { base, developer, input }),
+        });
+      }
     } catch {
       settle({ readyForModelExecution: false, reason: 'Unrecognized model request.' });
     }
@@ -190,6 +268,7 @@ function launch(mcpNames) {
     )
       delete env[key];
   const child = spawn(executable, args, { cwd: directory, env, stdio: ['pipe', 'pipe', 'pipe'] });
+  const exited = new Promise((resolve) => child.once('close', resolve));
   const pending = new Map();
   const decoder = new StringDecoder('utf8');
   let nextId = 0,
@@ -228,6 +307,19 @@ function launch(mcpNames) {
       try {
         const message = JSON.parse(line);
         if (message.method && 'id' in message) {
+          if (scenario) {
+            const known = [
+              'item/tool/requestUserInput',
+              'tool/requestUserInput',
+              'item/commandExecution/requestApproval',
+              'item/fileChange/requestApproval',
+              'item/permissions/requestApproval',
+            ];
+            execution.serverRequests.push(
+              known.includes(message.method) ? message.method : 'unrecognized',
+            );
+            finishExecution('Codex requested a client action; the probe refused it.');
+          }
           child.stdin.write(
             JSON.stringify({
               id: message.id,
@@ -236,6 +328,28 @@ function launch(mcpNames) {
           );
           stop();
           return;
+        }
+        if (scenario && ['item/started', 'item/completed'].includes(message.method)) {
+          const kind = message.params?.item?.type;
+          const known = [
+            'userMessage',
+            'agentMessage',
+            'reasoning',
+            'commandExecution',
+            'fileChange',
+            'mcpToolCall',
+            'dynamicToolCall',
+            'collabAgentToolCall',
+          ];
+          const label = known.includes(kind) ? kind : 'unrecognized';
+          if (!execution.itemTypes.includes(label)) execution.itemTypes.push(label);
+        }
+        if (scenario && message.method === 'turn/completed') {
+          const status = message.params?.turn?.status;
+          execution.turnStatus = ['completed', 'interrupted', 'failed'].includes(status)
+            ? status
+            : 'unrecognized';
+          finishExecution();
         }
         const call = pending.get(message.id);
         if (call) {
@@ -267,6 +381,7 @@ function launch(mcpNames) {
   return {
     request,
     stop,
+    exited,
     initialize: async () => {
       await request('initialize', {
         clientInfo: { name: 'openbranches_probe', version: '0.1.0' },
@@ -277,15 +392,25 @@ function launch(mcpNames) {
   };
 }
 const timeout = setTimeout(() => {
-  settle({ readyForModelExecution: false, reason: 'Probe deadline reached.' });
+  if (scenario) finishExecution('Probe deadline reached.');
+  else settle({ readyForModelExecution: false, reason: 'Probe deadline reached.' });
   active?.stop();
 }, 40000);
+const abort = () => {
+  if (scenario) finishExecution('Probe interrupted.');
+  else settle({ readyForModelExecution: false, reason: 'Probe interrupted.' });
+  active?.stop();
+};
+process.once('SIGINT', abort);
+process.once('SIGTERM', abort);
+let result;
 try {
   active = launch([]);
   await active.initialize();
   let { config } = await active.request('config/read', { includeLayers: false });
   const names = Object.keys(config.mcp_servers ?? {});
   active.stop();
+  await active.exited;
   active = launch(names);
   await active.initialize();
   ({ config } = await active.request('config/read', { includeLayers: false }));
@@ -327,16 +452,32 @@ try {
       additionalProperties: false,
     },
   });
-  const result = await observed;
-  console.log(JSON.stringify(result));
-  process.exitCode = result.readyForModelExecution ? 0 : 1;
+  result = await observed;
 } catch (error) {
-  console.log(JSON.stringify({ readyForModelExecution: false, reason: error.message }));
-  process.exitCode = 1;
+  result = {
+    readyForModelExecution: false,
+    reason: error.message,
+    ...(scenario ? { execution: { ...execution } } : {}),
+  };
 } finally {
   clearTimeout(timeout);
   active?.stop();
+  await active?.exited;
   server.closeAllConnections();
   await new Promise((resolve) => server.close(resolve));
+  if (scenario && result?.execution) {
+    try {
+      const contents = await readFile(fixture.writePath, 'utf8');
+      result.execution.writeCanaryChanged = contents !== 'untouched';
+      result.execution.writeMarkerPresent = contents === fixture.marker;
+    } catch {
+      result.execution.writeCanaryChanged = true;
+      result.execution.writeMarkerPresent = false;
+    }
+  }
   await rm(directory, { recursive: true, force: true });
+  process.removeListener('SIGINT', abort);
+  process.removeListener('SIGTERM', abort);
 }
+console.log(JSON.stringify(result));
+process.exitCode = result.readyForModelExecution ? 0 : 1;

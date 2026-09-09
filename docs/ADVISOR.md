@@ -32,7 +32,7 @@ npm run probe:advisor
 
 The probe creates an ephemeral test thread with fictional metadata, a dummy token, and a model provider pointing only to a loopback stub. It disables known execution features and each configured MCP server in the child process, verifies the effective feature/MCP settings, and requests a named profile with no filesystem writes or command-network access. It does not modify the user's Codex configuration or change `CODEX_HOME` or inherited sandbox restrictions. Temporary probe files are removed afterwards.
 
-The stub never forwards model requests. It reports counts, booleans, recognized public tool labels, message roles, known field names, and text lengths. Other tool names are redacted, and message ID values are never printed. It refuses actual generation and does not retain request bodies, credentials, private instructions, tool descriptions, or schemas. The script exits nonzero when it observes tools or context beyond the supplied probe messages.
+The stub never forwards model requests. It reports counts, booleans, recognized public tool labels, message roles, known field names, and text lengths. Other tool names are redacted, and message ID values are never printed. In the default inspection mode it refuses generation. The optional execution fixtures below return a fixed synthetic response stream. Neither mode calls a real model, and the stub does not retain request bodies, credentials, private instructions, tool descriptions, or schemas. The script exits nonzero when it observes tools or context beyond the supplied probe messages.
 
 On the development Mac with Codex 0.144.4, the verified result was:
 
@@ -71,6 +71,40 @@ The restricted catalog changed only capability fields on a temporary copy of the
 Version 0.144.4 rejected the newer `agents.enabled` configuration field and the added feature switches. The probe applies that field and explicit `view_image`/`sleep_tool` feature disables only from the separately verified 0.153.4 version onward. Per-tool configuration names that were ignored by the tested CLI were removed from the experiment rather than counted as effective controls.
 
 `requestAudit.mts` provides the shared, tested diagnostic. It recognizes bounded message IDs used by the newer protocol but rejects unexpected roles, repeated messages, hidden non-text content, malformed tool declarations, and ordinary or nested additional tools. Supplied user evidence cannot substitute for the top-level instructions. The positive fixture proves recognition of a controlled request shape only; it does not authorize model execution. Future production work must verify actual attempted tool calls, controlled framing context, token accounting, cancellation, and the supported authentication path before connecting the advisor runner.
+
+### Attempted execution fixtures
+
+Developers can inspect actual dispatch as well as advertised declarations:
+
+```sh
+npm run probe:advisor -- --attempt=exec-marker
+npm run probe:advisor -- --attempt=exec-read
+npm run probe:advisor -- --attempt=exec-write
+npm run probe:advisor -- --attempt=shell-marker
+npm run probe:advisor -- --attempt=question
+```
+
+Each run creates fresh, owned temporary files and supplies exactly one fixed tool call through the loopback Responses stream. The probe adapts only the fixed public tool's namespace to the observed declaration; it never executes instructions, descriptions, or arbitrary tool names taken from inspected context. The next model request is inspected for that call's output, then receives a fictional final answer. All client action requests are refused. The child is stopped before checking the write canary and removing temporary files. A 40-second probe deadline is followed by bounded child shutdown; interruption also initiates cleanup.
+
+The JavaScript marker is computed by reversing a fixture string, so the expected output never appears verbatim in its arguments. Echoing a failed tool's input cannot establish execution. The read canary is also absent from tool arguments. Diagnostics inspect only output associated with the fixture's call ID, report no output text, and label error patterns as hints. They never interpret a missing marker, timeout, or unrecognized response as proof of isolation. Execution mode always reports `readyForModelExecution: false` and exits nonzero; it is evidence collection, not a production gate override.
+
+Verified on this development Mac with the same disabled features and read-only profile:
+
+| CLI and catalog                       | Attempt                                                 | Observed result                                                                           |
+| ------------------------------------- | ------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Installed 0.144.4, normal catalog     | JavaScript computation through `exec`                   | Computed marker returned, despite disabled execution features in effective configuration  |
+| Installed 0.144.4, normal catalog     | Read/write owned canaries through nested `exec_command` | Missing-tool error hints; read content was not returned and write canary stayed unchanged |
+| Installed 0.144.4, normal catalog     | Direct, unadvertised `exec_command`                     | Unsupported-tool error hint; no marker returned                                           |
+| Installed 0.144.4, normal catalog     | `request_user_input`                                    | Unavailable error hint; no client action request                                          |
+| Temporary 0.153.4, normal catalog     | Advertised `functions.exec`                             | Unavailable error hint; no computed marker returned                                       |
+| Temporary 0.153.4, restricted catalog | Unadvertised `functions.exec`                           | Unsupported-tool error hint; no computed marker returned                                  |
+| Temporary 0.153.4, restricted catalog | Advertised `functions.request_user_input`               | Unavailable error hint; no client action request                                          |
+
+All rows completed their synthetic turns; none called a real model or changed a write canary. Extra developer/user framing remained present. These observations apply to the tested versions, installation, configuration, and mode. They do not establish network isolation, coverage of every capability, or behavior in other modes. In particular, the nested file attempts failed before reaching a shell, so they do not test OS-level filesystem enforcement. The successful JavaScript attempt produced a tool result without a command-execution item notification; a client cannot rely only on those notifications to prevent execution.
+
+The next boundary work is to classify and account for added framing, verify cancellation and the supported existing-sign-in model path, and establish effective restrictions across supported versions. An advertised capability can be disabled at dispatch, while a configuration flag can appear disabled without suppressing an older execution path. Neither the declarations nor the effective configuration alone is sufficient evidence.
+
+Fixture stream format follows the official [custom tool calling guide](https://developers.openai.com/api/docs/guides/function-calling#custom-tools) and [Responses output-item events](https://developers.openai.com/api/reference/resources/responses/streaming-events#response.output_item.done). Protocol behavior is checked against the actual installed app-server, rather than inferred from these API schemas alone.
 
 A successful probe would be a necessary diagnostic result, not sufficient proof of production safety. Before enabling AI, verify the actual model path, supported capabilities, context contents, read-only enforcement, interruption/deadline behavior, authentication/usage failures, grounded output, restart behavior, and explicit diff consent. Do not weaken the contract or silently switch to a different authentication mechanism to make the probe pass.
 
