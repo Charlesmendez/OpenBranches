@@ -3,7 +3,7 @@
 The renderer has no Node.js access. It talks through a narrow typed preload bridge to the Electron main process. Repository changes are observed, not performed.
 
 - `src/domain`: shared branch types, lifecycle classification, evidence labels, deterministic recommendations, semantic evidence revisions, and validated review choices.
-- `src/ui`: React views, reusable components, and workspace/provider hooks. React Flow renders bounded groups; the inventory virtualizes rows.
+- `src/ui`: React views, reusable components, and workspace/provider hooks. React Flow renders bounded groups; the inventory virtualizes rows. Shared navigation helpers and hooks retain per-project session position and coordinate full-list keyboard/focus behavior; see [navigation](NAVIGATION.md).
 - `src/data/demo.ts`: fictional example projects. Real and demo workspaces are separate.
 - `electron/git`: Git installation discovery and explicit Apple setup, read-only Git commands, NUL-delimited parsing, bounded worktree inspection, and a worker client with terminal errors/timeouts. Discovery supplies an absolute executable; inspection clears inherited Git repository/config overrides.
 - `electron/services`: SQLite persistence, repository watching/reconciliation, review decisions, and coordinated project monitoring. A Git failure retains the previous snapshot with an availability error.

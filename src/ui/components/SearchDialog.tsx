@@ -29,7 +29,19 @@ export function SearchDialog({
   );
   const results = matches.slice(0, 50);
   useEffect(() => {
+    const previous = document.activeElement;
+    const element = dialog.current;
     input.current?.focus();
+    return () => {
+      // A selected result may already have focused its new inventory. Restore
+      // the search origin only when closing would otherwise leave focus behind.
+      if (
+        previous instanceof HTMLElement &&
+        previous.isConnected &&
+        (document.activeElement === document.body || element?.contains(document.activeElement))
+      )
+        previous.focus({ preventScroll: true });
+    };
   }, []);
   useEffect(() => {
     setIndex(0);
@@ -53,7 +65,11 @@ export function SearchDialog({
         aria-label="Search all branches"
         ref={dialog}
         onKeyDown={(event) => {
-          if (event.key === 'Escape') close();
+          if (event.key === 'Escape') {
+            event.preventDefault();
+            event.stopPropagation();
+            close();
+          }
           if (event.key === 'ArrowDown') {
             event.preventDefault();
             setIndex((i) => Math.min(i + 1, results.length - 1));

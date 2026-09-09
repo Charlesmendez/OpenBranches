@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowUpRight,
   Command,
@@ -21,6 +21,8 @@ import { useWorkspace } from './hooks/useWorkspace';
 import { useProviders } from './hooks/useProviders';
 import { useGit } from './hooks/useGit';
 import { useReviews } from './hooks/useReviews';
+import { useProjectMemory } from './hooks/useProjectMemory';
+import { mapPositionFor, revealSelection } from './navigation';
 import { GitSetup } from './components/GitSetup';
 import { Sidebar } from './components/Sidebar';
 import { Overview, ActivityList } from './components/Overview';
@@ -39,11 +41,21 @@ export function App() {
   const gitNeedsSetup = !!git.status && git.status.state !== 'ready';
   const { snapshot, mode, setMode, error, setError, loading, adding, add, refresh } = workspace;
   const reviews = useReviews(mode === 'demo', snapshot.repositories);
+  const memory = useProjectMemory(mode, snapshot.repositories, loading);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [view, setView] = useState<View>('map');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [group, setGroup] = useState<Lifecycle>('active');
   const [searchOpen, setSearchOpen] = useState(false);
+  const [navigationRequest, setNavigationRequest] = useState(0);
+  const selectionOrigin = useRef<HTMLElement | null>(null);
+  const closeDetails = () => {
+    setSelectedId(null);
+    requestAnimationFrame(() => {
+      if (selectionOrigin.current?.isConnected)
+        selectionOrigin.current.focus({ preventScroll: true });
+    });
+  };
   const repository = snapshot.repositories.find((r) => r.id === projectId);
   const branches = useMemo(() => (repository ? featureBranches(repository) : []), [repository]);
   const counts = useMemo(() => groupCounts(branches), [branches]);
@@ -52,6 +64,12 @@ export function App() {
     [branches, group],
   );
   const selected = repository?.branches.find((branch) => branch.id === selectedId);
+  useEffect(() => {
+    if (repository && selectedId && !selected) closeDetails();
+  }, [repository, selectedId, selected]);
+  useEffect(() => {
+    if (projectId) memory.remember(projectId, { selectedId, group });
+  }, [projectId, mode, selectedId, group]);
   useEffect(() => {
     if (
       !loading &&
@@ -68,9 +86,9 @@ export function App() {
         event.preventDefault();
         setSearchOpen((open) => !open);
       }
-      if (event.key === 'Escape') {
+      if (event.key === 'Escape' && !event.defaultPrevented) {
         setSearchOpen(false);
-        setSelectedId(null);
+        closeDetails();
       }
     };
     window.addEventListener('keydown', listener);
@@ -82,15 +100,34 @@ export function App() {
     return () => clearTimeout(timer);
   }, [error, setError]);
   const selectProject = (id: string | null) => {
+    const target = snapshot.repositories.find((repository) => repository.id === id);
+    const saved =
+      id && target ? revealSelection(memory.read(id), featureBranches(target)) : undefined;
+    if (id && saved) memory.remember(id, saved);
     setProjectId(id);
-    setSelectedId(null);
-    setGroup('active');
+    setSelectedId(saved?.selectedId ?? null);
+    setGroup(saved?.group ?? 'active');
   };
-  const selectBranch = (branch: Branch) => setSelectedId(branch.id);
+  const selectBranch = (branch: Branch) => {
+    selectionOrigin.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setSelectedId(branch.id);
+  };
   const navigateBranch = (repoId: string, branchId?: string) => {
+    memory.remember(repoId, { inventory: undefined });
+    setNavigationRequest((request) => request + 1);
     setProjectId(repoId);
     setSelectedId(branchId ?? null);
+    setGroup(memory.read(repoId).group);
     setView(branchId ? 'inventory' : 'map');
+  };
+  const changeView = (next: View) => {
+    if (next === 'map' && repository && selected) {
+      const restored = revealSelection({ ...memory.read(repository.id), selectedId }, branches);
+      memory.remember(repository.id, restored);
+      setGroup(restored.group);
+    }
+    setView(next);
   };
   const addRepository = async () => {
     if (gitNeedsSetup) {
@@ -199,7 +236,7 @@ export function App() {
             {repository && (
               <>
                 <span>/</span>
-                <button onClick={() => setView('map')}>{repository.name}</button>
+                <button onClick={() => changeView('map')}>{repository.name}</button>
               </>
             )}
             {view === 'attention' && (
@@ -232,7 +269,7 @@ export function App() {
                   role="tab"
                   aria-selected={view === 'map'}
                   className={view === 'map' ? 'selected' : ''}
-                  onClick={() => setView('map')}
+                  onClick={() => changeView('map')}
                 >
                   <Map size={14} />
                   Map
@@ -389,11 +426,16 @@ export function App() {
             />
           ) : view === 'inventory' ? (
             <Inventory
-              key={repository.id}
+              key={`${mode}:${repository.id}:${navigationRequest}`}
               repository={repository}
               branches={repository.branches}
               selectedId={selectedId}
               onSelect={selectBranch}
+              initialPosition={memory.read(repository.id).inventory}
+              remember={(inventory) => memory.remember(repository.id, { inventory })}
+              onFocus={(element) => {
+                selectionOrigin.current = element;
+              }}
             />
           ) : (
             <div className="map-content">
@@ -404,7 +446,10 @@ export function App() {
                     role="tab"
                     aria-selected={group === value}
                     className={`${value} ${group === value ? 'selected' : ''}`}
-                    onClick={() => setGroup(value)}
+                    onClick={() => {
+                      setGroup(value);
+                      setSelectedId(null);
+                    }}
                   >
                     <i />
                     <span>{lifecycleLabels[value]}</span>
@@ -429,6 +474,15 @@ export function App() {
                 selectedId={selectedId}
                 onSelect={selectBranch}
                 onInventory={() => setView('inventory')}
+                initialPosition={
+                  memory.read(repository.id).maps[group] ?? mapPositionFor(grouped, selectedId)
+                }
+                remember={(position) =>
+                  memory.remember(repository.id, {
+                    maps: { ...memory.read(repository.id).maps, [group]: position },
+                  })
+                }
+                onScopeChange={() => setSelectedId(null)}
               />
               <div className="map-bottom-note">
                 <span>
@@ -457,7 +511,7 @@ export function App() {
           branch={selected}
           repository={repository}
           demo={mode === 'demo'}
-          close={() => setSelectedId(null)}
+          close={closeDetails}
           onError={setError}
         />
       )}

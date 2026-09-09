@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import type { Branch, Repository } from '../../domain/types';
 import { BranchStatus, EmptyState, Locations } from './Primitives';
+import { clusterFor, MAP_PAGE_SIZE, type MapPosition } from '../navigation';
 import '@xyflow/react/dist/style.css';
 
 type MapData = {
@@ -120,15 +121,31 @@ export function BranchMap({
   selectedId,
   onSelect,
   onInventory,
+  initialPosition,
+  remember,
+  onScopeChange,
 }: {
   repository: Repository;
   branches: Branch[];
   selectedId: string | null;
   onSelect: (branch: Branch) => void;
   onInventory: () => void;
+  initialPosition?: MapPosition;
+  remember: (position: MapPosition) => void;
+  onScopeChange: () => void;
 }) {
-  const [expanded, setExpanded] = useState<string | null>(null);
-  const [page, setPage] = useState(0);
+  const [position, setPosition] = useState<MapPosition>(
+    initialPosition ?? { expanded: null, page: 0 },
+  );
+  const { expanded, page } = position;
+  const move = (next: MapPosition) => {
+    setPosition(next);
+    remember(next);
+  };
+  const changeScope = (next: MapPosition) => {
+    onScopeChange();
+    move(next);
+  };
   const clusters = useMemo(
     () =>
       [
@@ -136,21 +153,21 @@ export function BranchMap({
           id: 'review',
           label: 'Pull requests',
           tone: 'violet',
-          branches: branches.filter((b) => b.pullRequest?.state === 'open'),
+          branches: branches.filter((b) => clusterFor(b) === 'review'),
           hint: 'Drafts and review',
         },
         {
           id: 'local',
           label: 'On your Mac',
           tone: 'amber',
-          branches: branches.filter((b) => b.pullRequest?.state !== 'open' && !b.remote),
+          branches: branches.filter((b) => clusterFor(b) === 'local'),
           hint: 'Local branches',
         },
         {
           id: 'tracked',
           label: 'Connected work',
           tone: 'teal',
-          branches: branches.filter((b) => b.pullRequest?.state !== 'open' && b.remote),
+          branches: branches.filter((b) => clusterFor(b) === 'tracked'),
           hint: 'With remote references',
         },
       ].filter((c) => c.branches.length),
@@ -159,10 +176,11 @@ export function BranchMap({
   const cluster = clusters.find((c) => c.id === expanded);
   const currentPage = Math.min(
     page,
-    Math.max(0, Math.ceil((cluster?.branches.length ?? 0) / 6) - 1),
+    Math.max(0, Math.ceil((cluster?.branches.length ?? 0) / MAP_PAGE_SIZE) - 1),
   );
   const visible = useMemo(
-    () => cluster?.branches.slice(currentPage * 6, (currentPage + 1) * 6) ?? [],
+    () =>
+      cluster?.branches.slice(currentPage * MAP_PAGE_SIZE, (currentPage + 1) * MAP_PAGE_SIZE) ?? [],
     [cluster, currentPage],
   );
   const { nodes, edges } = useMemo(() => {
@@ -238,8 +256,7 @@ export function BranchMap({
             hint: c.hint,
             clusterId: c.id,
             activate: () => {
-              setExpanded(c.id);
-              setPage(0);
+              changeScope({ expanded: c.id as MapPosition['expanded'], page: 0 });
             },
           },
         });
@@ -284,7 +301,10 @@ export function BranchMap({
       <div className="map-toolbar">
         <div>
           {cluster ? (
-            <button className="text-button" onClick={() => setExpanded(null)}>
+            <button
+              className="text-button"
+              onClick={() => changeScope({ expanded: null, page: 0 })}
+            >
               <ArrowLeft size={14} />
               All groups<span className="toolbar-slash">/</span>
               <strong>{cluster.label}</strong>
@@ -309,7 +329,15 @@ export function BranchMap({
           edges={edges}
           nodeTypes={nodeTypes}
           nodesFocusable={false}
-          fitView
+          fitView={!position.viewport}
+          defaultViewport={position.viewport}
+          onMoveEnd={(_event, viewport) => {
+            move({
+              expanded: (cluster?.id as MapPosition['expanded']) ?? null,
+              page: currentPage,
+              viewport,
+            });
+          }}
           fitViewOptions={{ padding: 0.16, maxZoom: 1.06 }}
           minZoom={0.3}
           maxZoom={1.5}
@@ -326,18 +354,22 @@ export function BranchMap({
           <Controls showInteractive={false} position="bottom-left" />
         </ReactFlow>
       </div>
-      {cluster && cluster.branches.length > 6 && (
+      {cluster && cluster.branches.length > MAP_PAGE_SIZE && (
         <div className="map-pagination">
-          <button disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>
+          <button
+            disabled={currentPage === 0}
+            onClick={() => changeScope({ expanded: position.expanded, page: currentPage - 1 })}
+          >
             Previous
           </button>
           <span>
-            {currentPage * 6 + 1}–{Math.min((currentPage + 1) * 6, cluster.branches.length)} of{' '}
+            {currentPage * MAP_PAGE_SIZE + 1}–
+            {Math.min((currentPage + 1) * MAP_PAGE_SIZE, cluster.branches.length)} of{' '}
             {cluster.branches.length}
           </span>
           <button
-            disabled={(currentPage + 1) * 6 >= cluster.branches.length}
-            onClick={() => setPage(currentPage + 1)}
+            disabled={(currentPage + 1) * MAP_PAGE_SIZE >= cluster.branches.length}
+            onClick={() => changeScope({ expanded: position.expanded, page: currentPage + 1 })}
           >
             Next
           </button>
