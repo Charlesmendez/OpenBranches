@@ -8,6 +8,7 @@ import { requireOwner, workspaceAccess, type Credential } from './access';
 import { TeamError, unauthorized } from './errors';
 import { secretHash, validSecret } from './secrets';
 import { pairingApprovalSchema, teamId } from '../../src/team/protocol';
+import type { TeamAssets } from './static';
 
 function json(response: ServerResponse, status: number, value: unknown) {
   if (response.destroyed || response.writableEnded) return;
@@ -84,6 +85,7 @@ export function createTeamServer(
   store: TeamStore,
   oauth: TeamOAuth,
   events: TeamEvents,
+  assets?: TeamAssets,
 ) {
   const limits = new RequestLimits();
   const streams = new Set<ServerResponse>();
@@ -95,7 +97,7 @@ export function createTeamServer(
       response.setHeader('Referrer-Policy', 'no-referrer');
       response.setHeader(
         'Content-Security-Policy',
-        "default-src 'none'; style-src 'self'; script-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
+        "default-src 'none'; style-src 'self'; style-src-attr 'unsafe-inline'; script-src 'self'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
       );
       void route(request, response).catch((error: unknown) => {
         if (response.headersSent) {
@@ -136,6 +138,15 @@ export function createTeamServer(
       throw new TeamError(421, 'wrong_host', 'Use the configured team service address.');
     if (!limits.allow(request, path.startsWith('/auth/') || path === '/api/pairings'))
       throw new TeamError(429, 'rate_limited', 'Too many requests. Try again in a minute.');
+    const asset = assets?.get(path);
+    if (asset && (method === 'GET' || method === 'HEAD')) {
+      response.writeHead(200, {
+        'Content-Type': asset.type,
+        'Content-Length': asset.body.byteLength,
+      });
+      response.end(method === 'HEAD' ? undefined : asset.body);
+      return;
+    }
     if (path === '/auth/github' && method === 'GET') {
       const started = await oauth.begin();
       response.setHeader('Set-Cookie', setCookie(config, 'browser', started.browser, 600));
@@ -153,7 +164,7 @@ export function createTeamServer(
         setCookie(config, 'session', signed.token, 28800),
         setCookie(config, 'browser', '', 0),
       ]);
-      response.writeHead(302, { Location: '/api/session' });
+      response.writeHead(302, { Location: '/' });
       response.end();
       return;
     }
@@ -219,6 +230,7 @@ export function createTeamServer(
           projectId: url.searchParams.get('project') ?? undefined,
           memberId: url.searchParams.get('member') ?? undefined,
           after: cursor ? cursor.split(':') : undefined,
+          query: url.searchParams.get('q') ?? undefined,
         }),
       );
       return;
@@ -258,6 +270,10 @@ export function createTeamServer(
     }
     if (resource === 'members' && method === 'DELETE' && id && !action) {
       json(response, 200, await store.members.remove(auth, workspaceId, id));
+      return;
+    }
+    if (resource === 'projects' && method === 'GET' && id && action === 'access' && !memberId) {
+      json(response, 200, await store.views.projectAccess(auth, workspaceId, id));
       return;
     }
     if (resource === 'projects' && method === 'POST' && !id) {

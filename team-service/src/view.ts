@@ -1,11 +1,15 @@
 import { z } from 'zod';
-import { sharedSnapshotSchema, teamId, type TeamView } from '../../src/team/protocol';
+import { sharedSnapshotSchema, teamId } from '../../src/team/protocol';
+import type { TeamPage } from '../../src/team/responses';
+import { denied } from './errors';
 import { TeamDatabase } from './db';
-import { workspaceAccess, type Credential } from './access';
+import { requireOwner, workspaceAccess, type Credential } from './access';
+import { visibleShares, searchPattern } from './visible';
 const pageSchema = z.object({
   projectId: teamId.optional(),
   memberId: teamId.optional(),
   after: z.tuple([teamId, teamId]).optional(),
+  query: z.string().max(160).optional(),
 });
 
 export class TeamViews {
@@ -14,7 +18,7 @@ export class TeamViews {
     credential: Credential,
     workspaceId: string,
     options: unknown = {},
-  ): Promise<TeamView & { nextCursor: string | null }> {
+  ): Promise<TeamPage> {
     const page = pageSchema.parse(options);
     return this.db.transaction(async (client) => {
       const principal = await workspaceAccess(client, credential, workspaceId);
@@ -28,24 +32,25 @@ export class TeamViews {
         WHERE p.workspace_id=$1 AND p.active AND ($3::boolean OR a.user_id IS NOT NULL) ORDER BY p.name,p.id LIMIT 1001`,
         [workspaceId, principal.userId, principal.role === 'owner'],
       );
+      const params = [
+        workspaceId,
+        principal.userId,
+        principal.role === 'owner',
+        page.projectId ?? null,
+        page.memberId ?? null,
+        searchPattern(page.query),
+      ];
+      const totals = await client.query(
+        `SELECT count(DISTINCT d.user_id)::integer AS people,count(DISTINCT p.id)::integer AS projects,
+        COALESCE(sum(jsonb_array_length(matched.branches)),0)::bigint::text AS reports,count(*)::integer AS snapshots,
+        count(*) FILTER (WHERE d.expires_at<=now() OR s.observed_at<now()-interval '5 minutes' OR s.received_at<now()-interval '5 minutes' OR s.observed_at>now()+interval '1 minute' OR (s.snapshot->>'sourceError')::boolean)::integer AS stale,
+        COALESCE(sum((s.snapshot->>'omittedBranches')::integer),0)::bigint::text AS omitted ${visibleShares}`,
+        params,
+      );
       const rows = await client.query(
-        `SELECT s.project_id AS "projectId",d.id AS "deviceId",d.user_id AS "memberId",d.name AS "deviceName",d.expires_at AS "deviceExpiresAt",s.epoch::text,s.sequence::text,s.received_at AS "receivedAt",s.snapshot
-        FROM ob_shares s JOIN ob_devices d ON d.id=s.device_id AND d.workspace_id=s.workspace_id
-        JOIN ob_members m ON m.workspace_id=d.workspace_id AND m.user_id=d.user_id AND m.active
-        JOIN ob_projects p ON p.id=s.project_id AND p.workspace_id=s.workspace_id AND p.active
-        LEFT JOIN ob_project_access a ON a.workspace_id=p.workspace_id AND a.project_id=p.id AND a.user_id=$2
-        WHERE s.workspace_id=$1 AND s.enabled AND s.snapshot IS NOT NULL AND d.revoked_at IS NULL
-          AND ($3::boolean OR a.user_id IS NOT NULL) AND ($4::uuid IS NULL OR p.id=$4) AND ($5::uuid IS NULL OR d.user_id=$5)
-          AND ($6::uuid IS NULL OR (d.id,p.id)>($6::uuid,$7::uuid)) ORDER BY d.id,p.id LIMIT 11`,
-        [
-          workspaceId,
-          principal.userId,
-          principal.role === 'owner',
-          page.projectId ?? null,
-          page.memberId ?? null,
-          page.after?.[0] ?? null,
-          page.after?.[1] ?? null,
-        ],
+        `SELECT s.project_id AS "projectId",d.id AS "deviceId",d.user_id AS "memberId",d.name AS "deviceName",d.expires_at AS "deviceExpiresAt",s.epoch::text,s.sequence::text,s.received_at AS "receivedAt",jsonb_set(s.snapshot,'{branches}',matched.branches) AS snapshot
+        ${visibleShares} AND ($7::uuid IS NULL OR (d.id,p.id)>($7::uuid,$8::uuid)) ORDER BY d.id,p.id LIMIT 11`,
+        [...params, page.after?.[0] ?? null, page.after?.[1] ?? null],
       );
       const selected = rows.rows.slice(0, 10);
       const last = selected.at(-1);
@@ -62,6 +67,11 @@ export class TeamViews {
           deviceExpiresAt: row.deviceExpiresAt.toISOString(),
           snapshot: sharedSnapshotSchema.parse(row.snapshot),
         })),
+        totals: {
+          ...totals.rows[0],
+          reports: Number(totals.rows[0].reports),
+          omitted: Number(totals.rows[0].omitted),
+        },
         checkedAt: new Date().toISOString(),
         nextCursor: rows.rows.length > 10 && last ? `${last.deviceId}:${last.projectId}` : null,
       };
@@ -76,6 +86,23 @@ export class TeamViews {
         [workspaceId, principal.role === 'owner' && !principal.deviceId, principal.userId],
       );
       return { devices: result.rows.slice(0, 1000), complete: result.rows.length <= 1000 };
+    });
+  }
+  async projectAccess(credential: Credential, workspaceId: string, projectId: string) {
+    return this.db.transaction(async (client) => {
+      requireOwner(await workspaceAccess(client, credential, workspaceId));
+      const project = await client.query(
+        'SELECT id FROM ob_projects WHERE workspace_id=$1 AND id=$2 AND active',
+        [workspaceId, projectId],
+      );
+      if (!project.rowCount) throw denied();
+      const result = await client.query(
+        `SELECT m.user_id AS "memberId",(a.user_id IS NOT NULL) AS enabled,COALESCE(a.can_share,false) AS "canShare"
+        FROM ob_members m LEFT JOIN ob_project_access a ON a.workspace_id=m.workspace_id AND a.user_id=m.user_id AND a.project_id=$2
+        WHERE m.workspace_id=$1 AND m.active AND m.role='member' ORDER BY m.user_id LIMIT 1001`,
+        [workspaceId, projectId],
+      );
+      return { members: result.rows.slice(0, 1000), complete: result.rows.length <= 1000 };
     });
   }
 }

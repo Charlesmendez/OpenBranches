@@ -8,6 +8,9 @@ COPY team-service/package.json team-service/package-lock.json ./team-service/
 RUN npm ci --prefix team-service --ignore-scripts --no-audit --no-fund
 COPY src ./src
 COPY team-service/src ./team-service/src
+COPY team-service/ui ./team-service/ui
+COPY assets/brand.svg ./assets/brand.svg
+COPY assets/providers ./assets/providers
 COPY scripts/build-team.mjs ./scripts/build-team.mjs
 RUN node scripts/build-team.mjs
 

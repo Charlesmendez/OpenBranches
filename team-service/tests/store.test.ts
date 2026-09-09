@@ -4,6 +4,8 @@ import { TeamDatabase } from '../src/db';
 import { TeamStore } from '../src/store';
 import { TeamEvents } from '../src/events';
 import { secretHash } from '../src/secrets';
+import { teamViewSchema, projectAccessSchema } from '../../src/team/responses';
+import { searchPattern } from '../src/visible';
 import type { Credential } from '../src/access';
 import { sharedWorkStale, type SharedSnapshot } from '../../src/team/protocol';
 
@@ -525,5 +527,77 @@ describe('PostgreSQL team authorization and sharing', () => {
     expect(owner.projects).toHaveLength(1000);
     expect(owner.coverage).toEqual({ people: true, projects: false });
     expect((await f.store.views.view(f.member, f.workspace.id)).coverage.projects).toBe(true);
+  });
+  it('searches authorized branch metadata and counts only matching reports', async () => {
+    const f = await fixture(),
+      value = snapshot();
+    value.branches.push({ ...value.branches[0], key: 'c'.repeat(64), name: 'fix/billing_100%' });
+    value.branches[0].tasks = [
+      {
+        key: 'd'.repeat(64),
+        tool: 'claude-code',
+        association: 'verified',
+        checkedAt: value.observedAt,
+      },
+    ];
+    await f.store.sharing.publish(f.device.credential, f.workspace.id, f.project.id, {
+      epoch: 1,
+      sequence: 1,
+      snapshot: value,
+    });
+    const found = await f.store.views.view(f.member, f.workspace.id, { query: 'billing_100%' });
+    expect(teamViewSchema.safeParse(found).success).toBe(true);
+    expect(found.totals.reports).toBe(1);
+    expect(found.work[0].snapshot.branches.map((branch) => branch.name)).toEqual([
+      'fix/billing_100%',
+    ]);
+    expect(
+      (await f.store.views.view(f.member, f.workspace.id, { query: '100_' })).totals.reports,
+    ).toBe(0);
+    expect(searchPattern('100%_')).toBe('%100\\%\\_%');
+    expect(
+      (await f.store.views.view(f.member, f.workspace.id, { query: 'Claude Code' })).totals.reports,
+    ).toBe(1);
+    const privateProject = await f.store.members.createProject(
+        f.owner,
+        f.workspace.id,
+        'Private billing project',
+      ),
+      ownerDevice = await f.pair(f.owner, 'Fictional private Mac');
+    await f.store.sharing.change(ownerDevice.credential, f.workspace.id, privateProject.id, {
+      expectedEpoch: 0,
+      enabled: true,
+      consent,
+    });
+    await f.store.sharing.publish(ownerDevice.credential, f.workspace.id, privateProject.id, {
+      epoch: 1,
+      sequence: 1,
+      snapshot: snapshot(),
+    });
+    expect(
+      (await f.store.views.view(f.member, f.workspace.id, { query: 'Private billing project' }))
+        .totals.reports,
+    ).toBe(0);
+    expect(
+      (await f.store.views.view(f.owner, f.workspace.id, { query: 'Private billing project' }))
+        .totals.reports,
+    ).toBe(1);
+  });
+  it('exposes project permission settings only to the workspace owner browser', async () => {
+    const f = await fixture();
+    const access = await f.store.views.projectAccess(f.owner, f.workspace.id, f.project.id);
+    expect(projectAccessSchema.safeParse(access).success).toBe(true);
+    expect(access.members).toEqual([{ memberId: f.memberId, enabled: true, canShare: true }]);
+    await expect(
+      f.store.views.projectAccess(f.member, f.workspace.id, f.project.id),
+    ).rejects.toMatchObject({ status: 403 });
+    const ownerDevice = await f.pair(f.owner, 'Fictional owner device');
+    await expect(
+      f.store.views.projectAccess(ownerDevice.credential, f.workspace.id, f.project.id),
+    ).rejects.toMatchObject({ status: 403 });
+    const other = await fixture();
+    await expect(
+      f.store.views.projectAccess(f.owner, f.workspace.id, other.project.id),
+    ).rejects.toMatchObject({ status: 403 });
   });
 });

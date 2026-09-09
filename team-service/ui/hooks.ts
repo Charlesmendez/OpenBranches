@@ -1,0 +1,136 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { TeamApiError, type TeamClient, type TeamFilter } from '../../src/team/client';
+import { loadTeamView, type LoadedTeamView } from '../../src/team/loadView';
+export function useAction() {
+  const [busy, setBusy] = useState(false),
+    [error, setError] = useState('');
+  const alive = useRef(true),
+    running = useRef(false);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
+  const run = async (action: () => Promise<void>) => {
+    if (running.current) return;
+    running.current = true;
+    setBusy(true);
+    setError('');
+    try {
+      await action();
+    } catch (error) {
+      if (alive.current)
+        setError(error instanceof Error ? error.message : 'The action could not complete.');
+    } finally {
+      running.current = false;
+      if (alive.current) setBusy(false);
+    }
+  };
+  return { busy, error, run, clear: () => setError('') };
+}
+export function useTeamData(client: TeamClient, workspace: string, filter: TeamFilter) {
+  const [data, setData] = useState<LoadedTeamView>(),
+    [error, setError] = useState(''),
+    [busy, setBusy] = useState(true),
+    [version, setVersion] = useState(0),
+    [pages, setPages] = useState(1),
+    [connection, setConnection] = useState<'connecting' | 'connected' | 'offline'>('connecting');
+  const scope = JSON.stringify(filter),
+    previous = useRef(scope);
+  const loading = useRef(busy),
+    pending = useRef(false);
+  const refresh = useCallback(() => {
+    if (loading.current) {
+      pending.current = true;
+      return;
+    }
+    setVersion((value) => value + 1);
+  }, []);
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'visible' && !loading.current) refresh();
+    }, 60000);
+    return () => clearInterval(timer);
+  }, [refresh]);
+  useEffect(() => {
+    const source = new EventSource(client.eventsPath(workspace));
+    let revision = '';
+    const update = (event: MessageEvent) => {
+      try {
+        const next = JSON.parse(event.data).revision;
+        if (typeof next !== 'string' || !/^\d+$/.test(next)) return;
+        setConnection('connected');
+        if (next !== revision) {
+          revision = next;
+          refresh();
+        }
+      } catch {}
+    };
+    source.addEventListener('invalidate', update as EventListener);
+    source.addEventListener('heartbeat', update as EventListener);
+    source.addEventListener('access_revoked', () => {
+      source.close();
+      setData(undefined);
+      setConnection('offline');
+      setError('Your workspace access changed. Sign in again to continue.');
+      client.accessChanged();
+    });
+    source.addEventListener('unavailable', () => {
+      setConnection('offline');
+    });
+    source.onerror = () => setConnection('offline');
+    return () => source.close();
+  }, [client, workspace, refresh]);
+  useEffect(() => {
+    const abort = new AbortController();
+    let wanted = pages;
+    if (previous.current !== scope) {
+      previous.current = scope;
+      setBusy(true);
+      setPages(1);
+      wanted = 1;
+    }
+    loading.current = true;
+    const timer = setTimeout(
+      () => {
+        setBusy(true);
+        setError('');
+        void loadTeamView(client, workspace, filter, wanted, abort.signal)
+          .then((value) => {
+            if (!abort.signal.aborted) setData(value);
+          })
+          .catch((error) => {
+            if (abort.signal.aborted) return;
+            if (error instanceof TeamApiError && (error.status === 401 || error.status === 403))
+              setData(undefined);
+            setError(error instanceof Error ? error.message : 'Could not load the workspace.');
+          })
+          .finally(() => {
+            if (!abort.signal.aborted) {
+              loading.current = false;
+              setBusy(false);
+              if (pending.current) {
+                pending.current = false;
+                setVersion((value) => value + 1);
+              }
+            }
+          });
+      },
+      filter.query ? 220 : 0,
+    );
+    return () => {
+      clearTimeout(timer);
+      abort.abort();
+    };
+  }, [client, workspace, scope, version, pages]);
+  return {
+    data,
+    error,
+    busy,
+    connection,
+    refresh,
+    loadMore: () => setPages((value) => Math.min(10, value + 1)),
+    atLimit: pages >= 10 || data?.limitReached === true,
+  };
+}

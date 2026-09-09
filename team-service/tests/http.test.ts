@@ -59,7 +59,22 @@ async function fixture() {
     });
   });
   const oauth = new TeamOAuth(db, config, store.identities, request),
-    server = createTeamServer(config, store, oauth, events);
+    server = createTeamServer(
+      config,
+      store,
+      oauth,
+      events,
+      new Map([
+        [
+          '/',
+          {
+            type: 'text/html; charset=utf-8',
+            body: Buffer.from('<!doctype html><title>Fictional team UI</title>'),
+          },
+        ],
+        ['/team.js', { type: 'text/javascript', body: Buffer.from('/* fictional asset */') }],
+      ]),
+    );
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   servers.push(server);
   const address = server.address();
@@ -355,5 +370,23 @@ describe('team HTTP and OAuth boundaries', () => {
     });
     expect(bad.status).toBe(400);
     expect(await bad.text()).not.toContain('PRIVATE SECRET');
+  });
+  it('serves only fixed UI assets without exposing source or accepting asset mutations', async () => {
+    const f = await fixture();
+    const page = await f.api('/');
+    expect(page.status).toBe(200);
+    expect(page.headers.get('content-type')).toContain('text/html');
+    expect(await page.text()).toContain('Fictional team UI');
+    expect(page.headers.get('content-security-policy')).toContain("frame-ancestors 'none'");
+    expect((await f.api('/team.js')).status).toBe(200);
+    expect((await f.api('/src/main.ts')).status).toBe(401);
+    expect((await f.api('/team.js', { method: 'POST', value: {} })).status).toBe(401);
+    const begin = await f.begin();
+    const callback = await f.api(
+      '/auth/callback?' +
+        new URLSearchParams({ state: begin.url.searchParams.get('state')!, code: 'owner-code' }),
+      { cookie: begin.cookie },
+    );
+    expect(callback.headers.get('location')).toBe('/');
   });
 });

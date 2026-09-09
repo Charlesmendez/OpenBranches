@@ -81,43 +81,8 @@ export const pairingApprovalSchema = z.strictObject({
   userCode: z.string().regex(/^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$/),
 });
 
-export interface TeamPerson {
-  id: string;
-  githubId: string;
-  login: string;
-  role: 'owner' | 'member';
-}
-export interface TeamProject {
-  id: string;
-  name: string;
-  githubId: string | null;
-  githubSlug: string | null;
-  canShare: boolean;
-}
-export interface TeamWorkspace {
-  id: string;
-  name: string;
-  revision: string;
-}
-export interface SharedWork {
-  projectId: string;
-  deviceId: string;
-  memberId: string;
-  deviceName: string;
-  deviceExpiresAt: string;
-  epoch: number;
-  sequence: number;
-  receivedAt: string;
-  snapshot: SharedSnapshot;
-}
-export interface TeamView {
-  workspace: TeamWorkspace;
-  people: TeamPerson[];
-  projects: TeamProject[];
-  work: SharedWork[];
-  checkedAt: string;
-  coverage: { people: boolean; projects: boolean };
-}
+export type { TeamPerson, TeamProject, TeamWorkspace, TeamView, SharedWork } from './responses';
+import type { SharedWork } from './responses';
 
 /** The server enforces the stored consent, independently of the companion. */
 export function snapshotWithinConsent(snapshot: SharedSnapshot, consent: ShareConsent) {

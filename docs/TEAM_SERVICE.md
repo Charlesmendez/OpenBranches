@@ -1,8 +1,30 @@
-# Team service: developer API preview
+# Team service: developer preview
 
 The optional service now implements GitHub browser identity verification, workspace membership, scoped device pairing, project permissions, selected metadata snapshots, revocation, and live invalidation events. It uses PostgreSQL and a separate Node.js process. Personal desktop use does not install or connect to it.
 
-This is an **API preview**. There is no browser administration screen or Mac pairing/publishing interface yet. GitHub App installation ingestion, organization membership synchronization, company PR alerts, and real two-member/device verification remain incomplete. Running this service does not automatically share any desktop projects. Do not describe it as a usable team release.
+The service includes a **browser workspace preview**: grouped shared branch reports, permission-aware search and totals, a focused branch inspector, people/project administration, pairing approval, and device revocation. The Mac pairing/publishing interface, GitHub App installation ingestion, organization membership synchronization, company PR alerts, and real two-member/device verification remain incomplete. Running this service does not automatically share any desktop projects. This is not a usable team release yet.
+
+## Try the fictional team
+
+With Node.js 24, root and team dependencies installed, and Docker running:
+
+```sh
+npm run team:preview
+```
+
+Open the loopback URL printed in the terminal. The preview creates its own disposable database containing eight fictional people, four projects, and 400 branch reports. Its visible banner switches between an owner and a member account. A temporary pairing code is printed for reviewing device approval. Permission changes, project removal, and device revocation operate on this fictional database through the real service API. Reports age naturally and become outdated after five minutes; restart the preview for fresh fixtures. Ctrl-C stops the process and its owned database container.
+
+This command does not read local repositories or use real GitHub accounts. Its fixture sign-in routes exist only in the development entry point, which is excluded from the production container. Never expose the fictional preview on a shared host. It verifies browser interaction with synthetic data, not actual GitHub authorization or separate Macs.
+
+## Browser behavior
+
+Shared work starts with collapsed person groups; switch to project groups or search to reveal relevant branches. Groups initially show eight reports and expand in batches. Search covers branch names, commit IDs, people, projects, recorded tools/models, and explicitly shared task titles. Counts and results use the same project permissions. A report is one device's observation; two devices reporting the same branch are not counted as two unique branches.
+
+Details show the reporting person/device, observed and received times, recorded coding tools/models, working-copy counts, and independent integration-target ancestry. Ancestry does not prove squash-merge equivalence, ownership, or live activity. Disconnected or old reports remain visibly outdated.
+
+Live events invalidate the view after committed changes. The browser coalesces refreshes, polls once a minute while visible for time-dependent totals, and displays reconnection state. Filter changes cancel obsolete reads. Paginated results must share a workspace revision; otherwise the browser restarts the read. Pages have an 8 MB response bound; a loaded view stops at ten pages or 16 MB and asks the viewer to narrow the scope. Workspace data stays in memory and is cleared when access is revoked. Incomplete lists and omitted branches remain explicit.
+
+Owners can add/remove people and team projects and separately grant viewing or sharing access. Members see their available projects and only their own devices. Pairing approval shows the account, team, and device before confirmation; pairing alone enables no project sharing. Removing a project or revoking a device withdraws shared reports without modifying Git repositories.
 
 ## Run the tests
 
@@ -29,7 +51,7 @@ Copy `team-service/.env.example` to `team-service/.env` and fill the empty setti
 docker compose --env-file team-service/.env -f team-service/compose.yaml up --build -d
 ```
 
-The example listens on `127.0.0.1:4389`, keeps PostgreSQL private on the container network, and stores its data in a named volume. Check `/health`, then open `/auth/github` to sign in. The callback currently displays `/api/session` JSON. Further actions are API operations until the administration screen is implemented.
+The example listens on `127.0.0.1:4389`, keeps PostgreSQL private on the container network, and stores its data in a named volume. Check `/health`, then open `/` for the browser workspace. Continue with GitHub to sign in; the callback returns to the workspace. The server serves only the three fixed build assets, with a same-origin content security policy and no inline scripts.
 
 For a shared host, place an HTTPS reverse proxy in front of the loopback listener, preserve the configured Host header, and disable response buffering for `/api/workspaces/:id/events`. Set `OPENBRANCHES_TEAM_ORIGIN` to that exact public HTTPS origin. Remote HTTP origins are rejected. Cookies are HttpOnly, SameSite=Lax, and Secure on HTTPS; browser mutations require the exact Origin header. No forwarded client address is trusted: the current per-address rate limit is shared by clients behind the proxy. Proxy limits and scale/load verification remain release work.
 
@@ -81,6 +103,7 @@ All workspace operations are scoped to `/api/workspaces/:workspaceId`. Browser s
 | Add / remove members                | `POST /members`, `DELETE /members/:memberId`                                   |
 | Create / remove local team projects | `POST /projects`, `DELETE /projects/:projectId`                                |
 | Grant project read/sharing access   | `PUT /projects/:projectId/access/:memberId`                                    |
+| Read project access (owner browser) | `GET /projects/:projectId/access`                                              |
 | Read / change device sharing        | `GET /shares`, `PUT /shares/:projectId`                                        |
 | Publish selected metadata           | `POST /shares/:projectId/snapshots`                                            |
 
@@ -88,6 +111,8 @@ All workspace operations are scoped to `/api/workspaces/:workspaceId`. Browser s
 
 Automated PostgreSQL and HTTP tests cover tenant isolation, distinct member/device identities, project permissions, state/PKCE and callback replay, CSRF, scoped device powers, stored consent, upload order, unsharing races, authorization after a queued revocation, restart behavior, revocation events, stale devices, pagination, and bounded coverage. Reconnection tests simulate repeated outages and shutdown races. GitHub responses in OAuth tests are fictional injected provider responses; real GitHub browser authorization is not yet verified.
 
-At this milestone, 189 desktop/domain tests and 25 team tests pass, as do both builds, type checks, formatting, and the team runtime dependency audit. A local ARM64 container check verified the non-root read-only runtime, initial migration, health endpoint, anonymous session denial, and pending pairing persistence across an actual process restart. Its database and network were disposable fictional fixtures and were removed afterward. GitHub-hosted CI is configured separately; its result must be checked on the pushed commit.
+The current suites pass 197 desktop/domain/client tests and 28 team tests, along with both builds, type checks, and formatting. New checks cover permission-aware search and totals, literal search characters and displayed tool names, owner-only project-access reads, fixed public assets, client response bounds, and consistent pagination. A local ARM64 container check verified the non-root read-only runtime, initial migration, browser assets and content security policy, absence of the fixture server and public development routes, health endpoint, anonymous session denial, and pending pairing persistence across an actual process restart. The check used disposable fictional services and removed them afterward. GitHub-hosted CI must be checked on the pushed commit.
 
-Before calling team mode complete: implement the administration and Mac sharing flows, GitHub installation and organization ingestion, local publication/recovery, company alerts, actual registered-app sign-in, two real member devices, offline/unshare/revoke UI verification, load testing, deployment upgrades, and native accessibility. See the full [team acceptance criteria](TEAM_WORKSPACES.md) and [release roadmap](ROADMAP.md).
+Browser checks against the isolated 400-report fixture verified collapsed groups, search with retained input focus, project filtering/grouping, loading additional snapshots, branch details, pairing review and approval, member device visibility, and revocation. Removing a member's access to Payments removed that project and its reports from their view; revoking their reporting Mac withdrew the remaining reports. Responsive checks covered desktop, tablet, and 390-pixel layouts without horizontal overflow. These fictional identities and device records do not satisfy real two-member/device acceptance.
+
+Before calling team mode complete: implement the Mac sharing flows, GitHub installation and organization ingestion, local publication/recovery, company alerts, actual registered-app sign-in, two real member devices, offline/unshare/revoke UI verification, load testing, deployment upgrades, and native accessibility. See the full [team acceptance criteria](TEAM_WORKSPACES.md) and [release roadmap](ROADMAP.md).

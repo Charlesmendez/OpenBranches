@@ -4,6 +4,7 @@ import { TeamStore } from './store';
 import { TeamOAuth } from './oauth';
 import { TeamEvents } from './events';
 import { createTeamServer } from './http';
+import { loadTeamAssets } from './static';
 
 async function main() {
   const config = teamConfig(process.env);
@@ -15,6 +16,7 @@ async function main() {
     store,
     new TeamOAuth(db, config, store.identities),
     events,
+    await loadTeamAssets(),
   );
   let closing: Promise<void> | undefined;
   const close = () =>

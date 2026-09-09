@@ -1,5 +1,7 @@
 {
   "extends": "../tsconfig.json",
-  "include": ["src", "tests", "../src/team"],
-  "compilerOptions": { "types": ["node"] }
+  "include": ["src", "tests", "../src/team", "ui", "dev"],
+  "compilerOptions": {
+    "types": ["node", "vite/client"]
+  }
 }
