@@ -9,6 +9,7 @@ import type {
   ReviewState,
   ProjectDiscoveryState,
   AgentHistoryStatus,
+  HandoffState,
 } from '../src/domain/types';
 
 const api: DesktopApi = {
@@ -60,6 +61,14 @@ const api: DesktopApi = {
   connectCodex: () => ipcRenderer.invoke('codex:connect'),
   disconnectCodex: () => ipcRenderer.invoke('codex:disconnect'),
   openCodexTask: (command) => ipcRenderer.invoke('codex:open-task', command),
+  getHandoffs: () => ipcRenderer.invoke('handoffs:get'),
+  previewHandoff: (selections) => ipcRenderer.invoke('handoffs:preview', selections),
+  sendHandoff: (command) => ipcRenderer.invoke('handoffs:send', command),
+  onHandoffs: (callback) => {
+    const listener = (_event: Electron.IpcRendererEvent, state: HandoffState) => callback(state);
+    ipcRenderer.on('handoffs:updated', listener);
+    return () => ipcRenderer.removeListener('handoffs:updated', listener);
+  },
   onCodex: (callback) => {
     const listener = (_event: Electron.IpcRendererEvent, status: CodexStatus) => callback(status);
     ipcRenderer.on('codex:updated', listener);

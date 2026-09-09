@@ -1,6 +1,8 @@
-# Advisor implementation and execution gate
+# Experimental automatic advisor
 
-AI execution is **not enabled**. The modules below are implemented and tested, but are not yet connected to a production model runner or automatic scheduler. Task linking and the account-allowance display are available independently.
+The product now uses explicit **Send to Codex, Claude, or Cursor** handoffs for AI investigation. A user selects one or more review branches, checks the exact evidence and prompt, and starts a read-only task in an installed coding agent. See [agent handoffs](HANDOFFS.md).
+
+The separate automatic advisor described below is experimental and **not enabled**. Its modules are implemented and tested, but they are not connected to a production model runner or automatic scheduler. They are retained as research for a possible future opt-in summary feature.
 
 ## Implemented safeguards
 

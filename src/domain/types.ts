@@ -64,6 +64,7 @@ export interface GitHubPullRequest extends PullRequest {
   observedAt: string;
 }
 export type CodingTool = 'codex' | 'claude-code' | 'cursor' | 'other' | 'unknown';
+export type HandoffProvider = Extract<CodingTool, 'codex' | 'claude-code' | 'cursor'>;
 export interface ModelIdentity {
   id: string;
   provider?: 'openai' | 'anthropic' | 'xai' | 'other';
@@ -89,6 +90,56 @@ export interface OpenTaskCommand {
   taskId: string;
 }
 export type OpenTaskResult = 'sent' | 'not-linked' | 'invalid-link' | 'unavailable' | 'failed';
+export interface HandoffSelection {
+  repositoryId: string;
+  branchId: string;
+}
+export interface HandoffProviderStatus {
+  provider: HandoffProvider;
+  installed: boolean;
+  label: string;
+}
+export interface HandoffPlan {
+  repositoryId: string;
+  repositoryName: string;
+  branches: { id: string; name: string; title: string }[];
+  prompt: string;
+}
+export interface HandoffPreview {
+  revision: string;
+  branchCount: number;
+  plans: HandoffPlan[];
+  providers: HandoffProviderStatus[];
+}
+export interface AgentHandoff {
+  id: string;
+  provider: HandoffProvider;
+  repositoryId: string;
+  repositoryName: string;
+  branchIds: string[];
+  branchNames: string[];
+  state: 'queued' | 'running' | 'completed' | 'failed';
+  createdAt: string;
+  updatedAt: string;
+  externalTaskId?: string;
+  result?: string;
+  error?: string;
+}
+export interface HandoffState {
+  providers: HandoffProviderStatus[];
+  handoffs: AgentHandoff[];
+}
+export interface HandoffCommand {
+  provider: HandoffProvider;
+  selections: HandoffSelection[];
+  revision: string;
+}
+export interface HandoffResult {
+  ok: boolean;
+  state: HandoffState;
+  createdIds: string[];
+  error?: string;
+}
 export interface Branch {
   id: string;
   repositoryId: string;
@@ -282,6 +333,10 @@ export interface DesktopApi {
   connectCodex(): Promise<void>;
   disconnectCodex(): Promise<void>;
   openCodexTask(command: OpenTaskCommand): Promise<OpenTaskResult>;
+  getHandoffs(): Promise<HandoffState>;
+  previewHandoff(selections: HandoffSelection[]): Promise<HandoffPreview>;
+  sendHandoff(command: HandoffCommand): Promise<HandoffResult>;
+  onHandoffs(callback: (state: HandoffState) => void): () => void;
   onCodex(callback: (status: CodexStatus) => void): () => void;
   onGitHub(callback: (status: GitHubStatus) => void): () => void;
   onSnapshot(callback: (snapshot: Snapshot) => void): () => void;

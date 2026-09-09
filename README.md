@@ -2,9 +2,9 @@
 
 A local Mac app for understanding branches, worktrees, and the work behind them.
 
-OpenBranches brings local Git and GitHub into one workspace: a grouped branch map, searchable inventory, branch details, recent activity, and evidence-backed recommendations. It is being built for people who have accumulated more coding-agent branches than they can comfortably remember.
+OpenBranches brings local Git and GitHub into one workspace: a grouped branch map, searchable inventory, branch details, recent activity, and an evidence-backed review inbox. It is being built for people who have accumulated more coding-agent branches than they can comfortably remember.
 
-**Development preview.** The full first release is still in progress. Codex-powered analysis and signed public downloads are not available yet. See [the roadmap](docs/ROADMAP.md) for the complete scope and outstanding work.
+**Development preview.** The full first release is still in progress. Signed public downloads and remaining release hardening are not available yet. See [the roadmap](docs/ROADMAP.md) for the complete scope and outstanding work.
 
 ## What works now
 
@@ -17,12 +17,12 @@ OpenBranches brings local Git and GitHub into one workspace: a grouped branch ma
 - Watch local changes while the app is running; refresh connected GitHub sources every two minutes.
 - Read public GitHub branches and pull requests without signing in. Private-repository sign-in is implemented using GitHub App device authorization but requires the release app registration.
 - Browse People & PRs across connected GitHub projects. Search authors, requested reviewers, PRs, and recorded tools; filter open work, review requests, quiet drafts, and recent history. Filters survive branch inspection and restarts. See [collaboration scope and evidence](docs/COLLABORATION.md).
-- Review findings about work that may deserve attention. Snooze for seven days or dismiss; choices survive restarts and new evidence brings the finding back. The attention count includes only findings waiting for review.
+- Review one row per branch, grouped by the decision to make. Send one branch or a multi-selection to Codex, Claude, or Cursor for a read-only investigation and concrete proposal. Selections spanning projects become one task per repository. Snooze for seven days or dismiss; choices survive restarts and new evidence brings the finding back.
 - Stop monitoring projects from Settings without changing their files, branches, or worktrees. Their valid cached connection metadata and review choices are removed together.
 - Connect local Codex task history, including archived tasks. Inspect the evidence for each branch association; multiple tasks can belong to a branch. This connection reads saved metadata and does not run AI.
 - Connect Claude Code local session history for monitored folders. See evidence-based tool badges, recorded model names, and mixed-tool sessions; search by tool or model. See [attribution and source limits](docs/AGENT_ATTRIBUTION.md).
 - Send a saved task to the desktop app with **Open in Codex**, with feedback for outdated associations and missing handlers. [Destination verification limits](docs/TASK_LINKS.md) remain explicit.
-- See the existing Codex account’s shared usage allowance. The advisor’s budget and evidence validators are implemented; [model execution remains gated](docs/ADVISOR.md).
+- See the existing Codex account’s shared usage allowance. OpenBranches does not run a separate recommendation model; it routes selected evidence to an installed coding agent through the [review handoff](docs/HANDOFFS.md).
 - Explore a fictional demo with 403 branch entries, independent of your real repositories.
 
 Repository inspection is read-only. OpenBranches does not fetch into your repositories, push, merge, delete branches, or remove worktrees. An absent commit in a target's ancestry is not presented as proof that a squash-equivalent change is missing.

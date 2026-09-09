@@ -1,8 +1,10 @@
-import { ArrowUpRight, Pause, RotateCcw } from 'lucide-react';
-import type { Branch, ReviewCommand } from '../../domain/types';
+import { ArrowUpRight, Pause, RotateCcw, Send } from 'lucide-react';
+import type { AgentHandoff, Branch, ReviewCommand } from '../../domain/types';
 import type { ReviewBucket } from '../../domain/reviews';
 import { triageQueues, type TriageItem } from '../../domain/triage';
 import { relativeTime } from '../../domain/branches';
+import { toolNames } from '../../domain/agents';
+import { ToolIcon } from './AgentBadges';
 
 export function TriageRow({
   item,
@@ -14,6 +16,9 @@ export function TriageRow({
   bucket,
   onSelection,
   onInspect,
+  handoff,
+  canSend,
+  onSend,
   onChoose,
 }: {
   item: TriageItem;
@@ -25,6 +30,9 @@ export function TriageRow({
   bucket: ReviewBucket;
   onSelection: (selected: boolean) => void;
   onInspect: () => void;
+  handoff?: AgentHandoff;
+  canSend: boolean;
+  onSend: () => void;
   onChoose: (choice: ReviewCommand['choice']) => Promise<unknown>;
 }) {
   return (
@@ -71,6 +79,24 @@ export function TriageRow({
       <div className="triage-row-actions">
         {bucket === 'active' ? (
           <>
+            {handoff?.state === 'queued' || handoff?.state === 'running' ? (
+              <span className="triage-agent-state" role="status">
+                <ToolIcon tool={handoff.provider} />
+                {toolNames[handoff.provider]} investigating
+              </span>
+            ) : (
+              <button
+                className="triage-send"
+                disabled={busy || !canSend}
+                title={
+                  canSend ? 'Prepare an agent handoff' : 'Open your live workspace to send work'
+                }
+                onClick={onSend}
+              >
+                <Send size={13} />
+                Send to…
+              </button>
+            )}
             <button
               disabled={busy}
               title="Snooze all signals for this branch for seven days"

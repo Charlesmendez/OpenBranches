@@ -40,7 +40,7 @@ export function CodexAllowance({ account }: { account: CodexAccount }) {
           )}
           {bucket?.exhausted && (
             <p className="muted-note">
-              Codex reports an account limit. AI reviews will wait for available allowance.
+              Codex reports an account limit. New Codex handoffs may fail until allowance resets.
             </p>
           )}
           <p className="muted-note">
@@ -51,17 +51,17 @@ export function CodexAllowance({ account }: { account: CodexAccount }) {
       ) : (
         <p className="muted-note">
           {account.auth === 'signed-out'
-            ? 'Sign in to Codex with ChatGPT to use the planned AI advisor.'
+            ? 'Sign in to Codex with ChatGPT to send branch investigations to it.'
             : account.auth === 'other'
-              ? 'This Codex installation is using a different sign-in method. The planned advisor uses ChatGPT sign-in.'
+              ? 'This Codex installation uses another sign-in method. Handoffs use that local Codex sign-in.'
               : 'Sign-in status could not be checked.'}{' '}
           Task linking works independently.
         </p>
       )}
       {account.error && <p className="muted-note">{account.error}</p>}
       <p className="muted-note">
-        AI reviews are not enabled in this preview. OpenBranches will limit reviews to six per 24
-        hours and never redeem reset credits.
+        Sending to Codex uses the same allowance as your other Codex work. OpenBranches never
+        redeems reset credits.
       </p>
     </div>
   );

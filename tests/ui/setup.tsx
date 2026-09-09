@@ -120,6 +120,23 @@ window.openbranches = {
   },
   onDiscoveredProjects: (listener) => subscribe(discoveryListeners, listener),
   openCodexTask: async () => 'not-linked',
+  getHandoffs: async () => ({
+    providers: [
+      { provider: 'codex', label: 'Codex', installed: true },
+      { provider: 'claude-code', label: 'Claude', installed: true },
+      { provider: 'cursor', label: 'Cursor', installed: true },
+    ],
+    handoffs: [],
+  }),
+  previewHandoff: async () => {
+    throw new Error('The fixture has no live branch evidence.');
+  },
+  sendHandoff: async () => ({
+    ok: false,
+    createdIds: [],
+    state: { providers: [], handoffs: [] },
+  }),
+  onHandoffs: () => () => {},
   getReviews: async () => ({ decisions: [] }),
   decideReview: async () => ({ ok: false, state: { decisions: [] } }),
   resetReviews: async () => ({ ok: true, state: { decisions: [] } }),

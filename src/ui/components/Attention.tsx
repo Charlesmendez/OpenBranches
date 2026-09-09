@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   ArrowUpRight,
@@ -11,9 +11,10 @@ import {
   Pause,
   RotateCcw,
   Search,
+  Send,
   X,
 } from 'lucide-react';
-import type { CodexStatus, Repository, ReviewCommand } from '../../domain/types';
+import type { AgentHandoff, CodexStatus, Repository, ReviewCommand } from '../../domain/types';
 import type { ReviewBucket } from '../../domain/reviews';
 import {
   triageFindings,
@@ -25,6 +26,9 @@ import {
 import type { ReviewsController } from '../hooks/useReviews';
 import { TriageRow } from './TriageRow';
 import { EmptyState } from './Primitives';
+import { AgentHandoffDialog } from './AgentHandoffDialog';
+import { HandoffActivity } from './HandoffActivity';
+import { useHandoffs } from '../hooks/useHandoffs';
 
 const PAGE_SIZE = 12;
 const labels: Record<ReviewBucket, string> = {
@@ -54,6 +58,27 @@ export function Attention({
   const [page, setPage] = useState(0);
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
+  const [handoffItems, setHandoffItems] = useState<TriageItem[] | null>(null);
+  const selectVisible = useRef<HTMLInputElement>(null);
+  const handoffs = useHandoffs(demo);
+  const handoffByBranch = useMemo(() => {
+    const result = new Map<string, AgentHandoff>();
+    for (const handoff of handoffs.state.handoffs) {
+      for (const branchId of handoff.branchIds) {
+        const key = `${handoff.repositoryId}\u0000${branchId}`;
+        if (!result.has(key)) result.set(key, handoff);
+      }
+    }
+    return result;
+  }, [handoffs.state.handoffs]);
+  const handoffSelections = useMemo(
+    () =>
+      handoffItems?.map((item) => ({
+        repositoryId: item.repositoryId,
+        branchId: item.id,
+      })) ?? [],
+    [handoffItems],
+  );
   const groups = useMemo(
     () =>
       Object.fromEntries(
@@ -94,7 +119,21 @@ export function Attention({
   const items = overview
     ? triageHighlights(all)
     : filtered.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
-  const selectedItems = items.filter((item) => selected.includes(item.id));
+  const selectedItems = all.filter((item) => selected.includes(item.id));
+  const selectedVisibleItems = items.filter((item) => selected.includes(item.id));
+  const selectedFilteredItems = filtered.filter((item) => selected.includes(item.id));
+  const allFilteredSelected =
+    filtered.length > 0 && selectedFilteredItems.length === filtered.length;
+  const selectedProjectCount = new Set(selectedItems.map((item) => item.repositoryId)).size;
+  const selectedActiveHandoffCount = selectedItems.filter((item) => {
+    const handoff = handoffByBranch.get(`${item.repositoryId}\u0000${item.id}`);
+    return handoff?.state === 'queued' || handoff?.state === 'running';
+  }).length;
+  useEffect(() => {
+    if (selectVisible.current)
+      selectVisible.current.indeterminate =
+        selectedVisibleItems.length > 0 && selectedVisibleItems.length < items.length;
+  }, [items.length, selectedVisibleItems.length]);
   const busy = reviews.busy || !!reviews.state.error || !reviews.ready;
   const choose = async (items: TriageItem[], choice: ReviewCommand['choice']) => {
     const commands = items.flatMap((item) =>
@@ -105,8 +144,8 @@ export function Attention({
   const change = (next: TriageQueue | 'all' | null) => {
     setQueue(next);
     setPage(0);
-    setSelected([]);
   };
+  useEffect(() => setSelected([]), [repositoryId]);
   const linked = codex.enabled && (codex.state === 'ready' || codex.state === 'connecting');
   const activeQueues = (Object.keys(triageQueues) as TriageQueue[]).filter((key) =>
     groups.active.some((item) => item.queue === key),
@@ -129,6 +168,11 @@ export function Attention({
           <ArrowUpRight size={13} />
         </button>
       </div>
+      <HandoffActivity
+        handoffs={handoffs.state.handoffs}
+        repositoryId={repositoryId}
+        now={reviews.now}
+      />
       <div className="review-toolbar">
         <nav className="review-filters" aria-label="Review status">
           {(Object.keys(labels) as ReviewBucket[]).map((value) => (
@@ -138,6 +182,7 @@ export function Attention({
               className={bucket === value ? 'selected' : ''}
               onClick={() => {
                 setBucket(value);
+                setSelected([]);
                 change(null);
               }}
             >
@@ -155,7 +200,6 @@ export function Attention({
             onChange={(event) => {
               setQuery(event.target.value);
               setPage(0);
-              setSelected([]);
             }}
           />
           {query && (
@@ -251,9 +295,37 @@ export function Attention({
           </div>
           {selectedItems.length > 0 && (
             <div className="triage-bulk" role="status">
-              <strong>{selectedItems.length} selected</strong>
+              <strong>
+                {selectedItems.length} selected
+                {selectedProjectCount > 1 ? ` across ${selectedProjectCount} projects` : ''}
+              </strong>
               {bucket === 'active' ? (
                 <>
+                  <button
+                    className="primary-button triage-send-selected"
+                    disabled={
+                      busy ||
+                      handoffs.busy ||
+                      !handoffs.ready ||
+                      demo ||
+                      selectedActiveHandoffCount > 0
+                    }
+                    title={
+                      selectedActiveHandoffCount
+                        ? `${selectedActiveHandoffCount} selected ${selectedActiveHandoffCount === 1 ? 'branch is' : 'branches are'} already with an agent.`
+                        : undefined
+                    }
+                    onClick={() => setHandoffItems(selectedItems)}
+                  >
+                    <Send size={13} />
+                    Send all {selectedItems.length} to…
+                  </button>
+                  {selectedActiveHandoffCount > 0 && (
+                    <span className="triage-bulk-note">
+                      Unselect {selectedActiveHandoffCount} already with an agent to send this
+                      batch.
+                    </span>
+                  )}
                   <button
                     className="secondary-button"
                     disabled={busy}
@@ -306,15 +378,36 @@ export function Attention({
               <div className="triage-list-header">
                 <label>
                   <input
+                    ref={selectVisible}
                     type="checkbox"
                     aria-label="Select visible review branches"
-                    checked={items.length > 0 && selectedItems.length === items.length}
-                    onChange={(event) =>
-                      setSelected(event.target.checked ? items.map((item) => item.id) : [])
-                    }
+                    checked={items.length > 0 && selectedVisibleItems.length === items.length}
+                    onChange={(event) => {
+                      const visibleIds = new Set(items.map((item) => item.id));
+                      setSelected((previous) =>
+                        event.target.checked
+                          ? [...new Set([...previous, ...visibleIds])]
+                          : previous.filter((id) => !visibleIds.has(id)),
+                      );
+                    }}
                   />
                   Select visible
                 </label>
+                {filtered.length > items.length && (
+                  <button
+                    className="text-button triage-select-results"
+                    onClick={() => {
+                      const filteredIds = new Set(filtered.map((item) => item.id));
+                      setSelected((previous) =>
+                        allFilteredSelected
+                          ? previous.filter((id) => !filteredIds.has(id))
+                          : [...new Set([...previous, ...filteredIds])],
+                      );
+                    }}
+                  >
+                    {allFilteredSelected ? 'Clear' : 'Select all'} {filtered.length} results
+                  </button>
+                )}
                 <span>One row per branch · expand for evidence</span>
               </div>
               {items.map((item) => (
@@ -327,6 +420,14 @@ export function Attention({
                   selected={selected.includes(item.id)}
                   busy={busy}
                   bucket={bucket}
+                  handoff={handoffByBranch.get(`${item.repositoryId}\u0000${item.id}`)}
+                  canSend={
+                    !demo &&
+                    handoffs.ready &&
+                    !['queued', 'running'].includes(
+                      handoffByBranch.get(`${item.repositoryId}\u0000${item.id}`)?.state ?? '',
+                    )
+                  }
                   onSelection={(checked) =>
                     setSelected((previous) =>
                       checked
@@ -335,6 +436,7 @@ export function Attention({
                     )
                   }
                   onInspect={() => onSelect(item.repositoryId, item.id)}
+                  onSend={() => setHandoffItems([item])}
                   onChoose={(choice) => choose([item], choice)}
                 />
               ))}
@@ -349,20 +451,14 @@ export function Attention({
               <button
                 className="secondary-button"
                 disabled={currentPage === 0}
-                onClick={() => {
-                  setPage(currentPage - 1);
-                  setSelected([]);
-                }}
+                onClick={() => setPage(currentPage - 1)}
               >
                 Previous
               </button>
               <button
                 className="secondary-button"
                 disabled={(currentPage + 1) * PAGE_SIZE >= filtered.length}
-                onClick={() => {
-                  setPage(currentPage + 1);
-                  setSelected([]);
-                }}
+                onClick={() => setPage(currentPage + 1)}
               >
                 Next
               </button>
@@ -382,6 +478,17 @@ export function Attention({
         >
           Reset {repositoryId ? 'this project’s' : 'all'} review choices
         </button>
+      )}
+      {handoffItems && handoffSelections.length > 0 && (
+        <AgentHandoffDialog
+          selections={handoffSelections}
+          handoffs={handoffs}
+          close={() => setHandoffItems(null)}
+          sent={() => {
+            setHandoffItems(null);
+            setSelected([]);
+          }}
+        />
       )}
     </div>
   );

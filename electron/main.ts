@@ -24,6 +24,7 @@ import { CodexService } from './codex/service';
 import { openCodexTask } from './codex/openTask';
 import { ProjectDiscoveryService } from './discovery/service';
 import { LocalHistoryService } from './agents/history';
+import { HandoffService } from './agents/handoffService';
 import { createClaudeHistorySource } from './claude/reader';
 import { GitInstallation, GIT_SETUP_GUIDE } from './git/installation';
 import { ReviewService } from './services/reviews';
@@ -52,6 +53,7 @@ let codex: CodexService | undefined;
 let discovery: ProjectDiscoveryService | undefined;
 let teams: TeamConnections | undefined;
 let teamPublisher: TeamPublisher | undefined;
+let handoffs: HandoffService | undefined;
 const localHistories = new Map<string, LocalHistoryService>();
 const refreshHistories = () =>
   Promise.all([...localHistories.values()].map((history) => history.refresh()));
@@ -136,10 +138,11 @@ app.whenReady().then(() => {
   store = new AppStore(app.getPath('userData'));
   const snapshot = () => {
     const source = github?.enrich(service.current()) ?? service.current();
-    return [...localHistories.values()].reduce(
+    const linked = [...localHistories.values()].reduce(
       (snapshot, history) => history.enrich(snapshot),
       codex?.enrich(source) ?? source,
     );
+    return handoffs?.enrich(linked) ?? linked;
   };
   const publish = () => {
     window?.webContents.send('snapshot:updated', snapshot());
@@ -168,6 +171,10 @@ app.whenReady().then(() => {
       createClaudeHistorySource(),
     ),
   );
+  handoffs = new HandoffService(store, snapshot, (state) => {
+    window?.webContents.send('handoffs:updated', state);
+    publish();
+  });
   reviews = new ReviewService(store, snapshot, (state) =>
     window?.webContents.send('reviews:updated', state),
   );
@@ -217,6 +224,12 @@ app.whenReady().then(() => {
   handle('reviews:get', () => reviews.currentState());
   handle('reviews:decide', (command: unknown) => reviews.decide(command));
   handle('reviews:reset', (repositoryId: unknown) => reviews.reset(repositoryId));
+  handle('handoffs:get', async () => {
+    await handoffs!.start();
+    return handoffs!.state();
+  });
+  handle('handoffs:preview', (selections: unknown) => handoffs!.preview(selections));
+  handle('handoffs:send', (command: unknown) => handoffs!.send(command));
   handle('git:check', async () => {
     const before = git.status().state;
     const status = await git.check(true);
@@ -315,6 +328,7 @@ app.whenReady().then(() => {
   createWindow();
   teams.start();
   teamPublisher.start();
+  void handoffs.start();
   void discovery.refresh();
   void refreshHistories();
   // A monochrome template icon adapts to the system menu bar appearance.
@@ -373,6 +387,7 @@ app.on('before-quit', () => {
   discovery?.close();
   teams?.close();
   teamPublisher?.close();
+  handoffs?.close();
   for (const history of localHistories.values()) history.close();
   service?.close();
   store?.close();
