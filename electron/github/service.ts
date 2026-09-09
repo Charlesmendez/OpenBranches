@@ -1,7 +1,7 @@
 import type { Repository, Snapshot } from '../../src/domain/types';
 import type { AppStore } from '../services/store';
 import type { GitHubAuth } from './auth';
-import { githubRepository, readRemote, type RemoteSnapshot } from './reader';
+import { githubRepository, readRemote, remoteSnapshotSchema, type RemoteSnapshot } from './reader';
 import { enrichRepository } from './enrich';
 
 export class GitHubService {
@@ -9,23 +9,57 @@ export class GitHubService {
   private enabled: boolean;
   private closed = false;
   private generation = 0;
-  private refreshing?: Promise<void>;
+  private job?: { generation: number; promise: Promise<void> };
   private timer: ReturnType<typeof setInterval>;
 
   constructor(
-    private store: AppStore,
-    private auth: GitHubAuth,
+    private store: Pick<AppStore, 'read' | 'write'>,
+    private auth: Pick<GitHubAuth, 'http'>,
     private current: () => Snapshot,
     private publish: () => void,
+    private read: typeof readRemote = readRemote,
   ) {
-    this.sources = store.read('github.sources', {});
-    this.enabled = store.read('github.enabled', false);
+    const cached = store.read<unknown>('github.sources', {});
+    this.sources = Object.create(null);
+    if (cached && typeof cached === 'object' && !Array.isArray(cached)) {
+      for (const [key, value] of Object.entries(cached)) {
+        const parsed = remoteSnapshotSchema.safeParse(value);
+        if (parsed.success) this.sources[key] = parsed.data;
+      }
+    }
+    this.enabled = store.read<boolean>('github.enabled', false) === true;
+    this.forgetUnselected();
     this.timer = setInterval(() => {
       void this.refresh();
     }, 120_000);
   }
   isEnabled() {
     return this.enabled;
+  }
+  private selectedKeys(snapshot = this.current()): Set<string> {
+    return new Set(
+      snapshot.repositories.flatMap((repository) =>
+        repository.remotes.flatMap((remote) => {
+          const slug = githubRepository(remote.url);
+          return slug ? [`${repository.id}:${remote.name}:${slug}`] : [];
+        }),
+      ),
+    );
+  }
+  forgetUnselected(): void {
+    this.prepareForgetUnselected(this.current())();
+  }
+  prepareForgetUnselected(snapshot: Snapshot): () => void {
+    const selected = this.selectedKeys(snapshot);
+    const sources = Object.fromEntries(
+      Object.entries(this.sources).filter(([key]) => selected.has(key)),
+    );
+    if (Object.keys(sources).length !== Object.keys(this.sources).length)
+      this.store.write('github.sources', sources);
+    return () => {
+      ++this.generation;
+      this.sources = sources;
+    };
   }
   setEnabled(enabled: boolean) {
     ++this.generation;
@@ -55,14 +89,15 @@ export class GitHubService {
   }
   refresh(): Promise<void> {
     if (!this.enabled || this.closed) return Promise.resolve();
-    if (this.refreshing) return this.refreshing;
-    this.refreshing = this.refreshAll().finally(() => {
-      this.refreshing = undefined;
+    if (this.job?.generation === this.generation) return this.job.promise;
+    const job = { generation: this.generation, promise: Promise.resolve() };
+    this.job = job;
+    job.promise = this.refreshAll(job.generation).finally(() => {
+      if (this.job === job) this.job = undefined;
     });
-    return this.refreshing;
+    return job.promise;
   }
-  private async refreshAll() {
-    const generation = this.generation;
+  private async refreshAll(generation: number) {
     for (const repository of this.current().repositories) {
       for (const remote of repository.remotes) {
         if (this.closed || !this.enabled || generation !== this.generation) return;
@@ -70,11 +105,14 @@ export class GitHubService {
         if (!slug) continue;
         const key = `${repository.id}:${remote.name}:${slug}`;
         try {
-          const fresh = await readRemote(this.auth.http, slug, remote.name);
+          if (!this.selectedKeys().has(key)) continue;
+          const fresh = await this.read(this.auth.http, slug, remote.name);
           if (this.closed || generation !== this.generation) return;
+          if (!this.selectedKeys().has(key)) continue;
           this.sources[key] = fresh;
         } catch (error) {
           if (this.closed || generation !== this.generation) return;
+          if (!this.selectedKeys().has(key)) continue;
           const previous = this.sources[key] ?? {
             repository: slug,
             remoteName: remote.name,
@@ -91,7 +129,11 @@ export class GitHubService {
         }
       }
     }
-    if (!this.closed) {
+    if (!this.closed && generation === this.generation) {
+      const selected = this.selectedKeys();
+      this.sources = Object.fromEntries(
+        Object.entries(this.sources).filter(([key]) => selected.has(key)),
+      );
       this.store.write('github.sources', this.sources);
       this.publish();
     }

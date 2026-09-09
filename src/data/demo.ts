@@ -2,7 +2,8 @@ import type { Branch, Repository, Snapshot } from '../domain/types';
 import { DAY } from '../domain/branches';
 
 const now = Date.now();
-const ago = (days: number) => new Date(now - days * DAY).toISOString();
+const ago = (days: number, referenceTime: number) =>
+  new Date(referenceTime - days * DAY).toISOString();
 const titles = [
   'Voice integration',
   'Invoice export',
@@ -25,6 +26,7 @@ function makeRepository(
   active: number,
   integrated: number,
   quiet: number,
+  referenceTime: number,
 ): Repository {
   const targetNames = id === 'atlas' ? ['develop', 'master'] : ['main'];
   const branches: Branch[] = Array.from({ length: count }, (_, i) => {
@@ -42,7 +44,7 @@ function makeRepository(
         : `${['Invoice', 'Workspace', 'Account', 'Search', 'Billing'][i % 5]} ${['polish', 'reliability', 'improvements', 'follow up'][i % 4]} ${i + 1}`;
     const name = `codex/${title.toLowerCase().replaceAll(' ', '-')}`;
     const sha = (i + 100000).toString(16).padEnd(40, 'a');
-    const updatedAt = ago(state === 'active' ? (i + 1) / 8 : 25 + (i % 65));
+    const updatedAt = ago(state === 'active' ? (i + 1) / 8 : 25 + (i % 65), referenceTime);
     const local = {
       name,
       fullName: `refs/heads/${name}`,
@@ -164,16 +166,16 @@ function makeRepository(
     targets: targetNames.map((name) => ({ name, sha: 'a'.repeat(40), source: 'github' })),
     worktrees: branches.flatMap((b) => b.worktrees),
     remotes: [{ name: 'origin', url: `https://github.com/example/${name}.git` }],
-    scannedAt: new Date(now).toISOString(),
+    scannedAt: new Date(referenceTime).toISOString(),
     shallow: false,
   };
 }
-export function createDemoSnapshot(): Snapshot {
+export function createDemoSnapshot(referenceTime = now): Snapshot {
   return {
     repositories: [
-      makeRepository('atlas', 'atlas-api', 229, 12, 158, 41),
-      makeRepository('studio', 'studio', 37, 4, 23, 7),
-      makeRepository('relay', 'relay', 137, 8, 103, 21),
+      makeRepository('atlas', 'atlas-api', 229, 12, 158, 41, referenceTime),
+      makeRepository('studio', 'studio', 37, 4, 23, 7, referenceTime),
+      makeRepository('relay', 'relay', 137, 8, 103, 21, referenceTime),
     ],
     events: [
       {
@@ -183,7 +185,7 @@ export function createDemoSnapshot(): Snapshot {
         kind: 'commit',
         title: 'New commit',
         detail: 'Voice integration',
-        at: new Date(now - 30_000).toISOString(),
+        at: new Date(referenceTime - 30_000).toISOString(),
       },
       {
         id: 'e2',
@@ -192,7 +194,7 @@ export function createDemoSnapshot(): Snapshot {
         kind: 'integration',
         title: 'Integrated into develop',
         detail: 'Signup welcome email',
-        at: new Date(now - 160_000).toISOString(),
+        at: new Date(referenceTime - 160_000).toISOString(),
       },
       {
         id: 'e3',
@@ -201,7 +203,7 @@ export function createDemoSnapshot(): Snapshot {
         kind: 'branch',
         title: 'Branch created on this Mac',
         detail: 'Invoice calculation',
-        at: new Date(now - 360_000).toISOString(),
+        at: new Date(referenceTime - 360_000).toISOString(),
       },
     ],
     updatedAt: new Date(now).toISOString(),

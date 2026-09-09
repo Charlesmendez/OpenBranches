@@ -2,11 +2,11 @@
 
 The renderer has no Node.js access. It talks through a narrow typed preload bridge to the Electron main process. Repository changes are observed, not performed.
 
-- `src/domain`: shared branch types, lifecycle classification, evidence labels, and deterministic recommendations.
+- `src/domain`: shared branch types, lifecycle classification, evidence labels, deterministic recommendations, semantic evidence revisions, and validated review choices.
 - `src/ui`: React views, reusable components, and workspace/provider hooks. React Flow renders bounded groups; the inventory virtualizes rows.
 - `src/data/demo.ts`: fictional example projects. Real and demo workspaces are separate.
 - `electron/git`: Git installation discovery and explicit Apple setup, read-only Git commands, NUL-delimited parsing, bounded worktree inspection, and a worker client with terminal errors/timeouts. Discovery supplies an absolute executable; inspection clears inherited Git repository/config overrides.
-- `electron/services`: SQLite persistence and repository watching/reconciliation. A Git failure retains the previous snapshot with an availability error.
+- `electron/services`: SQLite persistence, repository watching/reconciliation, review decisions, and coordinated project monitoring. A Git failure retains the previous snapshot with an availability error.
 - `electron/github`: fixed-origin HTTP transport, GitHub App device authorization, encrypted credential vault, paginated metadata reading, source enrichment, and refresh scheduling.
 - `electron/codex`: executable/version detection, a stdio inspection client with a read-method allowlist, bounded task-index parsing, pure association rules, and a cancellable refresh/cache service.
 - `electron/advisor`: shared policy, persistent global allowance, bounded metadata preparation, evidence identifiers, and structured finding validation. Model execution and scheduling are not yet wired; see `docs/ADVISOR.md` for the execution gate.
@@ -21,6 +21,10 @@ A repository identity comes from its canonical common Git directory, so linked w
 Local target history is checked against immutable commit IDs from the scan. Missing/shallow history remains unknown. A non-ancestor commit is described as absent from the checked history; squash/rebase equivalence requires more evidence. GitHub PR history is separate evidence and must never silently override newer branch work.
 
 GitHub enrichment does not fetch into a repository. New remote tips without available ancestry remain unknown. Source failures retain the prior checked time. Partial listings never prove deletion. Cached remote refs are retained and labelled if GitHub no longer lists them.
+
+Review choices belong to a finding ID and a SHA-256 revision of its branch evidence. Observation timestamps and unrelated target-tip advances are excluded so normal refreshes do not undo choices. Native commands recheck the current finding before writing SQLite; the renderer cannot choose its own expiry time. The demo has an independent store and stable fictional evidence. See [review behavior](REVIEWS.md).
+
+Stopping monitoring prepares the next repository snapshot and GitHub, Codex, and valid review caches in one SQLite transaction. Services adopt the new memory state and stop watchers only after commit. A failed cache write rolls back every record. Local scans and provider refreshes from the previous monitoring session cannot replace data after removal/re-addition.
 
 ## Process boundaries
 

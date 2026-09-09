@@ -399,6 +399,32 @@ async function serviceFixture(read: () => Promise<CodexIndex>) {
 }
 
 describe('Codex connection lifecycle', () => {
+  it('discards an old task refresh after stopping and re-adding project monitoring', async () => {
+    let finish!: (index: CodexIndex) => void;
+    let entered!: () => void;
+    const reading = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    let reads = 0;
+    const fixture = await serviceFixture(async () => {
+      if (++reads > 1) return { tasks: [task({ id: 'current-task' })], checkedAt, partial: false };
+      entered();
+      return new Promise((resolve) => {
+        finish = resolve;
+      });
+    });
+    const old = fixture.service.connect();
+    await reading;
+    const repositories = fixture.snapshot.repositories;
+    fixture.snapshot.repositories = [];
+    fixture.service.forgetUnselected();
+    expect(fixture.clients[0].close).toHaveBeenCalledOnce();
+    fixture.snapshot.repositories = repositories;
+    await fixture.service.refresh();
+    finish({ tasks: [task({ id: 'old-task' })], checkedAt, partial: false });
+    await old;
+    expect(fixture.values.get('codex.index')).toMatchObject({ tasks: [{ id: 'current-task' }] });
+  });
   it('stores only task metadata associated with selected projects and forgets removed projects', async () => {
     const fixture = await serviceFixture(async () => ({
       tasks: [task(), task({ id: 'unrelated-private', cwd: '/unrelated', gitInfo: null })],

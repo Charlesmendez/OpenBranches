@@ -99,6 +99,7 @@ export interface Snapshot {
 }
 export interface Recommendation {
   id: string;
+  revision: string;
   repositoryId: string;
   branchId: string;
   category: 'local-only' | 'forgotten' | 'integration-gap' | 'verify';
@@ -107,6 +108,28 @@ export interface Recommendation {
   evidence: string[];
   checkedAt: string;
   priority: 'review' | 'notice';
+}
+export interface ReviewDecision {
+  id: string;
+  repositoryId: string;
+  revision: string;
+  choice: 'dismissed' | 'snoozed';
+  decidedAt: number;
+  until?: number;
+}
+export interface ReviewState {
+  decisions: ReviewDecision[];
+  error?: string;
+}
+export interface ReviewCommand {
+  id: string;
+  revision: string;
+  choice: 'dismissed' | 'snoozed' | 'restore';
+}
+export interface ReviewResult {
+  ok: boolean;
+  state: ReviewState;
+  error?: string;
 }
 export interface GitHubStatus {
   connected: boolean;
@@ -151,6 +174,10 @@ export interface GitStatus {
   message?: string;
 }
 export interface DesktopApi {
+  getReviews(): Promise<ReviewState>;
+  decideReview(command: ReviewCommand): Promise<ReviewResult>;
+  resetReviews(repositoryId?: string): Promise<ReviewResult>;
+  onReviews(callback: (state: ReviewState) => void): () => void;
   checkGit(): Promise<GitStatus>;
   installGit(): Promise<void>;
   openGitSetupGuide(): Promise<void>;

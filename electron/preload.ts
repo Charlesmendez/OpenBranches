@@ -5,9 +5,18 @@ import type {
   GitHubStatus,
   GitStatus,
   Snapshot,
+  ReviewState,
 } from '../src/domain/types';
 
 const api: DesktopApi = {
+  getReviews: () => ipcRenderer.invoke('reviews:get'),
+  decideReview: (command) => ipcRenderer.invoke('reviews:decide', command),
+  resetReviews: (repositoryId) => ipcRenderer.invoke('reviews:reset', repositoryId),
+  onReviews: (callback) => {
+    const listener = (_event: Electron.IpcRendererEvent, state: ReviewState) => callback(state);
+    ipcRenderer.on('reviews:updated', listener);
+    return () => ipcRenderer.removeListener('reviews:updated', listener);
+  },
   checkGit: () => ipcRenderer.invoke('git:check'),
   installGit: () => ipcRenderer.invoke('git:install'),
   openGitSetupGuide: () => ipcRenderer.invoke('git:guide'),

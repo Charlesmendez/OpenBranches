@@ -21,6 +21,8 @@ import { GitHubService } from './github/service';
 import { createTokenVault } from './github/vault';
 import { CodexService } from './codex/service';
 import { GitInstallation, GIT_SETUP_GUIDE } from './git/installation';
+import { ReviewService } from './services/reviews';
+import { stopMonitoring } from './services/monitoring';
 declare const __GITHUB_APP_CLIENT_ID__: string;
 
 protocol.registerSchemesAsPrivileged([
@@ -38,6 +40,7 @@ let service: RepositoryService;
 let store: AppStore;
 let github: GitHubService | undefined;
 let codex: CodexService | undefined;
+let reviews: ReviewService;
 let githubAuth: GitHubAuth;
 let authTimer: ReturnType<typeof setInterval> | undefined;
 const devUrl = !app.isPackaged ? process.env.OPENBRANCHES_DEV_URL : undefined;
@@ -134,6 +137,9 @@ app.whenReady().then(() => {
     () => github!.enrich(service.current()),
     publish,
   );
+  reviews = new ReviewService(store, snapshot, (state) =>
+    window?.webContents.send('reviews:updated', state),
+  );
   const githubStatus = () => ({ ...githubAuth.status(), enabled: github!.isEnabled() });
   const pollGitHub = async () => {
     const wasConnected = githubAuth.status().connected;
@@ -150,6 +156,9 @@ app.whenReady().then(() => {
     if (githubAuth.status().device) void pollGitHub();
   }, 5000);
   handle('snapshot:get', snapshot);
+  handle('reviews:get', () => reviews.currentState());
+  handle('reviews:decide', (command: unknown) => reviews.decide(command));
+  handle('reviews:reset', (repositoryId: unknown) => reviews.reset(repositoryId));
   handle('git:check', async () => {
     const before = git.status().state;
     const status = await git.check(true);
@@ -175,8 +184,9 @@ app.whenReady().then(() => {
     return repository;
   });
   handle('repository:remove', (id: unknown) => {
-    service.remove(z.string().parse(id));
-    codex!.forgetUnselected();
+    stopMonitoring(z.string().parse(id), service, github!, codex!, reviews);
+    void github!.refresh();
+    void codex!.refresh();
   });
   handle('worktree:reveal', async (id: unknown, branchId: unknown) => {
     const repository = service.current().repositories.find((r) => r.id === z.string().parse(id));

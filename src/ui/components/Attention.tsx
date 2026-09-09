@@ -1,38 +1,72 @@
-import { useState } from 'react';
-import { ArrowUpRight, Check, Clock3, GitBranch, Laptop, Pause, Sparkles } from 'lucide-react';
-import type { Recommendation, Repository } from '../../domain/types';
+import { useLayoutEffect, useRef, useState } from 'react';
+import {
+  ArrowUpRight,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Clock3,
+  LoaderCircle,
+  Sparkles,
+} from 'lucide-react';
+import type { Repository, ReviewCommand } from '../../domain/types';
+import type { ReviewBucket } from '../../domain/reviews';
+import type { ReviewsController } from '../hooks/useReviews';
 import { EmptyState } from './Primitives';
-import { relativeTime } from '../../domain/branches';
+import { ReviewCard } from './ReviewCard';
 
-type Decisions = Record<string, { dismissed?: boolean; until?: number }>;
-function readDecisions(demo: boolean): Decisions {
-  try {
-    return JSON.parse(localStorage.getItem(`ob-decisions-${demo ? 'demo' : 'live'}`) ?? '{}');
-  } catch {
-    return {};
-  }
-}
+const PAGE_SIZE = 20;
+const labels: Record<ReviewBucket, string> = {
+  active: 'To review',
+  snoozed: 'Snoozed',
+  dismissed: 'Dismissed',
+};
 export function Attention({
-  recommendations,
+  reviews,
   repositories,
+  repositoryId,
   onSelect,
   onSettings,
   demo,
 }: {
-  recommendations: Recommendation[];
+  reviews: ReviewsController;
   repositories: Repository[];
+  repositoryId: string | null;
   onSelect: (repositoryId: string, branchId: string) => void;
   onSettings: () => void;
   demo: boolean;
 }) {
-  const [decisions, setDecisions] = useState<Decisions>(() => readDecisions(demo));
-  const visible = recommendations.filter(
-    (r) => !decisions[r.id]?.dismissed && (decisions[r.id]?.until ?? 0) < Date.now(),
+  const [bucket, setBucket] = useState<ReviewBucket>('active');
+  const [page, setPage] = useState(0);
+  const heading = useRef<HTMLHeadingElement>(null);
+  const cards = useRef(new Map<string, HTMLElement>());
+  const nextFocus = useRef<string | null | undefined>(undefined);
+  const scoped = (value: ReviewBucket) =>
+    reviews.groups[value].filter(
+      (item) => !repositoryId || item.finding.repositoryId === repositoryId,
+    );
+  const visible = scoped(bucket);
+  const pages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pages - 1);
+  const items = visible.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
+  const decisions = reviews.state.decisions.filter(
+    (decision) => !repositoryId || decision.repositoryId === repositoryId,
   );
-  const decide = (id: string, choice: Decisions[string]) => {
-    const next = { ...decisions, [id]: choice };
-    setDecisions(next);
-    localStorage.setItem(`ob-decisions-${demo ? 'demo' : 'live'}`, JSON.stringify(next));
+  useLayoutEffect(() => {
+    if (nextFocus.current !== undefined) {
+      const target = cards.current.get(nextFocus.current ?? '') ?? heading.current;
+      target?.focus({ preventScroll: true });
+      target?.scrollIntoView({ block: 'nearest' });
+      nextFocus.current = undefined;
+    }
+  }, [reviews.state]);
+  const decide = async (command: ReviewCommand, index: number) => {
+    nextFocus.current = items[index + 1]?.finding.id ?? items[index - 1]?.finding.id ?? null;
+    if (!(await reviews.decide(command))) nextFocus.current = undefined;
+  };
+  const movePage = (next: number) => {
+    setPage(next);
+    heading.current?.focus({ preventScroll: true });
+    heading.current?.scrollIntoView({ block: 'nearest' });
   };
   return (
     <div className="attention-content">
@@ -42,93 +76,155 @@ export function Attention({
         </span>
         <div>
           <strong>A little context goes a long way.</strong>
-          <p>Git evidence is available now. Connect Codex for context-aware recommendations.</p>
+          <p>
+            These findings use Git evidence. Codex task linking is available; AI reviews are still
+            being built.
+          </p>
         </div>
         <button className="secondary-button" onClick={onSettings}>
-          AI settings
+          Connections
           <ArrowUpRight size={14} />
         </button>
       </div>
-      <div className="section-kicker">
-        <span>
-          WORTH A LOOK <b>{visible.length}</b>
-        </span>
-        <span>Based on {demo ? 'sample' : 'local'} Git evidence</span>
+      <div className="review-toolbar">
+        <nav className="review-filters" aria-label="Review status">
+          {(Object.keys(labels) as ReviewBucket[]).map((value) => (
+            <button
+              key={value}
+              aria-pressed={bucket === value}
+              className={bucket === value ? 'selected' : ''}
+              onClick={() => {
+                setBucket(value);
+                setPage(0);
+              }}
+            >
+              {labels[value]}
+              <span>{reviews.ready ? scoped(value).length : '…'}</span>
+            </button>
+          ))}
+        </nav>
+        {visible.length > PAGE_SIZE ? (
+          <FindingPages page={currentPage} count={visible.length} onPage={movePage} top />
+        ) : (
+          <span>{demo ? 'Sample Git evidence' : 'Git evidence'}</span>
+        )}
       </div>
-      {!visible.length && (
-        <EmptyState
-          icon={Check}
-          title="A clear headspace"
-          description="There are no unsnoozed findings to review. New evidence will show up here."
-        />
-      )}
-      <div className="recommendation-list">
-        {visible.slice(0, 50).map((item) => {
-          const repo = repositories.find((r) => r.id === item.repositoryId);
-          const branch = repo?.branches.find((b) => b.id === item.branchId);
-          const Icon =
-            item.category === 'local-only'
-              ? Laptop
-              : item.category === 'forgotten'
-                ? Clock3
-                : GitBranch;
-          return (
-            <article key={item.id} className={`recommendation-card ${item.priority}`}>
-              <span className="recommendation-icon">
-                <Icon size={19} />
-              </span>
-              <div className="recommendation-body">
-                <div className="recommendation-context">
-                  {repo?.name}
-                  <span>/</span>
-                  {branch?.title}
-                  <span className="recommendation-checked">{relativeTime(item.checkedAt)}</span>
-                </div>
-                <h3>{item.title}</h3>
-                <p>{item.explanation}</p>
-                <details>
-                  <summary>Why this appeared</summary>
-                  <ul>
-                    {item.evidence.map((e) => (
-                      <li key={e}>{e}</li>
-                    ))}
-                  </ul>
-                </details>
-                <div className="recommendation-actions">
-                  <button
-                    className="text-button"
-                    onClick={() => onSelect(item.repositoryId, item.branchId)}
-                  >
-                    Inspect branch
-                    <ArrowUpRight size={14} />
-                  </button>
-                  <button onClick={() => decide(item.id, { until: Date.now() + 7 * 86_400_000 })}>
-                    <Pause size={13} />
-                    Snooze 7 days
-                  </button>
-                  <button onClick={() => decide(item.id, { dismissed: true })}>Dismiss</button>
-                </div>
-              </div>
-            </article>
-          );
-        })}
-      </div>
-      {visible.length > 50 && (
-        <p className="muted-note">
-          Showing the first 50 findings. Use the branch inventory to explore the full project.
+      <p className="review-policy">
+        Your choices stay until the evidence changes. Snoozed findings return after seven days.
+      </p>
+      {(reviews.error || reviews.state.error) && (
+        <p className="review-error" role="alert">
+          {reviews.error || reviews.state.error}
         </p>
       )}
-      {Object.keys(decisions).length > 0 && (
+      {reviews.connectionFailed && (
+        <button className="secondary-button" onClick={reviews.retry}>
+          Retry loading review choices
+        </button>
+      )}
+      <h2 ref={heading} tabIndex={-1} className="section-kicker review-heading">
+        {labels[bucket]}{' '}
+        <span>
+          {visible.length} {visible.length === 1 ? 'finding' : 'findings'}
+        </span>
+      </h2>
+      {!reviews.ready ? (
+        <EmptyState
+          icon={LoaderCircle}
+          title="Opening your review history"
+          description="Your saved choices are being loaded."
+        />
+      ) : !visible.length ? (
+        <EmptyState
+          icon={bucket === 'snoozed' ? Clock3 : Check}
+          title={
+            bucket === 'active'
+              ? 'A clear headspace'
+              : bucket === 'snoozed'
+                ? 'Nothing snoozed'
+                : 'Nothing dismissed'
+          }
+          description={
+            bucket === 'active'
+              ? 'There’s nothing waiting for your review. New evidence will appear here.'
+              : 'Findings you set aside will appear here. You can bring them back at any time.'
+          }
+        />
+      ) : (
+        <div className="recommendation-list">
+          {items.map((item, index) => {
+            const repo = repositories.find(
+              (repository) => repository.id === item.finding.repositoryId,
+            );
+            return (
+              <ReviewCard
+                key={item.finding.id}
+                item={item}
+                repository={repo}
+                bucket={bucket}
+                now={reviews.now}
+                busy={reviews.busy || !!reviews.state.error}
+                register={(node) => {
+                  if (node) cards.current.set(item.finding.id, node);
+                  else cards.current.delete(item.finding.id);
+                }}
+                onSelect={onSelect}
+                onDecide={(command) => void decide(command, index)}
+              />
+            );
+          })}
+        </div>
+      )}
+      {reviews.ready && visible.length > PAGE_SIZE && (
+        <FindingPages page={currentPage} count={visible.length} onPage={movePage} />
+      )}
+      {!reviews.connectionFailed && (decisions.length > 0 || reviews.state.error) && (
         <button
           className="text-button reset-decisions"
-          onClick={() => {
-            setDecisions({});
-            localStorage.removeItem(`ob-decisions-${demo ? 'demo' : 'live'}`);
-          }}
+          disabled={reviews.busy || !reviews.ready}
+          onClick={() =>
+            void reviews.reset(reviews.state.error ? undefined : (repositoryId ?? undefined))
+          }
         >
-          Reset snoozed and dismissed findings
+          {repositoryId && !reviews.state.error
+            ? 'Reset this project’s review choices'
+            : 'Reset all review choices'}
         </button>
       )}
     </div>
+  );
+}
+function FindingPages({
+  page,
+  count,
+  onPage,
+  top = false,
+}: {
+  page: number;
+  count: number;
+  onPage: (page: number) => void;
+  top?: boolean;
+}) {
+  return (
+    <nav
+      className={`review-pagination ${top ? 'compact' : ''}`}
+      aria-label={top ? 'Finding pages at top' : 'Finding pages'}
+    >
+      <span>
+        {page * PAGE_SIZE + 1}–{Math.min(count, (page + 1) * PAGE_SIZE)} of {count}
+      </span>
+      <button className="secondary-button" disabled={page === 0} onClick={() => onPage(page - 1)}>
+        <ChevronLeft size={14} />
+        Previous
+      </button>
+      <button
+        className="secondary-button"
+        disabled={(page + 1) * PAGE_SIZE >= count}
+        onClick={() => onPage(page + 1)}
+      >
+        Next
+        <ChevronRight size={14} />
+      </button>
+    </nav>
   );
 }

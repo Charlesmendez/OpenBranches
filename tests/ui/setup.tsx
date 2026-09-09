@@ -33,6 +33,10 @@ const subscribe = <T,>(listeners: Set<(value: T) => void>, listener: (value: T) 
   };
 };
 window.openbranches = {
+  getReviews: async () => ({ decisions: [] }),
+  decideReview: async () => ({ ok: false, state: { decisions: [] } }),
+  resetReviews: async () => ({ ok: true, state: { decisions: [] } }),
+  onReviews: () => () => {},
   checkGit: async () => status,
   installGit: async () => {
     installCalls++;
@@ -56,7 +60,14 @@ window.openbranches = {
     snapshotListeners.forEach((listener) => listener(snapshot));
     return repository;
   },
-  removeRepository: async () => {},
+  removeRepository: async (id) => {
+    snapshot = {
+      ...snapshot,
+      repositories: snapshot.repositories.filter((repository) => repository.id !== id),
+      events: snapshot.events.filter((event) => event.repositoryId !== id),
+    };
+    snapshotListeners.forEach((listener) => listener(snapshot));
+  },
   refresh: async () => {},
   revealWorktree: async () => {},
   openExternal: async () => {},

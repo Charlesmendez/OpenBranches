@@ -6,20 +6,22 @@ import type { GitInstallation } from '../git/installation';
 
 export class RepositoryService {
   private snapshot: Snapshot;
-  private worker: GitWorkerClient;
+  private worker: Pick<GitWorkerClient, 'scan' | 'close'>;
   private closed = false;
   private refreshing?: Promise<void>;
   private watchPaths = new Map<string, string>();
   private watchers = new Map<string, FSWatcher[]>();
   private debounces = new Map<string, ReturnType<typeof setTimeout>>();
   private inFlight = new Map<string, Promise<Repository>>();
+  private revisions = new Map<string, number>();
   private reconcile: ReturnType<typeof setInterval>;
   constructor(
     private store: AppStore,
     private publish: (snapshot: Snapshot) => void,
     git: Pick<GitInstallation, 'executable'>,
+    worker: Pick<GitWorkerClient, 'scan' | 'close'> = new GitWorkerClient(git),
   ) {
-    this.worker = new GitWorkerClient(git);
+    this.worker = worker;
     this.snapshot = { ...store.snapshot(), scanning: false };
     this.reconcile = setInterval(() => {
       void this.refresh();
@@ -34,16 +36,33 @@ export class RepositoryService {
     this.replace(repository);
     return repository;
   }
-  remove(id: string): void {
+  remove(id: string, prepareConnections?: (next: Snapshot) => () => void): void {
+    if (!this.snapshot.repositories.some((repository) => repository.id === id)) return;
+    const next = {
+      ...this.snapshot,
+      repositories: this.snapshot.repositories.filter((repository) => repository.id !== id),
+      events: this.snapshot.events.filter((event) => event.repositoryId !== id),
+      updatedAt: new Date().toISOString(),
+    };
+    // Keep the workspace and its connection caches in one durable change.
+    // Preparing a connection writes storage but does not replace its memory.
+    const adoptConnections = this.store.transaction(() => {
+      this.store.write('snapshot', next);
+      return prepareConnections?.(next);
+    });
+    const removed = this.snapshot.repositories.find((repository) => repository.id === id)!;
+    this.revisions.set(id, this.revision(id) + 1);
+    for (const path of [removed.path, ...removed.worktrees.map((tree) => tree.path)])
+      this.inFlight.delete(path);
     this.watchers.get(id)?.forEach((w) => w.close());
     this.watchers.delete(id);
     this.watchPaths.delete(id);
     const timer = this.debounces.get(id);
     if (timer) clearTimeout(timer);
     this.debounces.delete(id);
-    this.snapshot.repositories = this.snapshot.repositories.filter((r) => r.id !== id);
-    this.snapshot.events = this.snapshot.events.filter((e) => e.repositoryId !== id);
-    this.emit();
+    this.snapshot = next;
+    adoptConnections?.();
+    this.publish(this.snapshot);
   }
   refresh(): Promise<void> {
     if (this.closed) return Promise.resolve();
@@ -57,12 +76,14 @@ export class RepositoryService {
     this.snapshot.scanning = true;
     this.publish(this.snapshot);
     for (const repository of [...this.snapshot.repositories]) {
+      const revision = this.revision(repository.id);
+      if (!this.isCurrent(repository.id, revision)) continue;
       try {
         const fresh = await this.scan(repository.path);
-        if (this.snapshot.repositories.some((r) => r.id === repository.id)) this.replace(fresh);
+        if (this.isCurrent(repository.id, revision)) this.replace(fresh);
       } catch (error) {
         const current = this.snapshot.repositories.find((r) => r.id === repository.id);
-        if (current)
+        if (current && this.isCurrent(repository.id, revision))
           current.error = error instanceof Error ? error.message : 'Repository unavailable';
       }
     }
@@ -72,9 +93,21 @@ export class RepositoryService {
   private scan(path: string): Promise<Repository> {
     const existing = this.inFlight.get(path);
     if (existing) return existing;
-    const promise = this.worker.scan(path).finally(() => this.inFlight.delete(path));
+    const promise = this.worker.scan(path).finally(() => {
+      if (this.inFlight.get(path) === promise) this.inFlight.delete(path);
+    });
     this.inFlight.set(path, promise);
     return promise;
+  }
+  private revision(id: string): number {
+    return this.revisions.get(id) ?? 0;
+  }
+  private isCurrent(id: string, revision: number): boolean {
+    return (
+      !this.closed &&
+      this.revision(id) === revision &&
+      this.snapshot.repositories.some((repository) => repository.id === id)
+    );
   }
   private replace(repository: Repository): void {
     if (this.closed) return;
@@ -131,10 +164,10 @@ export class RepositoryService {
             repository.id,
             setTimeout(async () => {
               this.debounces.delete(repository.id);
+              const revision = this.revision(repository.id);
               try {
                 const fresh = await this.scan(repository.path);
-                if (this.snapshot.repositories.some((r) => r.id === repository.id))
-                  this.replace(fresh);
+                if (this.isCurrent(repository.id, revision)) this.replace(fresh);
               } catch {
                 /* The reconciliation pass publishes availability failures. */
               }

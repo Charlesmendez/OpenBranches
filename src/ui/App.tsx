@@ -16,16 +16,11 @@ import {
   X,
 } from 'lucide-react';
 import type { Branch, Lifecycle, View } from '../domain/types';
-import {
-  featureBranches,
-  groupCounts,
-  lifecycleLabels,
-  lifecycleOf,
-  recommendationsFor,
-} from '../domain/branches';
+import { featureBranches, groupCounts, lifecycleLabels, lifecycleOf } from '../domain/branches';
 import { useWorkspace } from './hooks/useWorkspace';
 import { useProviders } from './hooks/useProviders';
 import { useGit } from './hooks/useGit';
+import { useReviews } from './hooks/useReviews';
 import { GitSetup } from './components/GitSetup';
 import { Sidebar } from './components/Sidebar';
 import { Overview, ActivityList } from './components/Overview';
@@ -43,6 +38,7 @@ export function App() {
   const git = useGit();
   const gitNeedsSetup = !!git.status && git.status.state !== 'ready';
   const { snapshot, mode, setMode, error, setError, loading, adding, add, refresh } = workspace;
+  const reviews = useReviews(mode === 'demo', snapshot.repositories);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [view, setView] = useState<View>('map');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -56,13 +52,16 @@ export function App() {
     [branches, group],
   );
   const selected = repository?.branches.find((branch) => branch.id === selectedId);
-  const recommendations = useMemo(
-    () => snapshot.repositories.flatMap((r) => recommendationsFor(r)),
-    [snapshot.repositories],
-  );
-  const attention = projectId
-    ? recommendations.filter((r) => r.repositoryId === projectId)
-    : recommendations;
+  useEffect(() => {
+    if (
+      !loading &&
+      projectId &&
+      !snapshot.repositories.some((repository) => repository.id === projectId)
+    ) {
+      setProjectId(null);
+      setSelectedId(null);
+    }
+  }, [loading, projectId, snapshot.repositories]);
   useEffect(() => {
     const listener = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
@@ -185,7 +184,7 @@ export function App() {
         repositories={snapshot.repositories}
         selectedId={projectId}
         view={view}
-        attentionCount={recommendations.length}
+        attentionCount={reviews.ready ? reviews.groups.active.length : 0}
         demo={mode === 'demo'}
         gitNeedsSetup={gitNeedsSetup}
         onProject={selectProject}
@@ -287,11 +286,19 @@ export function App() {
               description="Loading your last snapshot…"
             />
           ) : view === 'settings' ? (
-            <Settings git={git} />
+            <Settings
+              git={git}
+              repositories={snapshot.repositories}
+              demo={mode === 'demo'}
+              onRemove={workspace.remove}
+              onAdd={() => void addRepository()}
+              onLive={switchMode}
+            />
           ) : view === 'attention' ? (
             <Attention
               key={`${mode}:${projectId}`}
-              recommendations={attention}
+              reviews={reviews}
+              repositoryId={projectId}
               repositories={snapshot.repositories}
               onSelect={navigateBranch}
               onSettings={() => setView('settings')}

@@ -59,4 +59,16 @@ describe('branch evidence', () => {
     repo.error = 'Unavailable';
     expect(recommendationsFor(repo)).toEqual([]);
   });
+  it('does not call known active task work forgotten solely because its last commit is old', () => {
+    const repo = createDemoSnapshot().repositories[0];
+    const branch = repo.branches[0];
+    repo.branches = [branch];
+    branch.worktrees = [];
+    branch.pullRequest = undefined;
+    branch.updatedAt = new Date(Date.now() - 30 * DAY).toISOString();
+    expect(branch.tasks?.some((task) => task.status === 'active')).toBe(true);
+    expect(recommendationsFor(repo).some((item) => item.category === 'forgotten')).toBe(false);
+    branch.tasks = [];
+    expect(recommendationsFor(repo).some((item) => item.category === 'forgotten')).toBe(true);
+  });
 });

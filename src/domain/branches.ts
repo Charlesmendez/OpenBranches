@@ -1,4 +1,5 @@
 import type { Branch, IntegrationState, Lifecycle, Recommendation, Repository } from './types';
+import { recommendationRevision } from './reviews';
 
 export const DAY = 86_400_000;
 export const lifecycleLabels: Record<Lifecycle, string> = {
@@ -68,6 +69,7 @@ export function recommendationsFor(repository: Repository, now = Date.now()): Re
       repositoryId: repository.id,
       branchId: branch.id,
       checkedAt: repository.scannedAt,
+      revision: recommendationRevision(repository, branch),
     };
     const pending = Object.entries(branch.integration)
       .filter(([, state]) => state === 'pending')
@@ -92,6 +94,7 @@ export function recommendationsFor(repository: Repository, now = Date.now()): Re
       age >= 14 &&
       pending.length &&
       !branch.worktrees.some((w) => w.dirty !== false) &&
+      !branch.tasks?.some((task) => task.status === 'active') &&
       branch.pullRequest?.state !== 'open'
     ) {
       facts.push({

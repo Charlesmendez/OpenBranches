@@ -107,14 +107,35 @@ export class CodexService {
   }
 
   forgetUnselected() {
-    const linked = this.enrich(this.current());
+    this.prepareForgetUnselected(this.current())();
+  }
+
+  prepareForgetUnselected(snapshot: Snapshot): () => void {
+    const index = this.selectedIndex(snapshot, this.index);
+    this.store.write('codex.index', index);
+    return () => {
+      ++this.generation;
+      this.client?.close();
+      this.client = undefined;
+      this.index = index;
+      if (this.statusValue.state === 'connecting')
+        this.statusValue = {
+          ...this.statusValue,
+          state: index.checkedAt ? 'ready' : 'not-connected',
+        };
+    };
+  }
+
+  private selectedIndex(snapshot: Snapshot, index: CodexIndex): CodexIndex {
+    const linked = this.statusValue.enabled
+      ? snapshot.repositories.map((repository) =>
+          linkRepository(repository, index.tasks, index.checkedAt),
+        )
+      : [];
     const ids = new Set(
-      linked.repositories.flatMap((r) =>
-        r.branches.flatMap((b) => b.tasks?.map((t) => t.id) ?? []),
-      ),
+      linked.flatMap((r) => r.branches.flatMap((b) => b.tasks?.map((t) => t.id) ?? [])),
     );
-    this.index.tasks = this.index.tasks.filter((task) => ids.has(task.id));
-    this.store.write('codex.index', this.index);
+    return { ...index, tasks: index.tasks.filter((task) => ids.has(task.id)) };
   }
 
   refresh(): Promise<void> {
@@ -149,8 +170,9 @@ export class CodexService {
         ? await this.dependencies.read(client)
         : { tasks: [], checkedAt: new Date().toISOString(), partial: false };
       if (!valid()) return;
-      this.index = fresh;
-      this.forgetUnselected();
+      const index = this.selectedIndex(this.current(), fresh);
+      this.store.write('codex.index', index);
+      this.index = index;
       this.statusValue = { ...this.statusValue, state: 'ready', error: undefined };
       const account = await readCodexAccount(client);
       if (valid()) this.statusValue = { ...this.statusValue, account };

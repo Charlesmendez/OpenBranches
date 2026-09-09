@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import type { PullRequest } from '../../src/domain/types';
 import type { GitHubHttp } from './http';
 
 export function githubRepository(remoteUrl: string): string | undefined {
@@ -38,16 +37,33 @@ const pullSchema = z.object({
   }),
 });
 
-export interface RemoteSnapshot {
-  repository: string;
-  remoteName: string;
-  branches: { name: string; sha: string }[];
-  pulls: (PullRequest & { headName: string; headRepository: string })[];
-  checkedAt: string;
-  branchesComplete: boolean;
-  pullHistoryComplete: boolean;
-  error?: string;
-}
+const cachedText = z.string().max(8192);
+export const remoteSnapshotSchema = z.object({
+  repository: cachedText,
+  remoteName: cachedText,
+  branches: z.array(z.object({ name: cachedText, sha: cachedText })).max(5000),
+  pulls: z
+    .array(
+      z.object({
+        number: z.number().int().positive(),
+        title: cachedText,
+        url: cachedText,
+        state: z.enum(['open', 'closed', 'merged']),
+        draft: z.boolean().optional(),
+        base: cachedText,
+        headSha: cachedText,
+        updatedAt: cachedText,
+        headName: cachedText,
+        headRepository: cachedText,
+      }),
+    )
+    .max(300),
+  checkedAt: cachedText,
+  branchesComplete: z.boolean(),
+  pullHistoryComplete: z.boolean(),
+  error: cachedText.optional(),
+});
+export type RemoteSnapshot = z.infer<typeof remoteSnapshotSchema>;
 
 /** Paginate branches completely up to a visible resource bound. Pull-request
  * history is deliberately bounded and never used to prove that no PR exists. */

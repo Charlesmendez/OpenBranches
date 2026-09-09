@@ -1,12 +1,27 @@
 import { useEffect, useState } from 'react';
 import { ArrowUpRight, Check, Cloud, Copy, Laptop, LoaderCircle, ShieldCheck } from 'lucide-react';
-import type { GitHubStatus } from '../../domain/types';
+import type { GitHubStatus, Repository } from '../../domain/types';
 import { useProviders } from '../hooks/useProviders';
 import { CodexConnection } from './CodexConnection';
 import { GitSetup } from './GitSetup';
 import type { GitSetupController } from '../hooks/useGit';
+import { MonitoredProjects } from './MonitoredProjects';
 
-export function Settings({ git }: { git: GitSetupController }) {
+export function Settings({
+  git,
+  repositories,
+  demo,
+  onRemove,
+  onAdd,
+  onLive,
+}: {
+  git: GitSetupController;
+  repositories: Repository[];
+  demo: boolean;
+  onRemove: (id: string) => Promise<boolean>;
+  onAdd: () => void;
+  onLive: () => void;
+}) {
   const providers = useProviders();
   const [github, setGitHub] = useState<GitHubStatus>(providers.github);
   const [busy, setBusy] = useState(false);
@@ -39,6 +54,13 @@ export function Settings({ git }: { git: GitSetupController }) {
     });
   return (
     <div className="settings-content">
+      <MonitoredProjects
+        repositories={repositories}
+        demo={demo}
+        onRemove={onRemove}
+        onAdd={onAdd}
+        onLive={onLive}
+      />
       <section className="settings-section">
         <div className="section-kicker">
           <span>CONNECTIONS</span>

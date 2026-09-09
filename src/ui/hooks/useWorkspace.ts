@@ -8,7 +8,18 @@ const empty: Snapshot = {
   updatedAt: new Date().toISOString(),
   scanning: false,
 };
-const demo = createDemoSnapshot();
+function demoSnapshot() {
+  const now = Date.now();
+  try {
+    const saved = Number(localStorage.getItem('ob-demo-origin-v1'));
+    const origin = Number.isSafeInteger(saved) && saved > 0 && saved <= now ? saved : now;
+    localStorage.setItem('ob-demo-origin-v1', String(origin));
+    return createDemoSnapshot(origin);
+  } catch {
+    return createDemoSnapshot();
+  }
+}
+const demo = demoSnapshot();
 export function useWorkspace() {
   const [mode, setMode] = useState<'live' | 'demo'>(window.openbranches ? 'live' : 'demo');
   const [live, setLive] = useState<Snapshot>(empty);
@@ -63,6 +74,19 @@ export function useWorkspace() {
       setError(String(error));
     }
   }, [mode]);
+  const remove = useCallback(
+    async (id: string) => {
+      if (mode === 'demo' || !window.openbranches) return false;
+      try {
+        await window.openbranches.removeRepository(id);
+        return true;
+      } catch {
+        setError('This project could not be removed from your workspace. Please try again.');
+        return false;
+      }
+    },
+    [mode],
+  );
   return {
     snapshot: mode === 'demo' ? demo : live,
     mode,
@@ -73,5 +97,6 @@ export function useWorkspace() {
     adding,
     add,
     refresh,
+    remove,
   };
 }

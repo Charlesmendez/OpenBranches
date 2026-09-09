@@ -31,6 +31,18 @@ export class AppStore {
       )
       .run(key, JSON.stringify(value));
   }
+  /** Synchronous writes only. Adopt in-memory state after this returns. */
+  transaction<T>(run: () => T): T {
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      const result = run();
+      this.db.exec('COMMIT');
+      return result;
+    } catch (error) {
+      this.db.exec('ROLLBACK');
+      throw error;
+    }
+  }
   snapshot(): Snapshot {
     return this.read('snapshot', {
       repositories: [],
