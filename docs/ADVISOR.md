@@ -32,7 +32,7 @@ npm run probe:advisor
 
 The probe creates an ephemeral test thread with fictional metadata, a dummy token, and a model provider pointing only to a loopback stub. It disables known execution features and each configured MCP server in the child process, verifies the effective feature/MCP settings, and requests a named profile with no filesystem writes or command-network access. It does not modify the user's Codex configuration or change `CODEX_HOME` or inherited sandbox restrictions. Temporary probe files are removed afterwards.
 
-The stub never forwards model requests. It reports only counts and booleans, refuses actual generation, and does not retain request bodies, credentials, or private configuration values. The script exits nonzero when it observes tools or context beyond the supplied probe messages.
+The stub never forwards model requests. It reports counts, booleans, recognized public tool labels, message roles, known field names, and text lengths. Other tool names are redacted, and message ID values are never printed. It refuses actual generation and does not retain request bodies, credentials, private instructions, tool descriptions, or schemas. The script exits nonzero when it observes tools or context beyond the supplied probe messages.
 
 On the development Mac with Codex 0.144.4, the verified result was:
 
@@ -47,6 +47,30 @@ On the development Mac with Codex 0.144.4, the verified result was:
 ```
 
 An empty top-level tool list was insufficient: extra capabilities appeared in `additional_tools` input items. The same request contained additional context. This is evidence about the tested installation, not a claim that every installation of that version behaves identically.
+
+### Compatibility checks
+
+The probe can target a separate official CLI installation without replacing the user's installed binary:
+
+```sh
+OPENBRANCHES_PROBE_CODEX=/absolute/path/to/codex npm run probe:advisor
+```
+
+The optional `OPENBRANCHES_PROBE_MODEL_CATALOG` environment variable selects an absolute JSON catalog path for a developer-only experiment using Codex's documented `model_catalog_json` override. The probe never changes the user's configuration, catalog, or authentication settings. A supplied catalog file remains the caller's responsibility; the probe only deletes temporary files it creates itself.
+
+The following checks used `gpt-5.6-terra`, fictional input, a dummy token, and the same loopback-only provider. The separate 0.153.4 installation came from the official `@openai/codex` npm package.
+
+| CLI and catalog                       | Advertised capabilities remaining            | Extra context | Result    |
+| ------------------------------------- | -------------------------------------------- | ------------- | --------- |
+| Installed 0.144.4, normal catalog     | Execution, waiting, questions, collaboration | Present       | Not ready |
+| Temporary 0.153.4, normal catalog     | Execution, waiting, questions                | Present       | Not ready |
+| Temporary 0.153.4, restricted catalog | Questions                                    | Present       | Not ready |
+
+The restricted catalog changed only capability fields on a temporary copy of the selected model entry: `tool_mode: null`, `multi_agent_version: null`, `node_repl_disabled: true`, and `apply_patch_tool_type: null`. It is not a shipped catalog or an approved production execution path. The remaining question capability and added developer/user context still require verification. Changing catalog fields alone does not establish enforcement of filesystem or network restrictions.
+
+Version 0.144.4 rejected the newer `agents.enabled` configuration field and the added feature switches. The probe applies that field and explicit `view_image`/`sleep_tool` feature disables only from the separately verified 0.153.4 version onward. Per-tool configuration names that were ignored by the tested CLI were removed from the experiment rather than counted as effective controls.
+
+`requestAudit.mts` provides the shared, tested diagnostic. It recognizes bounded message IDs used by the newer protocol but rejects unexpected roles, repeated messages, hidden non-text content, malformed tool declarations, and ordinary or nested additional tools. Supplied user evidence cannot substitute for the top-level instructions. The positive fixture proves recognition of a controlled request shape only; it does not authorize model execution. Future production work must verify actual attempted tool calls, controlled framing context, token accounting, cancellation, and the supported authentication path before connecting the advisor runner.
 
 A successful probe would be a necessary diagnostic result, not sufficient proof of production safety. Before enabling AI, verify the actual model path, supported capabilities, context contents, read-only enforcement, interruption/deadline behavior, authentication/usage failures, grounded output, restart behavior, and explicit diff consent. Do not weaken the contract or silently switch to a different authentication mechanism to make the probe pass.
 

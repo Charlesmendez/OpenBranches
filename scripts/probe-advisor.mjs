@@ -1,12 +1,40 @@
 // Developer-only negative/positive capability check. All generated model traffic
 // goes to a loopback stub with a dummy token. No real model is called.
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { StringDecoder } from 'node:string_decoder';
+import { auditModelRequest } from '../electron/advisor/requestAudit.mts';
+
+const executable = process.env.OPENBRANCHES_PROBE_CODEX ?? 'codex';
+const catalog = process.env.OPENBRANCHES_PROBE_MODEL_CATALOG;
+function unavailable(reason) {
+  console.log(JSON.stringify({ readyForModelExecution: false, reason }));
+  process.exit(1);
+}
+if (catalog && !isAbsolute(catalog)) unavailable('The probe catalog must be an absolute path.');
+if (process.env.OPENBRANCHES_PROBE_CODEX && !isAbsolute(executable))
+  unavailable('The probe executable override must be an absolute path.');
+let version;
+try {
+  version = execFileSync(executable, ['--version'], {
+    encoding: 'utf8',
+    timeout: 3000,
+    maxBuffer: 4096,
+    stdio: ['ignore', 'pipe', 'ignore'],
+  }).trim();
+} catch {
+  unavailable('Codex could not be detected. Check the selected CLI installation.');
+}
+const versionParts = /^codex-cli (\d+)\.(\d+)\.(\d+)$/.exec(version);
+if (!versionParts) unavailable('The probe requires a recognized Codex CLI version.');
+const supportsAgentsSetting =
+  Number(versionParts[1]) === 0 &&
+  (Number(versionParts[2]) > 153 ||
+    (Number(versionParts[2]) === 153 && Number(versionParts[3]) >= 4));
 
 const directory = await mkdtemp(join(tmpdir(), 'openbranches-probe-'));
 const base = 'You are a read-only branch advisor. Analyze supplied JSON only.';
@@ -32,6 +60,7 @@ const disabled = [
   'code_mode_host',
   'code_mode_only',
   'image_generation',
+  ...(supportsAgentsSetting ? ['view_image', 'sleep_tool'] : []),
   'memories',
   'workspace_dependencies',
   'shell_snapshot',
@@ -42,6 +71,7 @@ const disabled = [
 ];
 let active;
 let settle;
+let configuredTools = [];
 const observed = new Promise((resolve) => {
   settle = resolve;
 });
@@ -80,29 +110,11 @@ const server = createServer((request, response) => {
   });
   request.on('end', () => {
     try {
-      const payload = JSON.parse(body);
-      const items = Array.isArray(payload.input) ? payload.input : [];
-      const ordinaryTools = Array.isArray(payload.tools) ? payload.tools.length : 0;
-      const injectedTools = items
-        .filter((item) => item.type === 'additional_tools')
-        .reduce((sum, item) => sum + (Array.isArray(item.tools) ? item.tools.length : 0), 0);
-      const itemText = (item) =>
-        typeof item.content === 'string'
-          ? item.content
-          : Array.isArray(item.content)
-            ? item.content.map((part) => part.text ?? '').join('')
-            : '';
-      const allowed = new Set([base, developer, input]);
-      const extraContext =
-        items.some((item) => item.type !== 'message' || !allowed.has(itemText(item))) ||
-        (!!payload.instructions && !allowed.has(payload.instructions));
-      const hasInput = items.some((item) => item.role === 'user' && itemText(item) === input);
       settle({
         modelCalls: 'local stub only',
-        ordinaryTools,
-        injectedTools,
-        extraContext,
-        readyForModelExecution: hasInput && !ordinaryTools && !injectedTools && !extraContext,
+        version,
+        configuredTools,
+        ...auditModelRequest(JSON.parse(body), { base, developer, input }),
       });
     } catch {
       settle({ readyForModelExecution: false, reason: 'Unrecognized model request.' });
@@ -130,6 +142,8 @@ function toml(value) {
 }
 function launch(mcpNames) {
   const overrides = {
+    ...(supportsAgentsSetting ? { 'agents.enabled': false } : {}),
+    ...(catalog ? { model_catalog_json: catalog } : {}),
     web_search: 'disabled',
     'tools.view_image': false,
     project_doc_max_bytes: 0,
@@ -175,7 +189,7 @@ function launch(mcpNames) {
       !['CODEX_HOME', 'CODEX_SANDBOX', 'CODEX_SANDBOX_NETWORK_DISABLED'].includes(key)
     )
       delete env[key];
-  const child = spawn('codex', args, { cwd: directory, env, stdio: ['pipe', 'pipe', 'pipe'] });
+  const child = spawn(executable, args, { cwd: directory, env, stdio: ['pipe', 'pipe', 'pipe'] });
   const pending = new Map();
   const decoder = new StringDecoder('utf8');
   let nextId = 0,
@@ -275,6 +289,9 @@ try {
   active = launch(names);
   await active.initialize();
   ({ config } = await active.request('config/read', { includeLayers: false }));
+  configuredTools = Object.keys(config.tools ?? {})
+    .slice(0, 30)
+    .map((key) => (['web_search', 'view_image'].includes(key) ? key : 'unrecognized'));
   if (
     !disabled.every((key) => config.features?.[key] === false) ||
     Object.values(config.mcp_servers ?? {}).some((value) => value.enabled !== false)
