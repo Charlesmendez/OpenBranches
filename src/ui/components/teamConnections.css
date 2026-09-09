@@ -7,7 +7,7 @@
   padding-top: 25px;
 }
 .mac-shared-projects .mac-team-heading > svg {
-  color: var(--teal);
+  color: var(--accent);
   flex-shrink: 0;
 }
 .mac-shared-projects h3 {
@@ -131,7 +131,7 @@
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 21px;
-  background: linear-gradient(130deg, #79cdb808, transparent 65%), var(--surface);
+  background: linear-gradient(130deg, #798ecd08, transparent 65%), var(--surface);
   min-width: 0;
 }
 .mac-team-card > header {
@@ -165,17 +165,17 @@
 }
 .mac-team-code code {
   font-size: 24px;
-  color: var(--teal);
+  color: var(--accent);
   letter-spacing: 3px;
 }
 .mac-team-sharing-off {
   display: flex;
   align-items: flex-start;
   gap: 9px;
-  color: var(--teal);
+  color: var(--accent);
   font-size: 12px;
   line-height: 1.6;
-  background: #79cdb809;
+  background: #798ecd09;
   border-radius: 7px;
   padding: 11px 12px;
 }
@@ -233,14 +233,14 @@
   font-size: 12px;
 }
 .mac-consent-options input {
-  accent-color: var(--teal);
+  accent-color: var(--accent);
 }
 .mac-payload-review {
   margin-top: 20px;
   padding: 18px;
   border-radius: 10px;
-  border: 1px solid #79cdb835;
-  background: #79cdb806;
+  border: 1px solid #798ecd35;
+  background: #798ecd06;
 }
 .mac-preview-title {
   display: flex;
@@ -253,7 +253,7 @@
   overflow-wrap: anywhere;
 }
 .mac-preview-title > svg {
-  color: var(--teal);
+  color: var(--accent);
   flex-shrink: 0;
 }
 .mac-preview-title p {
@@ -297,7 +297,7 @@
 }
 .mac-payload-review summary:focus-visible,
 .mac-payload-review textarea:focus-visible {
-  outline: 2px solid var(--teal);
+  outline: 2px solid var(--accent);
   outline-offset: 4px;
 }
 .mac-payload-review textarea {

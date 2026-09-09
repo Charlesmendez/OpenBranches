@@ -117,7 +117,7 @@ export function Overview({
                 <div className="route-tasks">
                   {previews.map((branch) => (
                     <div key={branch.id} className="route-task">
-                      <span className={branch.pullRequest ? 'violet-dot' : 'teal-dot'} />
+                      <span className={branch.pullRequest ? 'violet-dot' : 'blue-dot'} />
                       <span>{branch.title}</span>
                       {branch.pullRequest && <small>PR #{branch.pullRequest.number}</small>}
                     </div>

@@ -3,9 +3,14 @@ import type { Branch, Repository, TaskLink } from '../../src/domain/types';
 import type { SavedAgentTask } from './types';
 import { toolNames } from '../../src/domain/agents';
 import { githubRepository } from '../../src/github/reader';
+import { LIVE_ACTIVITY_TTL } from '../../src/domain/branchActivity';
 
 function context(repository: Repository) {
   return {
+    checkoutFresh:
+      !repository.error &&
+      Number.isFinite(Date.parse(repository.scannedAt)) &&
+      Math.abs(Date.now() - Date.parse(repository.scannedAt)) <= 120_000,
     paths: new Set(
       [repository.path, ...repository.worktrees.map((w) => w.path)].map((path) => resolve(path)),
     ),
@@ -43,8 +48,23 @@ function matchTask(
   const sameCommit = !!task.gitInfo?.sha && commitIds(branch).includes(task.gitInfo.sha);
   const sameDetachedWorktree =
     branch.detached && sameCommit && branch.worktrees.some((w) => resolve(w.path) === cwd);
-  if (!sameBranch && !sameDetachedWorktree) return;
-  const verified = !branch.detached && sameRepository && sameBranch && sameCommit;
+  const liveCheckout =
+    repository.checkoutFresh &&
+    task.tool === 'codex' &&
+    task.runtime &&
+    Date.parse(task.runtime.checkedAt) >= Date.now() - LIVE_ACTIVITY_TTL &&
+    Date.parse(task.runtime.checkedAt) <= Date.now() + 60_000 &&
+    !branch.detached &&
+    branch.worktrees.some(
+      (tree) =>
+        tree.available &&
+        resolve(tree.path) === cwd &&
+        tree.branch?.replace(/^refs\/heads\//, '') === branch.name &&
+        tree.head === branch.local?.sha,
+    );
+  if (!sameBranch && !sameDetachedWorktree && !liveCheckout) return;
+  const verified =
+    !!liveCheckout || (!branch.detached && sameRepository && sameBranch && sameCommit);
   const commitEvidence =
     task.gitInfo?.sha === branch.local?.sha
       ? 'Saved commit matches the local branch tip.'
@@ -54,30 +74,43 @@ function matchTask(
     tool: task.tool,
     model: task.model,
     title: task.name?.trim() || 'Untitled ' + toolNames[task.tool] + ' task',
-    status: 'unknown', // Saved metadata does not establish a client's current activity.
+    status:
+      liveCheckout && task.runtime
+        ? task.runtime.state === 'active'
+          ? 'active'
+          : 'idle'
+        : 'unknown',
+    ...(liveCheckout && task.runtime
+      ? { activitySource: 'codex-runtime' as const, waiting: task.runtime.state === 'waiting' }
+      : {}),
     association: verified ? 'verified' : 'possible',
     archived: task.archived,
     updatedAt: new Date(task.updatedAt * 1000).toISOString(),
-    checkedAt: task.checkedAt ?? checkedAt,
-    evidence: verified
+    checkedAt: task.runtime?.checkedAt ?? task.checkedAt ?? checkedAt,
+    evidence: liveCheckout
       ? [
-          'Saved task folder belongs to this repository.',
-          'Saved branch name matches.',
-          commitEvidence,
+          'Codex runtime status read from the running local daemon.',
+          'Task folder matches this branch’s current checkout.',
         ]
-      : sameDetachedWorktree
+      : verified
         ? [
-            'Saved task folder and commit match this detached worktree. Branch ownership is unconfirmed.',
-          ]
-        : [
-            sameRepository
-              ? 'Saved task folder belongs to this repository.'
-              : 'Saved GitHub repository matches; the task folder is not a known local worktree.',
+            'Saved task folder belongs to this repository.',
             'Saved branch name matches.',
-            sameCommit
-              ? commitEvidence
-              : 'The branch has changed or its saved commit is unavailable.',
-          ],
+            commitEvidence,
+          ]
+        : sameDetachedWorktree
+          ? [
+              'Saved task folder and commit match this detached worktree. Branch ownership is unconfirmed.',
+            ]
+          : [
+              sameRepository
+                ? 'Saved task folder belongs to this repository.'
+                : 'Saved GitHub repository matches; the task folder is not a known local worktree.',
+              'Saved branch name matches.',
+              sameCommit
+                ? commitEvidence
+                : 'The branch has changed or its saved commit is unavailable.',
+            ],
   };
 }
 
@@ -98,7 +131,13 @@ export function linkRepository(
   const evidence = context(repository);
   const byBranch = new Map<string, SavedAgentTask[]>();
   const byCommit = new Map<string, SavedAgentTask[]>();
+  const liveByCwd = new Map<string, SavedAgentTask[]>();
   for (const task of tasks) {
+    if (task.tool === 'codex' && task.runtime) {
+      const group = liveByCwd.get(resolve(task.cwd)) ?? [];
+      group.push(task);
+      liveByCwd.set(resolve(task.cwd), group);
+    }
     const name = task.gitInfo?.branch?.replace(/^refs\/heads\//, '');
     if (name) {
       const group = byBranch.get(name) ?? [];
@@ -125,7 +164,14 @@ export function linkRepository(
                   .map((task) => [task.id, task]),
               ).values(),
             ]
-          : (byBranch.get(branch.name) ?? [])
+          : [
+              ...new Map(
+                [
+                  ...(byBranch.get(branch.name) ?? []),
+                  ...branch.worktrees.flatMap((tree) => liveByCwd.get(resolve(tree.path)) ?? []),
+                ].map((task) => [task.id, task]),
+              ).values(),
+            ]
         )
           .flatMap((task) => {
             const link = matchTask(evidence, branch, task, checkedAt);

@@ -34,6 +34,7 @@ function mapPosition(value: unknown): MapPosition | undefined {
   const result: MapPosition = {
     expanded: option(value.expanded, ['review', 'local', 'tracked', null], null),
     page: Math.floor(number(value.page, 0, 100_000)),
+    ...(value.source === 'github' ? { source: 'github' as const } : {}),
   };
   if (record(value.viewport)) {
     const { x, y, zoom } = value.viewport;

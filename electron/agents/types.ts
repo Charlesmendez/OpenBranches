@@ -9,5 +9,6 @@ export interface SavedAgentTask {
   checkedAt?: string;
   archived?: boolean;
   model?: ModelIdentity;
+  runtime?: { state: 'active' | 'idle' | 'waiting'; checkedAt: string };
   gitInfo?: { branch?: string | null; sha?: string | null; originUrl?: string | null } | null;
 }

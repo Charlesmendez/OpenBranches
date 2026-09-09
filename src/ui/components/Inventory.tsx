@@ -143,7 +143,7 @@ export function Inventory({
                   <span
                     key={target.name}
                     className={
-                      ['main', 'master'].includes(target.name) ? 'amber-text' : 'teal-text'
+                      ['main', 'master'].includes(target.name) ? 'amber-text' : 'blue-text'
                     }
                   >
                     <GitBranch size={13} />

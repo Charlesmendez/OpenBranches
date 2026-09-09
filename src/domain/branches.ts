@@ -1,9 +1,10 @@
 import type { Branch, IntegrationState, Lifecycle, Recommendation, Repository } from './types';
 import { recommendationRevision } from './reviews';
+import { idleWork, liveTasks, waitingTasks } from './branchActivity';
 
 export const DAY = 86_400_000;
 export const lifecycleLabels: Record<Lifecycle, string> = {
-  active: 'Active work',
+  active: 'Recent & open',
   integrated: 'Integrated',
   quiet: 'Quiet',
   unverified: 'Unverified',
@@ -13,7 +14,8 @@ export function lifecycleOf(branch: Branch, now = Date.now()): Lifecycle {
   if (
     branch.pullRequest?.state === 'open' ||
     branch.worktrees.some((w) => w.dirty) ||
-    branch.tasks?.some((task) => task.association === 'verified' && task.status === 'active') ||
+    liveTasks(branch, now).length ||
+    waitingTasks(branch, now).length ||
     age < 14 * DAY
   )
     return 'active';
@@ -90,19 +92,14 @@ export function recommendationsFor(repository: Repository, now = Date.now()): Re
         priority: 'review',
       });
     }
-    if (
-      age >= 14 &&
-      pending.length &&
-      !branch.worktrees.some((w) => w.dirty !== false) &&
-      !branch.tasks?.some((task) => task.status === 'active') &&
-      branch.pullRequest?.state !== 'open'
-    ) {
+    const idle = idleWork(branch, now);
+    if (idle) {
       facts.push({
         ...base,
         id: `${branch.id}:forgotten`,
         category: 'forgotten',
-        title: 'Worth picking up again?',
-        explanation: `${branch.title} has had no commit activity for ${age} days. Its current commit is not in ${pending.join(' or ')} history. Check whether it was paused or integrated through a squash or rebase.`,
+        title: 'Review idle work',
+        explanation: `${branch.title} has no observed commit or linked task activity for ${idle.days} days. Its current commit is not in ${pending.join(' or ')} history. Check whether it was paused or integrated through a squash or rebase.`,
         evidence: [
           `Last commit ${age} days ago`,
           `Current commit not in ${pending.join(', ')} history`,

@@ -1,20 +1,32 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
+  ArrowLeft,
   ArrowUpRight,
   Check,
-  ChevronLeft,
   ChevronRight,
   Clock3,
+  GitBranch,
+  Laptop,
   LoaderCircle,
-  Sparkles,
+  Pause,
+  RotateCcw,
+  Search,
+  X,
 } from 'lucide-react';
-import type { Repository, ReviewCommand } from '../../domain/types';
+import type { CodexStatus, Repository, ReviewCommand } from '../../domain/types';
 import type { ReviewBucket } from '../../domain/reviews';
+import {
+  triageFindings,
+  triageHighlights,
+  triageQueues,
+  type TriageItem,
+  type TriageQueue,
+} from '../../domain/triage';
 import type { ReviewsController } from '../hooks/useReviews';
+import { TriageRow } from './TriageRow';
 import { EmptyState } from './Primitives';
-import { ReviewCard } from './ReviewCard';
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 12;
 const labels: Record<ReviewBucket, string> = {
   active: 'To review',
   snoozed: 'Snoozed',
@@ -27,6 +39,7 @@ export function Attention({
   onSelect,
   onSettings,
   demo,
+  codex,
 }: {
   reviews: ReviewsController;
   repositories: Repository[];
@@ -34,56 +47,86 @@ export function Attention({
   onSelect: (repositoryId: string, branchId: string) => void;
   onSettings: () => void;
   demo: boolean;
+  codex: CodexStatus;
 }) {
   const [bucket, setBucket] = useState<ReviewBucket>('active');
+  const [queue, setQueue] = useState<TriageQueue | 'all' | null>(null);
   const [page, setPage] = useState(0);
-  const heading = useRef<HTMLHeadingElement>(null);
-  const cards = useRef(new Map<string, HTMLElement>());
-  const nextFocus = useRef<string | null | undefined>(undefined);
-  const scoped = (value: ReviewBucket) =>
-    reviews.groups[value].filter(
-      (item) => !repositoryId || item.finding.repositoryId === repositoryId,
-    );
-  const visible = scoped(bucket);
-  const pages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
-  const currentPage = Math.min(page, pages - 1);
-  const items = visible.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
-  const decisions = reviews.state.decisions.filter(
-    (decision) => !repositoryId || decision.repositoryId === repositoryId,
+  const [query, setQuery] = useState('');
+  const [selected, setSelected] = useState<string[]>([]);
+  const groups = useMemo(
+    () =>
+      Object.fromEntries(
+        (Object.keys(labels) as ReviewBucket[]).map((value) => [
+          value,
+          triageFindings(
+            reviews.groups[value].filter(
+              (item) => !repositoryId || item.finding.repositoryId === repositoryId,
+            ),
+            repositories,
+          ),
+        ]),
+      ) as Record<ReviewBucket, TriageItem[]>,
+    [reviews.groups, repositories, repositoryId],
   );
-  useLayoutEffect(() => {
-    if (nextFocus.current !== undefined) {
-      const target = cards.current.get(nextFocus.current ?? '') ?? heading.current;
-      target?.focus({ preventScroll: true });
-      target?.scrollIntoView({ block: 'nearest' });
-      nextFocus.current = undefined;
-    }
-  }, [reviews.state]);
-  const decide = async (command: ReviewCommand, index: number) => {
-    nextFocus.current = items[index + 1]?.finding.id ?? items[index - 1]?.finding.id ?? null;
-    if (!(await reviews.decide(command))) nextFocus.current = undefined;
+  const all = groups[bucket];
+  const repoById = new Map(repositories.map((repo) => [repo.id, repo]));
+  const branchById = new Map(
+    repositories.flatMap((repo) => repo.branches.map((branch) => [branch.id, branch] as const)),
+  );
+  const needle = query.trim().toLowerCase();
+  const filtered = all.filter(
+    (item) =>
+      (!queue || queue === 'all' || item.queue === queue) &&
+      (!needle ||
+        [
+          repoById.get(item.repositoryId)?.name,
+          branchById.get(item.id)?.name,
+          branchById.get(item.id)?.title,
+          ...item.findings.map((value) => value.finding.explanation),
+        ]
+          .join(' ')
+          .toLowerCase()
+          .includes(needle)),
+  );
+  const overview = bucket === 'active' && !queue && !needle;
+  const currentPage = Math.min(page, Math.max(0, Math.ceil(filtered.length / PAGE_SIZE) - 1));
+  const items = overview
+    ? triageHighlights(all)
+    : filtered.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
+  const selectedItems = items.filter((item) => selected.includes(item.id));
+  const busy = reviews.busy || !!reviews.state.error || !reviews.ready;
+  const choose = async (items: TriageItem[], choice: ReviewCommand['choice']) => {
+    const commands = items.flatMap((item) =>
+      item.findings.map(({ finding }) => ({ id: finding.id, revision: finding.revision, choice })),
+    );
+    if (await reviews.decideMany(commands)) setSelected([]);
   };
-  const movePage = (next: number) => {
-    setPage(next);
-    heading.current?.focus({ preventScroll: true });
-    heading.current?.scrollIntoView({ block: 'nearest' });
+  const change = (next: TriageQueue | 'all' | null) => {
+    setQueue(next);
+    setPage(0);
+    setSelected([]);
   };
+  const linked = codex.enabled && (codex.state === 'ready' || codex.state === 'connecting');
+  const activeQueues = (Object.keys(triageQueues) as TriageQueue[]).filter((key) =>
+    groups.active.some((item) => item.queue === key),
+  );
   return (
     <div className="attention-content">
-      <div className="advisor-callout">
-        <span className="advisor-icon">
-          <Sparkles size={21} />
+      <div className="review-source-status">
+        <span>
+          <i className={`status-dot ${linked ? '' : 'muted'}`} />
+          {demo
+            ? 'Demo evidence'
+            : linked
+              ? `Codex connected · ${codex.taskCount ?? 0} linked tasks${codex.state === 'connecting' ? ' · syncing' : ''}`
+              : codex.enabled
+                ? 'Codex connection needs attention · saved evidence available'
+                : 'Git evidence connected'}
         </span>
-        <div>
-          <strong>A little context goes a long way.</strong>
-          <p>
-            These findings use Git evidence. Codex task linking is available; AI reviews are still
-            being built.
-          </p>
-        </div>
-        <button className="secondary-button" onClick={onSettings}>
-          Connections
-          <ArrowUpRight size={14} />
+        <button className="text-button" onClick={onSettings}>
+          {linked ? 'Connection details' : 'Connect an agent'}
+          <ArrowUpRight size={13} />
         </button>
       </div>
       <div className="review-toolbar">
@@ -95,23 +138,33 @@ export function Attention({
               className={bucket === value ? 'selected' : ''}
               onClick={() => {
                 setBucket(value);
-                setPage(0);
+                change(null);
               }}
             >
               {labels[value]}
-              <span>{reviews.ready ? scoped(value).length : '…'}</span>
+              <span>{reviews.ready ? groups[value].length : '…'}</span>
             </button>
           ))}
         </nav>
-        {visible.length > PAGE_SIZE ? (
-          <FindingPages page={currentPage} count={visible.length} onPage={movePage} top />
-        ) : (
-          <span>{demo ? 'Sample Git evidence' : 'Git evidence'}</span>
-        )}
+        <label className="triage-search">
+          <Search size={15} />
+          <input
+            aria-label="Search review branches"
+            placeholder="Search branches or projects…"
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setPage(0);
+              setSelected([]);
+            }}
+          />
+          {query && (
+            <button aria-label="Clear review search" onClick={() => setQuery('')}>
+              <X size={13} />
+            </button>
+          )}
+        </label>
       </div>
-      <p className="review-policy">
-        Your choices stay until the evidence changes. Snoozed findings return after seven days.
-      </p>
       {(reviews.error || reviews.state.error) && (
         <p className="review-error" role="alert">
           {reviews.error || reviews.state.error}
@@ -122,109 +175,214 @@ export function Attention({
           Retry loading review choices
         </button>
       )}
-      <h2 ref={heading} tabIndex={-1} className="section-kicker review-heading">
-        {labels[bucket]}{' '}
-        <span>
-          {visible.length} {visible.length === 1 ? 'finding' : 'findings'}
-        </span>
-      </h2>
       {!reviews.ready ? (
         <EmptyState
           icon={LoaderCircle}
-          title="Opening your review history"
-          description="Your saved choices are being loaded."
-        />
-      ) : !visible.length ? (
-        <EmptyState
-          icon={bucket === 'snoozed' ? Clock3 : Check}
-          title={
-            bucket === 'active'
-              ? 'A clear headspace'
-              : bucket === 'snoozed'
-                ? 'Nothing snoozed'
-                : 'Nothing dismissed'
-          }
-          description={
-            bucket === 'active'
-              ? 'There’s nothing waiting for your review. New evidence will appear here.'
-              : 'Findings you set aside will appear here. You can bring them back at any time.'
-          }
+          title="Opening review history"
+          description="Loading your saved choices."
         />
       ) : (
-        <div className="recommendation-list">
-          {items.map((item, index) => {
-            const repo = repositories.find(
-              (repository) => repository.id === item.finding.repositoryId,
-            );
-            return (
-              <ReviewCard
-                key={item.finding.id}
-                item={item}
-                repository={repo}
-                bucket={bucket}
-                now={reviews.now}
-                busy={reviews.busy || !!reviews.state.error}
-                register={(node) => {
-                  if (node) cards.current.set(item.finding.id, node);
-                  else cards.current.delete(item.finding.id);
+        <>
+          {overview && (
+            <>
+              <div className="triage-intro">
+                <h2>
+                  {activeQueues.length
+                    ? `${activeQueues.length} review queues. Start with one.`
+                    : 'Nothing waiting for review.'}
+                </h2>
+                <p>
+                  {all.length
+                    ? `${all.length} branches grouped by the decision to make. Age alone is not an emergency.`
+                    : 'New evidence will appear here as your projects change.'}
+                </p>
+              </div>
+              <div className="triage-queues">
+                {activeQueues.map((key) => {
+                  const count = all.filter((item) => item.queue === key).length;
+                  const Icon = key === 'unpublished' ? Laptop : key === 'idle' ? Clock3 : GitBranch;
+                  return (
+                    <button key={key} className={`triage-queue ${key}`} onClick={() => change(key)}>
+                      <div>
+                        <Icon size={19} />
+                        <span>{count} branches</span>
+                      </div>
+                      <strong>{triageQueues[key].title}</strong>
+                      <p>{triageQueues[key].description}</p>
+                      <span className="queue-open">
+                        Review queue
+                        <ChevronRight size={14} />
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+          <div className="triage-list-heading">
+            <div>
+              {queue && (
+                <button className="text-button" onClick={() => change(null)}>
+                  <ArrowLeft size={13} />
+                  All queues
+                </button>
+              )}
+              <h2>
+                {overview
+                  ? 'Start here'
+                  : queue && queue !== 'all'
+                    ? triageQueues[queue].title
+                    : `${labels[bucket]} branches`}
+              </h2>
+              <span>
+                {overview
+                  ? repositoryId
+                    ? 'Up to five suggestions for this project'
+                    : 'Up to five suggestions, spread across your projects'
+                  : `${filtered.length} ${filtered.length === 1 ? 'branch' : 'branches'}`}
+              </span>
+            </div>
+            {overview && all.length > items.length && (
+              <button className="text-button" onClick={() => change('all')}>
+                See all {all.length}
+                <ArrowUpRight size={14} />
+              </button>
+            )}
+          </div>
+          {selectedItems.length > 0 && (
+            <div className="triage-bulk" role="status">
+              <strong>{selectedItems.length} selected</strong>
+              {bucket === 'active' ? (
+                <>
+                  <button
+                    className="secondary-button"
+                    disabled={busy}
+                    onClick={() => void choose(selectedItems, 'snoozed')}
+                  >
+                    <Pause size={13} />
+                    Snooze 7 days
+                  </button>
+                  <button
+                    className="secondary-button"
+                    disabled={busy}
+                    onClick={() => void choose(selectedItems, 'dismissed')}
+                  >
+                    Dismiss selected
+                  </button>
+                </>
+              ) : (
+                <button
+                  className="secondary-button"
+                  disabled={busy}
+                  onClick={() => void choose(selectedItems, 'restore')}
+                >
+                  <RotateCcw size={13} />
+                  Restore selected
+                </button>
+              )}
+              <button className="text-button" onClick={() => setSelected([])}>
+                Clear
+              </button>
+            </div>
+          )}
+          {!items.length ? (
+            <EmptyState
+              icon={Check}
+              title={
+                needle
+                  ? 'No matching branches'
+                  : bucket === 'active'
+                    ? 'Nothing to review here'
+                    : `Nothing ${labels[bucket].toLowerCase()}`
+              }
+              description={
+                needle
+                  ? 'Try a branch name or project.'
+                  : 'Your saved choices stay until the evidence changes.'
+              }
+            />
+          ) : (
+            <div className="triage-list">
+              <div className="triage-list-header">
+                <label>
+                  <input
+                    type="checkbox"
+                    aria-label="Select visible review branches"
+                    checked={items.length > 0 && selectedItems.length === items.length}
+                    onChange={(event) =>
+                      setSelected(event.target.checked ? items.map((item) => item.id) : [])
+                    }
+                  />
+                  Select visible
+                </label>
+                <span>One row per branch · expand for evidence</span>
+              </div>
+              {items.map((item) => (
+                <TriageRow
+                  key={item.id}
+                  item={item}
+                  branch={branchById.get(item.id)}
+                  projectName={repoById.get(item.repositoryId)?.name}
+                  now={reviews.now}
+                  selected={selected.includes(item.id)}
+                  busy={busy}
+                  bucket={bucket}
+                  onSelection={(checked) =>
+                    setSelected((previous) =>
+                      checked
+                        ? [...new Set([...previous, item.id])]
+                        : previous.filter((id) => id !== item.id),
+                    )
+                  }
+                  onInspect={() => onSelect(item.repositoryId, item.id)}
+                  onChoose={(choice) => choose([item], choice)}
+                />
+              ))}
+            </div>
+          )}
+          {!overview && filtered.length > PAGE_SIZE && (
+            <nav className="review-pagination" aria-label="Review branch pages">
+              <span>
+                {currentPage * PAGE_SIZE + 1}–
+                {Math.min(filtered.length, (currentPage + 1) * PAGE_SIZE)} of {filtered.length}
+              </span>
+              <button
+                className="secondary-button"
+                disabled={currentPage === 0}
+                onClick={() => {
+                  setPage(currentPage - 1);
+                  setSelected([]);
                 }}
-                onSelect={onSelect}
-                onDecide={(command) => void decide(command, index)}
-              />
-            );
-          })}
-        </div>
+              >
+                Previous
+              </button>
+              <button
+                className="secondary-button"
+                disabled={(currentPage + 1) * PAGE_SIZE >= filtered.length}
+                onClick={() => {
+                  setPage(currentPage + 1);
+                  setSelected([]);
+                }}
+              >
+                Next
+              </button>
+            </nav>
+          )}
+        </>
       )}
-      {reviews.ready && visible.length > PAGE_SIZE && (
-        <FindingPages page={currentPage} count={visible.length} onPage={movePage} />
-      )}
-      {!reviews.connectionFailed && (decisions.length > 0 || reviews.state.error) && (
+      <p className="review-policy">
+        Snoozing hides a branch for seven days. Dismissing hides it until the evidence changes.
+        Neither action changes Git.
+      </p>
+      {reviews.state.decisions.length > 0 && (
         <button
           className="text-button reset-decisions"
-          disabled={reviews.busy || !reviews.ready}
-          onClick={() =>
-            void reviews.reset(reviews.state.error ? undefined : (repositoryId ?? undefined))
-          }
+          disabled={busy}
+          onClick={() => void reviews.reset(repositoryId ?? undefined)}
         >
-          {repositoryId && !reviews.state.error
-            ? 'Reset this project’s review choices'
-            : 'Reset all review choices'}
+          Reset {repositoryId ? 'this project’s' : 'all'} review choices
         </button>
       )}
     </div>
-  );
-}
-function FindingPages({
-  page,
-  count,
-  onPage,
-  top = false,
-}: {
-  page: number;
-  count: number;
-  onPage: (page: number) => void;
-  top?: boolean;
-}) {
-  return (
-    <nav
-      className={`review-pagination ${top ? 'compact' : ''}`}
-      aria-label={top ? 'Finding pages at top' : 'Finding pages'}
-    >
-      <span>
-        {page * PAGE_SIZE + 1}–{Math.min(count, (page + 1) * PAGE_SIZE)} of {count}
-      </span>
-      <button className="secondary-button" disabled={page === 0} onClick={() => onPage(page - 1)}>
-        <ChevronLeft size={14} />
-        Previous
-      </button>
-      <button
-        className="secondary-button"
-        disabled={(page + 1) * PAGE_SIZE >= count}
-        onClick={() => onPage(page + 1)}
-      >
-        Next
-        <ChevronRight size={14} />
-      </button>
-    </nav>
   );
 }

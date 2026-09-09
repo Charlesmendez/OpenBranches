@@ -8,14 +8,14 @@ export async function buildIcons() {
   await mkdir('assets', { recursive: true });
   const brand = await readFile('assets/brand.svg', 'utf8');
   const symbol = brand.replace(/<svg[^>]+>/, '').replace('</svg>', '');
-  const icon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><defs><linearGradient id="bg" x2=".3" y2="1"><stop stop-color="#303b38"/><stop offset="1" stop-color="#131b19"/></linearGradient><linearGradient id="mark" x2="1" y2="1"><stop stop-color="#c5f2df"/><stop offset="1" stop-color="#78c6ac"/></linearGradient></defs><rect x="32" y="32" width="960" height="960" rx="214" fill="url(#bg)" stroke="#486254" stroke-width="4"/><g transform="translate(226 205) scale(20.4)" fill="none" stroke="url(#mark)" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round">${symbol}</g></svg>`;
+  const icon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"><defs><linearGradient id="bg" x2=".3" y2="1"><stop stop-color="#292d3b"/><stop offset="1" stop-color="#111216"/></linearGradient><linearGradient id="mark" x2="1" y2="1"><stop stop-color="#d7dfff"/><stop offset="1" stop-color="#8da9ff"/></linearGradient></defs><rect x="32" y="32" width="960" height="960" rx="214" fill="url(#bg)" stroke="#444958" stroke-width="4"/><g transform="translate(226 205) scale(20.4)" fill="none" stroke="url(#mark)" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round">${symbol}</g></svg>`;
   await writeFile('assets/icon.svg', icon);
   const png = (width) =>
     new Resvg(icon, { fitTo: { mode: 'width', value: width } }).render().asPng();
   await writeFile('assets/icon.png', png(1024));
   await writeFile(
     'assets/trayTemplate.png',
-    new Resvg(brand.replace('#9cd9c5', '#000000'), { fitTo: { mode: 'width', value: 44 } })
+    new Resvg(brand.replace('#a1b8ff', '#000000'), { fitTo: { mode: 'width', value: 44 } })
       .render()
       .asPng(),
   );

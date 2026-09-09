@@ -34,6 +34,7 @@ import { Attention } from './components/Attention';
 import { SearchDialog } from './components/SearchDialog';
 import { Settings } from './components/Settings';
 import { EmptyState, IconButton } from './components/Primitives';
+import { triageFindings } from '../domain/triage';
 
 const People = lazy(() =>
   import('./components/People').then((module) => ({ default: module.People })),
@@ -218,13 +219,13 @@ export function App() {
       : view === 'settings'
         ? 'Make yourself at home.'
         : view === 'attention'
-          ? 'A little less to keep in your head.'
+          ? 'Decide what happens next.'
           : view === 'activity'
             ? 'The work keeps moving.'
             : repository
               ? view === 'inventory'
                 ? 'Find your thread.'
-                : 'Your work, connected.'
+                : 'Follow the work.'
               : 'A pulse on every project.';
   const subtitle =
     view === 'people'
@@ -232,7 +233,7 @@ export function App() {
       : view === 'settings'
         ? 'Your connections, your data, your way of working.'
         : view === 'attention'
-          ? 'Evidence first. A few useful next steps.'
+          ? 'A short starting list. The rest is organized into review queues.'
           : view === 'activity'
             ? 'A running history of what changed across your projects.'
             : repository
@@ -285,7 +286,15 @@ export function App() {
         repositories={snapshot.repositories}
         selectedId={projectId}
         view={view}
-        attentionCount={reviews.ready ? reviews.groups.active.length : 0}
+        attentionCount={
+          reviews.ready
+            ? new Set(
+                triageFindings(reviews.groups.active, snapshot.repositories).map(
+                  (item) => item.queue,
+                ),
+              ).size
+            : 0
+        }
         demo={mode === 'demo'}
         gitNeedsSetup={gitNeedsSetup}
         onProject={selectProject}
@@ -450,6 +459,7 @@ export function App() {
               onSelect={navigateBranch}
               onSettings={() => setView('settings')}
               demo={mode === 'demo'}
+              codex={providers.codex}
             />
           ) : view === 'activity' ? (
             <section className="full-activity">
@@ -575,13 +585,16 @@ export function App() {
                   })
                 }
                 onScopeChange={() => setSelectedId(null)}
+                liveState={
+                  mode === 'demo' ? 'connected' : (providers.codex.liveState ?? 'unavailable')
+                }
               />
               <div className="map-bottom-note">
                 <span>
                   <Sparkles size={13} />
-                  Expand a little. Understand a lot.
+                  Each target is checked independently.
                 </span>
-                <span>Quiet doesn’t mean finished.</span>
+                <span>Missing history does not rule out a squash merge.</span>
               </div>
             </div>
           )}

@@ -5,31 +5,31 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #304b43;
-  border: 1px solid #87b7a630;
+  background: var(--hover);
+  border: 1px solid #8793b730;
   border-radius: 12px;
-  color: #c2ded0;
+  color: #c2c9de;
   font-size: 11px;
   font-weight: 600;
 }
 .person-tone-1 {
   color: #c6c5e7;
-  background: #393749;
+  background: var(--hover);
   border-color: #aba0df30;
 }
 .person-tone-2 {
   color: #e0c5aa;
-  background: #443b32;
+  background: var(--hover);
   border-color: #daa68430;
 }
 .person-tone-3 {
   color: #b1cfdf;
-  background: #2c404f;
+  background: var(--hover);
   border-color: #86bada30;
 }
 .person-tone-4 {
   color: #dbc0ce;
-  background: #45363f;
+  background: var(--hover);
   border-color: #cfa5be30;
 }
 .pull-people {
@@ -37,7 +37,7 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  color: #b0c3ca;
+  color: var(--text-soft);
   font-size: 11px;
   line-height: 1.6;
   overflow-wrap: anywhere;
@@ -45,5 +45,5 @@
 .inspector-pr-people {
   margin: 0 0 22px;
   padding-bottom: 16px;
-  border-bottom: 1px solid #34424a;
+  border-bottom: 1px solid var(--line-strong);
 }

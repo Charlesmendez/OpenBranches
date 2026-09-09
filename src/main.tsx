@@ -2,6 +2,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './ui/App';
 import './ui/styles.css';
+import './ui/components/workflow.css';
 
 const root = createRoot(document.getElementById('root')!);
 root.render(

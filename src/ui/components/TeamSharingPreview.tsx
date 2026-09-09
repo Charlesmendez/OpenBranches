@@ -199,7 +199,7 @@ export function TeamSharingPreview({
                 {new Date(preview.snapshot.observedAt).toLocaleString()}
               </p>
             </div>
-            <span className="pill teal">Ready for review</span>
+            <span className="pill blue">Ready for review</span>
           </div>
           {preview.snapshot.sourceError && (
             <p className="connection-error">

@@ -8,6 +8,7 @@ import { lazy, Suspense, useState } from 'react';
 import { TaskDetails } from './TaskDetails';
 import { IntegrationEvidence } from './IntegrationEvidence';
 import { pullSourceStale } from '../../domain/sourceFreshness';
+import { BranchActivity } from './BranchActivity';
 const PullSignals = lazy(() =>
   import('./PullSignals').then((module) => ({ default: module.PullSignals })),
 );
@@ -87,6 +88,7 @@ export function Inspector({
         />
       </div>
       <AgentBadges branch={branch} />
+      <BranchActivity branch={branch} />
       {branch.pullRequest &&
       (branch.pullRequest.author ||
         branch.pullRequest.requestedReviewers?.length ||

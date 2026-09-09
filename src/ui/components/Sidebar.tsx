@@ -63,7 +63,11 @@ export function Sidebar(p: Props) {
         >
           <Sparkles size={17} />
           Needs attention
-          {p.attentionCount > 0 && <span className="attention-count">{p.attentionCount}</span>}
+          {p.attentionCount > 0 && (
+            <span className="attention-count" title={`${p.attentionCount} review queues`}>
+              {p.attentionCount}
+            </span>
+          )}
         </button>
         <button
           className={p.view === 'activity' ? 'selected' : ''}

@@ -62,7 +62,7 @@ export function CodexConnection({ status }: { status: CodexStatus }) {
           </span>
         )}
         {status.state === 'ready' && (
-          <span className="pill teal">
+          <span className="pill blue">
             <Check size={12} /> {status.taskCount ?? 0} related{' '}
             {(status.taskCount ?? 0) === 1 ? 'task' : 'tasks'}
           </span>
@@ -89,9 +89,19 @@ export function CodexConnection({ status }: { status: CodexStatus }) {
         )}
         <p className="muted-note">
           Only task metadata for your selected projects is saved in OpenBranches. Task linking does
-          not run AI or send prompts. Live task activity and tasks on other computers are not
-          available here.
+          not run AI or send prompts. When the local Codex daemon is available, running tasks are
+          checked every 15 seconds. A running task is linked to its observed checkout; stale
+          activity expires.
         </p>
+        {status.enabled && (
+          <p className="muted-note">
+            {status.liveState === 'connected'
+              ? 'Live Codex status connected on this Mac.'
+              : status.liveState === 'partial'
+                ? 'Some running task statuses could not be checked. Activity is shown only for confirmed matches.'
+                : 'Live Codex status is unavailable. Saved task links remain available.'}
+          </p>
+        )}
         {(error || status.error) && (
           <p className="connection-error" role="alert">
             {error || status.error}

@@ -136,7 +136,7 @@ function SharedProject({
           </h4>
           <p>{share.teamName}</p>
         </div>
-        <span className={'pill ' + (share.state === 'sharing' && !share.error ? 'teal' : 'amber')}>
+        <span className={'pill ' + (share.state === 'sharing' && !share.error ? 'blue' : 'amber')}>
           {label}
         </span>
       </header>

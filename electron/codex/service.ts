@@ -3,7 +3,13 @@ import type { CodexStatus, OpenTaskCommand, Snapshot } from '../../src/domain/ty
 import type { AppStore } from '../services/store';
 import { findCodex, type CodexExecutable } from './executable';
 import { CodexInspectionClient } from './transport';
-import { indexSchema, readTaskIndex, type CodexIndex } from './reader';
+import {
+  indexSchema,
+  readTaskIndex,
+  readLiveTasks,
+  type CodexIndex,
+  type CodexTask,
+} from './reader';
 import { associateTask, linkRepository } from './associations';
 import { readCodexAccount } from './account';
 
@@ -13,6 +19,7 @@ interface Dependencies {
   find: () => Promise<CodexExecutable | undefined>;
   launch: (executable: string, cwd: string) => DiscoveryClient;
   read: (client: DiscoveryClient) => Promise<CodexIndex>;
+  launchLive?: (executable: string, cwd: string) => DiscoveryClient;
 }
 
 export class CodexService {
@@ -24,6 +31,10 @@ export class CodexService {
   private client?: DiscoveryClient;
   private detection?: Promise<CodexExecutable | undefined>;
   private timer: ReturnType<typeof setInterval>;
+  private liveTimer: ReturnType<typeof setInterval>;
+  private liveTasks: CodexTask[] = [];
+  private liveClient?: DiscoveryClient;
+  private liveJob?: Promise<void>;
 
   constructor(
     private store: Pick<AppStore, 'read' | 'write'>,
@@ -34,6 +45,7 @@ export class CodexService {
       find: findCodex,
       launch: CodexInspectionClient.launch,
       read: readTaskIndex,
+      launchLive: CodexInspectionClient.launchLive,
     },
   ) {
     const enabled = store.read<boolean>('codex.enabled', false) === true;
@@ -43,6 +55,9 @@ export class CodexService {
     this.timer = setInterval(() => {
       void this.refresh();
     }, 60_000);
+    this.liveTimer = setInterval(() => {
+      void this.refreshLive();
+    }, 15_000);
   }
 
   status(): CodexStatus {
@@ -79,6 +94,7 @@ export class CodexService {
     this.detection = undefined;
     this.statusValue = { ...this.statusValue, enabled: true };
     this.store.write('codex.enabled', true);
+    void this.refreshLive();
     return this.refresh();
   }
 
@@ -86,6 +102,8 @@ export class CodexService {
     ++this.generation;
     this.client?.close();
     this.client = undefined;
+    this.liveClient?.close();
+    this.liveTasks = [];
     this.index = emptyIndex();
     this.statusValue = {
       installed: this.statusValue.installed,
@@ -103,7 +121,15 @@ export class CodexService {
     return {
       ...snapshot,
       repositories: snapshot.repositories.map((r) =>
-        linkRepository(r, this.index.tasks, this.index.checkedAt),
+        linkRepository(
+          r,
+          [
+            ...new Map(
+              [...this.index.tasks, ...this.liveTasks].map((task) => [task.id, task]),
+            ).values(),
+          ],
+          this.index.checkedAt,
+        ),
       ),
     };
   }
@@ -112,7 +138,7 @@ export class CodexService {
     if (this.closed || !this.statusValue.enabled) return false;
     const repository = this.current().repositories.find((r) => r.id === repositoryId);
     const branch = repository?.branches.find((b) => b.id === branchId);
-    const task = this.index.tasks.find((t) => t.id === taskId);
+    const task = [...this.liveTasks, ...this.index.tasks].find((t) => t.id === taskId);
     return !!(
       repository &&
       branch &&
@@ -133,6 +159,8 @@ export class CodexService {
       this.client?.close();
       this.client = undefined;
       this.index = index;
+      this.liveTasks = [];
+      this.liveClient?.close();
       if (this.statusValue.state === 'connecting')
         this.statusValue = {
           ...this.statusValue,
@@ -159,6 +187,7 @@ export class CodexService {
 
   refresh(): Promise<void> {
     if (this.closed || !this.statusValue.enabled) return Promise.resolve();
+    void this.refreshLive();
     if (this.job?.generation === this.generation) return this.job.promise;
     const job = { generation: this.generation, promise: Promise.resolve() };
     this.job = job;
@@ -166,6 +195,47 @@ export class CodexService {
       if (this.job === job) this.job = undefined;
     });
     return job.promise;
+  }
+
+  refreshLive(): Promise<void> {
+    if (this.closed || !this.statusValue.enabled || !this.dependencies.launchLive)
+      return Promise.resolve();
+    if (this.liveJob) return this.liveJob;
+    const generation = this.generation;
+    const valid = () => !this.closed && this.statusValue.enabled && generation === this.generation;
+    this.liveJob = (async () => {
+      let client: DiscoveryClient | undefined;
+      try {
+        const executable = await this.detect();
+        if (!valid() || !executable?.supported) return;
+        await mkdir(this.directory, { recursive: true, mode: 0o700 });
+        if (!valid()) return;
+        client = this.dependencies.launchLive!(executable.path, this.directory);
+        this.liveClient = client;
+        await client.initialize();
+        const live = await readLiveTasks(client);
+        if (!valid()) return;
+        const selected = this.selectedIndex(this.current(), live);
+        this.liveTasks = selected.tasks;
+        this.statusValue = {
+          ...this.statusValue,
+          liveState: live.partial ? 'partial' : 'connected',
+          liveCheckedAt: live.checkedAt,
+        };
+      } catch {
+        if (valid()) {
+          this.liveTasks = [];
+          this.statusValue = { ...this.statusValue, liveState: 'unavailable' };
+        }
+      } finally {
+        client?.close();
+        if (this.liveClient === client) this.liveClient = undefined;
+        if (valid()) this.publish();
+      }
+    })().finally(() => {
+      this.liveJob = undefined;
+    });
+    return this.liveJob;
   }
 
   private async refreshIndex(generation: number) {
@@ -216,6 +286,8 @@ export class CodexService {
     this.closed = true;
     ++this.generation;
     clearInterval(this.timer);
+    clearInterval(this.liveTimer);
     this.client?.close();
+    this.liveClient?.close();
   }
 }

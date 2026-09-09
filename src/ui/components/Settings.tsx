@@ -97,7 +97,7 @@ export function Settings({
             </p>
           </div>
           {git.status?.state === 'ready' && (
-            <span className="pill teal">
+            <span className="pill blue">
               <Check size={12} />
               Local inspection
             </span>

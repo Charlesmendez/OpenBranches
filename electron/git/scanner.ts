@@ -9,7 +9,7 @@ import { gitEnvironment } from './installation';
 
 const exec = promisify(execFile);
 const REF_FORMAT =
-  '%(refname)%00%(objectname)%00%(committerdate:iso-strict)%00%(subject)%00%(upstream)%00%(symref)';
+  '%(refname)%00%(objectname)%00%(committerdate:iso-strict)%00%(subject)%00%(upstream)%00%(symref)%00%(authorname)';
 function createGitRunner(executable: string) {
   return async (path: string, args: string[]): Promise<string> => {
     const { stdout } = await exec(
@@ -76,7 +76,7 @@ export function parseRefs(output: string): GitRef[] {
     .split('\n')
     .filter(Boolean)
     .flatMap((line) => {
-      const [fullName, sha, updatedAt, subject, upstream, symbolic] = line.split('\0');
+      const [fullName, sha, updatedAt, subject, upstream, symbolic, author] = line.split('\0');
       if (symbolic || !sha || !fullName.startsWith('refs/')) return [];
       const isRemote = fullName.startsWith('refs/remotes/');
       const short = fullName.replace(/^refs\/(heads|remotes)\//, '');
@@ -87,6 +87,7 @@ export function parseRefs(output: string): GitRef[] {
           sha,
           updatedAt,
           subject,
+          ...(author ? { author } : {}),
           upstream: upstream || undefined,
           name: isRemote ? short.slice(slash + 1) : short,
           remote: isRemote ? short.slice(0, slash) : undefined,

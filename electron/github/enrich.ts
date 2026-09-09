@@ -85,6 +85,7 @@ export function enrichRepository(repository: Repository, sources: RemoteSnapshot
         checkedAt: source.checkedAt,
         updatedAt: cached?.updatedAt ?? '',
         subject: cached?.subject ?? '',
+        ...(cached?.author ? { author: cached.author } : {}),
       };
       if (branch) {
         branch.remote = remote;

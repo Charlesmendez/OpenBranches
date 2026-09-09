@@ -10,6 +10,7 @@ export interface GitRef {
   sha: string;
   updatedAt: string;
   subject: string;
+  author?: string;
   remote?: string;
   upstream?: string;
   source?: 'github';
@@ -35,6 +36,7 @@ export interface PullRequest {
   state: 'open' | 'merged' | 'closed';
   draft?: boolean;
   base: string;
+  repository?: string;
   headSha: string;
   updatedAt: string;
   author?: GitHubActor;
@@ -78,6 +80,8 @@ export interface TaskLink {
   updatedAt?: string;
   checkedAt?: string;
   evidence?: string[];
+  activitySource?: 'codex-runtime';
+  waiting?: boolean;
 }
 export interface OpenTaskCommand {
   repositoryId: string;
@@ -224,6 +228,8 @@ export interface CodexStatus {
   taskCount?: number;
   error?: string;
   account?: CodexAccount;
+  liveState?: 'connected' | 'partial' | 'unavailable';
+  liveCheckedAt?: string;
 }
 export interface ProviderStatus {
   codex: CodexStatus;

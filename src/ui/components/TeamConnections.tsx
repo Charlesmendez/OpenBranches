@@ -204,7 +204,7 @@ function ConnectionCard({
           <h3>{identity?.workspaceName ?? 'Finish connecting this Mac'}</h3>
           <span className="mac-team-origin">{connection.origin}</span>
         </div>
-        <span className={'pill ' + (connected ? 'teal' : 'amber')}>
+        <span className={'pill ' + (connected ? 'blue' : 'amber')}>
           {connected
             ? 'Paired'
             : connection.state === 'pairing'

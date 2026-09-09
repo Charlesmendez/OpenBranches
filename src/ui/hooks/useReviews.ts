@@ -157,6 +157,23 @@ export function useReviews(demo: boolean, repositories: Repository[]) {
           })
         : window.openbranches.resetReviews(repositoryId),
     );
+  const decideMany = (commands: ReviewCommand[]) =>
+    perform(async () => {
+      const revision = generation.current;
+      let next = state;
+      if (demo || !window.openbranches) {
+        const { applyReviewCommand } = await import('../../domain/reviewDecisions');
+        for (const command of commands) next = applyReviewCommand(next, command, recommendations);
+        return saveDemo(next);
+      }
+      for (const command of commands) {
+        if (generation.current !== revision) return { ok: false, state: next };
+        const result = await window.openbranches.decideReview(command);
+        if (!result.ok) return result;
+        next = result.state;
+      }
+      return { ok: true, state: next };
+    });
   return {
     groups,
     state,
@@ -165,6 +182,7 @@ export function useReviews(demo: boolean, repositories: Repository[]) {
     error,
     now,
     decide,
+    decideMany,
     reset,
     connectionFailed,
     retry: () => setReload((value) => value + 1),

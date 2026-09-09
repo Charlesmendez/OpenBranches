@@ -16,7 +16,7 @@
   display: none;
 }
 .pull-signals > summary:focus-visible {
-  outline: 2px solid var(--teal);
+  outline: 2px solid var(--accent);
   outline-offset: 5px;
   border-radius: 5px;
 }
@@ -35,7 +35,7 @@
 }
 .signal-chip.passed,
 .signal-result.passed {
-  color: #83d4b0;
+  color: #8397d4;
 }
 .signal-chip.pending,
 .signal-result.pending {

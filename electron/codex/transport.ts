@@ -4,10 +4,17 @@ import { StringDecoder } from 'node:string_decoder';
 // This connection only exposes inspection. It cannot create/resume a thread,
 // start a model turn, execute a command, or change Codex settings.
 export type InspectionMethod =
-  'initialize' | 'thread/list' | 'account/read' | 'account/rateLimits/read';
+  | 'initialize'
+  | 'thread/list'
+  | 'thread/loaded/list'
+  | 'thread/read'
+  | 'account/read'
+  | 'account/rateLimits/read';
 const methods = new Set<InspectionMethod>([
   'initialize',
   'thread/list',
+  'thread/loaded/list',
+  'thread/read',
   'account/read',
   'account/rateLimits/read',
 ]);
@@ -60,6 +67,18 @@ export class CodexInspectionClient {
     );
   }
 
+  /** Attach to the existing daemon for live status. Ending the proxy leaves
+   * the daemon and all of the user's tasks running. No daemon is started. */
+  static launchLive(executable: string, cwd: string) {
+    return new CodexInspectionClient(
+      spawn(executable, ['app-server', 'proxy'], {
+        cwd,
+        stdio: ['pipe', 'pipe', 'pipe'],
+        windowsHide: true,
+      }),
+    );
+  }
+
   async initialize() {
     await this.request('initialize', {
       clientInfo: { name: 'openbranches', title: 'OpenBranches', version: '0.1.0' },
@@ -70,6 +89,13 @@ export class CodexInspectionClient {
 
   request(method: InspectionMethod, params: unknown, timeout = 15_000): Promise<unknown> {
     if (!methods.has(method)) return Promise.reject(new Error('Unsupported inspection method.'));
+    if (
+      method === 'thread/read' &&
+      (!params ||
+        typeof params !== 'object' ||
+        (params as { includeTurns?: unknown }).includeTurns !== false)
+    )
+      return Promise.reject(new Error('Task inspection requires includeTurns: false.'));
     if (this.closed) return Promise.reject(new Error('The Codex connection is closed.'));
     if (this.pending.size >= 4)
       return Promise.reject(new Error('Too many Codex inspection requests.'));

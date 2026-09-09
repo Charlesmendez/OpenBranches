@@ -8,6 +8,7 @@ export type ClusterId = 'review' | 'local' | 'tracked';
 export interface MapPosition {
   expanded: ClusterId | null;
   page: number;
+  source?: 'local' | 'github';
   viewport?: { x: number; y: number; zoom: number };
 }
 export interface InventoryPosition {

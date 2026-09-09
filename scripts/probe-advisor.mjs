@@ -191,6 +191,33 @@ const server = createServer((request, response) => {
           modelCalls: 'local stub only',
           version,
           configuredTools,
+          framing: (payload.input ?? [])
+            .filter((item) => item.type === 'message')
+            .map((item) => {
+              const content =
+                typeof item.content === 'string'
+                  ? item.content
+                  : (item.content ?? []).map((part) => part.text ?? '').join('');
+              return {
+                role: ['developer', 'user', 'system'].includes(item.role) ? item.role : 'other',
+                characters: content.length,
+                tags: [
+                  ...new Set(
+                    (
+                      content.match(
+                        /<\/?(?:environment_context|permissions|collaboration_mode|INSTRUCTIONS|user_instructions|system-reminder|skills_instructions)[^>]*>/g,
+                      ) ?? []
+                    ).map((tag) => tag.match(/^<\/?([a-zA-Z_-]+)/)?.[1]),
+                  ),
+                ],
+                containsUserHomePath: /\/Users\//.test(content),
+                containsProbePath: content.includes(directory),
+                containsAgentGuidance: /AGENTS\.md|Global Engineering Working Agreements/.test(
+                  content,
+                ),
+                containsPrompt: content.includes(input),
+              };
+            }),
           ...auditModelRequest(payload, { base, developer, input }),
         });
       }
@@ -224,7 +251,9 @@ function launch(mcpNames) {
     ...(catalog ? { model_catalog_json: catalog } : {}),
     web_search: 'disabled',
     'tools.view_image': false,
+    'tools.experimental_request_user_input.enabled': false,
     project_doc_max_bytes: 0,
+    'skills.include_instructions': false,
     model_instructions_file: instructions,
     developer_instructions: developer,
     include_environment_context: false,

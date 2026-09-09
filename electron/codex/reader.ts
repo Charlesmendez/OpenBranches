@@ -3,7 +3,7 @@ import type { CodexInspectionClient } from './transport';
 import { githubRepository } from '../../src/github/reader';
 
 const timestamp = z.number().int().min(0).max(253402300799);
-const threadSchema = z.object({
+export const threadSchema = z.object({
   id: z.string().min(1).max(200),
   cwd: z.string().min(1).max(16384),
   name: z.string().max(4096).nullish(),
@@ -29,7 +29,10 @@ const threadSchema = z.object({
     })
     .nullish(),
 });
-export type CodexTask = z.infer<typeof threadSchema> & { archived: boolean };
+export type CodexTask = z.infer<typeof threadSchema> & {
+  archived: boolean;
+  runtime?: { state: 'active' | 'idle' | 'waiting'; checkedAt: string };
+};
 const pageSchema = z.object({
   data: z.array(z.unknown()).max(100),
   nextCursor: z.string().max(16384).nullable(),
@@ -101,4 +104,60 @@ export async function readTaskIndex(
     }
   }
   return { tasks: [...tasks.values()], checkedAt: new Date().toISOString(), partial };
+}
+
+export async function readLiveTasks(
+  client: Pick<CodexInspectionClient, 'request'>,
+): Promise<CodexIndex> {
+  const deadline = Date.now() + 12_000;
+  const loaded = z
+    .object({
+      data: z.array(z.string().min(1).max(200)).max(200),
+      nextCursor: z.string().nullable().optional(),
+    })
+    .parse(await client.request('thread/loaded/list', { limit: 100 }, 5000));
+  const tasks: CodexTask[] = [];
+  let partial = !!loaded.nextCursor || loaded.data.length > 100;
+  for (let start = 0; start < Math.min(loaded.data.length, 100); start += 4) {
+    if (Date.now() >= deadline) {
+      partial = true;
+      break;
+    }
+    const results = await Promise.allSettled(
+      loaded.data.slice(start, start + 4).map(async (threadId) => {
+        const response = z
+          .object({
+            thread: threadSchema.extend({
+              status: z.object({
+                type: z.enum(['active', 'idle', 'notLoaded', 'systemError']),
+                activeFlags: z
+                  .array(z.enum(['waitingOnApproval', 'waitingOnUserInput']))
+                  .optional(),
+              }),
+            }),
+          })
+          .parse(await client.request('thread/read', { threadId, includeTurns: false }, 5000));
+        const { status, ...task } = response.thread;
+        if (task.id !== threadId || !['active', 'idle'].includes(status.type)) return;
+        return {
+          ...task,
+          archived: false,
+          runtime: {
+            state:
+              status.type === 'idle'
+                ? ('idle' as const)
+                : status.activeFlags?.length
+                  ? ('waiting' as const)
+                  : ('active' as const),
+            checkedAt: new Date().toISOString(),
+          },
+        };
+      }),
+    );
+    for (const result of results) {
+      if (result.status === 'fulfilled' && result.value) tasks.push(result.value);
+      else partial = true;
+    }
+  }
+  return { tasks, partial, checkedAt: new Date().toISOString() };
 }

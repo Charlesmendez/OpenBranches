@@ -6,7 +6,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { ChildProcessWithoutNullStreams } from 'node:child_process';
 import { CodexInspectionClient, type InspectionMethod } from '../electron/codex/transport';
-import { readTaskIndex, type CodexTask, type CodexIndex } from '../electron/codex/reader';
+import {
+  readTaskIndex,
+  readLiveTasks,
+  indexSchema,
+  type CodexTask,
+  type CodexIndex,
+} from '../electron/codex/reader';
 import { associateTask, linkRepository } from '../electron/codex/associations';
 import { supportedVersion } from '../electron/codex/executable';
 import { CodexService } from '../electron/codex/service';
@@ -263,6 +269,52 @@ describe('Codex task discovery', () => {
 });
 
 describe('task association evidence', () => {
+  it('attributes runtime activity only to a fresh matching checkout, even when another branch matches the saved commit', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(checkedAt));
+    const repo = repository();
+    const live = task({ runtime: { state: 'active', checkedAt } });
+    expect(associateTask(repo, repo.branches[0], live, checkedAt)).toMatchObject({
+      status: 'active',
+      activitySource: 'codex-runtime',
+    });
+    repo.branches[0].worktrees = [];
+    expect(associateTask(repo, repo.branches[0], live, checkedAt)).toMatchObject({
+      association: 'verified',
+      status: 'unknown',
+    });
+    repo.branches[0].worktrees = repo.worktrees;
+    const stale = task({
+      runtime: {
+        state: 'active',
+        checkedAt: new Date(Date.parse(checkedAt) - 100000).toISOString(),
+      },
+    });
+    expect(associateTask(repo, repo.branches[0], stale, checkedAt)?.status).toBe('unknown');
+    repo.scannedAt = new Date(Date.parse(checkedAt) - 180000).toISOString();
+    expect(associateTask(repo, repo.branches[0], live, checkedAt)?.status).toBe('unknown');
+  });
+  it('uses the current checkout after a branch switch without relabeling the saved branch as running', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(checkedAt));
+    const repo = repository();
+    const previous = repo.branches[0];
+    const current = {
+      ...previous,
+      id: 'current',
+      name: 'feat/current',
+      local: { ...previous.local!, name: 'feat/current' },
+      worktrees: [{ ...repo.worktrees[0], branch: 'feat/current' }],
+    };
+    repo.branches = [{ ...previous, worktrees: [] }, current];
+    repo.worktrees = current.worktrees;
+    const linked = linkRepository(
+      repo,
+      [task({ runtime: { state: 'active', checkedAt } })],
+      checkedAt,
+    );
+    expect(linked.branches.map((b) => b.tasks?.[0]?.status)).toEqual(['unknown', 'active']);
+  });
   it('uses detached worktree heads when there is no named ref', () => {
     const repo = repository();
     repo.branches[0] = {
@@ -357,6 +409,52 @@ describe('task association evidence', () => {
         (b) => b.tasks?.length === 10 && b.tasks.every((t) => t.association === 'verified'),
       ),
     ).toBe(true);
+  });
+});
+
+describe('live task metadata', () => {
+  it('reads loaded statuses without turns, distinguishes waiting, and strips runtime from persisted indexes', async () => {
+    const request = vi.fn(async (method: string, params: any) =>
+      method === 'thread/loaded/list'
+        ? { data: ['running', 'waiting', 'idle'], nextCursor: null }
+        : {
+            thread: {
+              ...task({ id: params.threadId }),
+              status: {
+                type: params.threadId === 'idle' ? 'idle' : 'active',
+                activeFlags: params.threadId === 'waiting' ? ['waitingOnUserInput'] : [],
+              },
+              turns: [{ privatePrompt: 'private turn text' }],
+              preview: 'private preview',
+            },
+          },
+    );
+    const index = await readLiveTasks({ request });
+    expect(index.partial).toBe(false);
+    expect(index.tasks.map((task) => task.runtime?.state)).toEqual(['active', 'waiting', 'idle']);
+    expect(
+      request.mock.calls
+        .slice(1)
+        .every(([method, params]) => method === 'thread/read' && params.includeTurns === false),
+    ).toBe(true);
+    expect(JSON.stringify(index)).not.toMatch(/private turn|private preview|turns/);
+    expect(JSON.stringify(indexSchema.parse(index))).not.toContain('runtime');
+  });
+  it('reports incomplete coverage and excludes responses for a different thread', async () => {
+    const request = vi.fn(async (method: string, params: any) => {
+      if (method === 'thread/loaded/list')
+        return { data: ['good', 'wrong', 'failed'], nextCursor: 'more' };
+      if (params.threadId === 'failed') throw new Error('unavailable');
+      return {
+        thread: {
+          ...task({ id: params.threadId === 'wrong' ? 'different' : 'good' }),
+          status: { type: 'active', activeFlags: [] },
+        },
+      };
+    });
+    const index = await readLiveTasks({ request });
+    expect(index.partial).toBe(true);
+    expect(index.tasks.map((task) => task.id)).toEqual(['good']);
   });
 });
 

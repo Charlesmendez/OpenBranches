@@ -104,7 +104,7 @@ export function BranchStatus({ branch }: { branch: Branch }) {
     return <span className="pill amber">Uncommitted work</span>;
   if (branch.pullRequest?.state === 'merged')
     return (
-      <span className="pill teal">
+      <span className="pill blue">
         <Check size={12} />
         PR merged into {branch.pullRequest.base}
       </span>
@@ -114,7 +114,7 @@ export function BranchStatus({ branch }: { branch: Branch }) {
   );
   if (integrated.length)
     return (
-      <span className="pill teal">
+      <span className="pill blue">
         <Check size={12} />
         In {integrated.map(([target]) => target).join(' + ')}
       </span>

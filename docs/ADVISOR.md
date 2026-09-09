@@ -104,6 +104,14 @@ All rows completed their synthetic turns; none called a real model or changed a 
 
 The next boundary work is to classify and account for added framing, verify cancellation and the supported existing-sign-in model path, and establish effective restrictions across supported versions. An advertised capability can be disabled at dispatch, while a configuration flag can appear disabled without suppressing an older execution path. Neither the declarations nor the effective configuration alone is sufficient evidence.
 
+### September 9 context investigation
+
+The separate 0.153.4 CLI accepted two controls confirmed in the official source: `skills.include_instructions = false` and `tools.experimental_request_user_input.enabled = false`. With the restricted experimental catalog, the fictional loopback request contained zero ordinary and zero injected tools. It still contained the user's global AGENTS.md instructions and an empty `additional_tools` envelope, so the existing diagnostic correctly remained non-passing. No real model was called.
+
+Global instruction loading is independent of `project_doc_max_bytes`. The app-server constructs `CodexHomeUserInstructionsProvider`, which reads the home instruction file before project documentation is considered. The implementation exposes no configuration switch there to suppress those instructions. This is a remaining product decision: support and account for the user's existing Codex instructions, or use a separate explicitly configured API credential for a metadata-only request. The current runner remains disabled. The installed 0.144.4 CLI did not complete the same newer restricted configuration; this experiment is not a supported production fallback.
+
+Source: [Codex home instructions](https://github.com/openai/codex/blob/main/codex-rs/codex-home/src/instructions/mod.rs), [project instructions](https://github.com/openai/codex/blob/main/codex-rs/core/src/agents_md.rs), and [configuration](https://github.com/openai/codex/blob/main/codex-rs/core/src/config/mod.rs).
+
 Fixture stream format follows the official [custom tool calling guide](https://developers.openai.com/api/docs/guides/function-calling#custom-tools) and [Responses output-item events](https://developers.openai.com/api/reference/resources/responses/streaming-events#response.output_item.done). Protocol behavior is checked against the actual installed app-server, rather than inferred from these API schemas alone.
 
 A successful probe would be a necessary diagnostic result, not sufficient proof of production safety. Before enabling AI, verify the actual model path, supported capabilities, context contents, read-only enforcement, interruption/deadline behavior, authentication/usage failures, grounded output, restart behavior, and explicit diff consent. Do not weaken the contract or silently switch to a different authentication mechanism to make the probe pass.
