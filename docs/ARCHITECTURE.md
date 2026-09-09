@@ -44,3 +44,9 @@ Task opening has a separate narrow IPC command. The main process validates IDs, 
 The future AI advisor must obey the full privacy, budget, and read-only contract in the roadmap before becoming user-accessible. Discovery's method restrictions do not establish the safety of model execution; that needs its own verified boundary.
 
 GitHub PR signals are isolated in `electron/github/signals.ts` and `signalsSchema.ts`, with shared actor normalization. A global request/time allowance rotates bounded check, commit-status, and submitted-review reads. `src/domain/pullSignals.ts` keeps exact-head/stale/partial semantics separate from the UI; `PullSignals` is reused by PR cards and the branch inspector. See [PR signals](PR_SIGNALS.md).
+
+## Optional team service
+
+`src/team/` defines the versioned shared metadata contract, consent validation, staleness, and the companion's field-whitelist preparation. `team-service/` is a separately installed and bundled PostgreSQL/Node API; its `pg` dependency is absent from the desktop runtime. Identity, membership, pairing, sharing, views, OAuth, and event delivery are separate modules over the same transaction and access checks. Workspace row locks order permission changes and publication, followed by a fresh authorization check after acquiring a lock. HTTP routes validate transport and delegate domain operations. Notifications contain only revisions; consumers fetch authorized views.
+
+The browser administration and Mac companion integration remain unimplemented. No desktop scan calls the service or uploads metadata. See [protocol, API, deployment preview, and verification limits](TEAM_SERVICE.md).

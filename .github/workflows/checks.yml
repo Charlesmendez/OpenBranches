@@ -1,0 +1,43 @@
+name: Checks
+on:
+  pull_request:
+  push:
+    branches: [develop, main]
+permissions:
+  contents: read
+concurrency:
+  group: checks-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      OPENBRANCHES_TEAM_TEST_DATABASE_URL: postgresql://postgres:openbranches-ci-fixture@127.0.0.1:5432/openbranches_test
+    services:
+      postgres:
+        image: postgres:18-alpine@sha256:d3e1620b530c944afa6e887d22eb899824da68e19c52024bf98f5220c88a65b2
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: openbranches-ci-fixture
+          POSTGRES_DB: openbranches_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d openbranches_test"
+          --health-interval 5s --health-timeout 3s --health-retries 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            team-service/package-lock.json
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run team:install
+      - run: npm run typecheck && npm run team:typecheck
+      - run: npm test && npm run test:team
+      - run: npm run format:check
+      - run: npm run build && npm run team:build

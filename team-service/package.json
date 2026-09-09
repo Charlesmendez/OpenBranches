@@ -1,0 +1,17 @@
+{
+  "name": "@openbranches/team-service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "description": "Optional self-hosted OpenBranches team service",
+  "dependencies": {
+    "pg": "8.23.0"
+  },
+  "devDependencies": {
+    "@types/pg": "8.23.1"
+  },
+  "engines": {
+    "node": ">=24.14.0 <25"
+  }
+}

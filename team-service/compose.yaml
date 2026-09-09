@@ -1,0 +1,41 @@
+services:
+  team:
+    build:
+      context: ..
+      dockerfile: team-service/Dockerfile
+    init: true
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:4389:4389'
+    environment:
+      OPENBRANCHES_TEAM_ORIGIN: ${OPENBRANCHES_TEAM_ORIGIN:?Set the public team origin}
+      OPENBRANCHES_OWNER_GITHUB_ID: ${OPENBRANCHES_OWNER_GITHUB_ID:?Set the owner's numeric GitHub ID}
+      GITHUB_APP_CLIENT_ID: ${GITHUB_APP_CLIENT_ID:?Set the registered GitHub App client ID}
+      GITHUB_APP_CLIENT_SECRET: ${GITHUB_APP_CLIENT_SECRET:?Set the GitHub App client secret}
+      DATABASE_URL: postgresql://openbranches:${POSTGRES_PASSWORD:?Set a random URL-safe database password}@db:5432/openbranches
+    depends_on:
+      db:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+  db:
+    image: postgres:18-alpine@sha256:d3e1620b530c944afa6e887d22eb899824da68e19c52024bf98f5220c88a65b2
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: openbranches
+      POSTGRES_DB: openbranches
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set a random URL-safe database password}
+    volumes:
+      - team-database:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U openbranches -d openbranches']
+      interval: 5s
+      timeout: 3s
+      retries: 15
+volumes:
+  team-database:

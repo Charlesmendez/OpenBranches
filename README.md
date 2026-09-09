@@ -31,7 +31,7 @@ Repository inspection is read-only. OpenBranches does not fetch into your reposi
 
 The intended release experience is **download the DMG, drag OpenBranches into Applications, open it, follow discovered projects or choose a folder**. End users will not need Node.js or a terminal. Git 2.36 or newer is required for local inspection. The app detects it and provides a guided setup when needed; see [Mac setup](docs/INSTALLATION.md).
 
-Multi-agent attribution and team workspaces are part of the planned first release. Team mode will combine GitHub activity with local work that each member explicitly chooses to share through the Mac app and an optional open-source shared service. Codex and Claude Code local attribution are implemented. Live Cursor/Grok ingestion, that service, and local sharing remain unfinished; see [team scope and privacy](docs/TEAM_WORKSPACES.md).
+Multi-agent attribution and team workspaces are part of the planned first release. Team mode will combine GitHub activity with local work that each member explicitly chooses to share through the Mac app and an optional open-source shared service. Codex and Claude Code local attribution are implemented. An optional [team API preview](docs/TEAM_SERVICE.md) now implements membership, pairing, permissions, snapshots, and revocation. Live Cursor/Grok ingestion, the team administration and Mac sharing interfaces, GitHub organization ingestion, and real multi-device verification remain unfinished; see [team scope and privacy](docs/TEAM_WORKSPACES.md).
 
 Current installers are **unsigned developer previews**, not normal public releases. Signed and notarized downloads for Apple Silicon and Intel Macs are a release gate. We do not recommend changing macOS security settings to install a preview.
 

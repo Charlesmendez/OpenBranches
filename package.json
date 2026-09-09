@@ -20,7 +20,12 @@
     "make": "npm run build && OPENBRANCHES_SIGN_RELEASE=0 electron-forge make && OPENBRANCHES_SIGN_RELEASE=0 node scripts/make-dmg.mjs",
     "make:release": "npm run build && OPENBRANCHES_SIGN_RELEASE=1 electron-forge make && OPENBRANCHES_SIGN_RELEASE=1 node scripts/make-dmg.mjs",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "team:install": "npm ci --prefix team-service --ignore-scripts --no-audit --no-fund",
+    "team:typecheck": "tsc --noEmit --project team-service/tsconfig.json",
+    "team:build": "npm run team:typecheck && node scripts/build-team.mjs",
+    "team:start": "node team-service/dist/main.js",
+    "test:team": "node scripts/test-team.mjs"
   },
   "dependencies": {
     "@noble/hashes": "^2.4.0",
