@@ -1,5 +1,5 @@
-import type { PullCheck, PullSignals, SubmittedReview } from '../../src/domain/pullSignals';
-import { GitHubError, type GitHubHttp } from './http';
+import type { PullCheck, PullSignals, SubmittedReview } from '../domain/pullSignals';
+import { GitHubError, type GitHubReader } from './transport';
 import type { CachedPull } from './pulls';
 import { parseChecks, parseReviews, parseStatuses } from './signalsSchema';
 
@@ -25,7 +25,7 @@ const errorMessage = (error: unknown) =>
 /** Each endpoint gets at most two pages. No review bodies, check output, log
  * links, or arbitrary external URLs leave these whitelisted decoders. */
 async function readPages<T>(
-  http: Pick<GitHubHttp, 'get'>,
+  http: GitHubReader,
   path: string,
   parse: (body: unknown) => Page<T>,
   key: (item: T) => string,
@@ -129,7 +129,7 @@ function reviewObservation(
 /** Rotate through open PRs by last attempt. Unchanged heads can reuse a recent
  * observation; changing heads immediately invalidates all old signal evidence. */
 export async function readPullSignals(
-  http: Pick<GitHubHttp, 'get'>,
+  http: GitHubReader,
   repository: string,
   pulls: CachedPull[],
   previous: CachedPull[],

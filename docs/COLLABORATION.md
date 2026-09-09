@@ -20,7 +20,7 @@ Duplicate remotes and local clones do not multiply PR counts. Branch links are p
 
 ## Structure and verification
 
-- `electron/github/pulls.ts` owns normalization, open/closed pagination, and partial-cache retention. It reuses the fixed-origin HTTP transport and existing service lifecycle.
+- `src/github/pulls.ts` owns normalization, open/closed pagination, and partial-cache retention. It reuses the fixed-origin HTTP transport and existing service lifecycle.
 - `src/domain/collaboration.ts` indexes and deduplicates PR evidence, keeps person roles distinct, and supplies shared search/filter selectors. Branch links are indexed once per repository.
 - `People`, `PeoplePullCard`, and `PullPeople` separate workspace layout, PR presentation, and reusable identity display. Scoped styles accompany the collaboration view.
 - `peopleNavigation.ts` and `usePeoplePosition` reuse the existing bounded, coalesced navigation store; they do not create another persistence backend.

@@ -1,10 +1,15 @@
 import type { Repository, Snapshot } from '../../src/domain/types';
 import type { AppStore } from '../services/store';
 import type { GitHubAuth } from './auth';
-import { githubRepository, readRemote, remoteSnapshotSchema, type RemoteSnapshot } from './reader';
+import {
+  githubRepository,
+  readRemote,
+  remoteSnapshotSchema,
+  type RemoteSnapshot,
+} from '../../src/github/reader';
 import { enrichRepository } from './enrich';
-import { retainPartialPulls } from './pulls';
-import { limitSignalCache } from './signals';
+import { retainPartialPulls } from '../../src/github/pulls';
+import { limitSignalCache } from '../../src/github/signals';
 
 export class GitHubService {
   private sources: Record<string, RemoteSnapshot>;

@@ -4,7 +4,7 @@ The branch inspector separates **This Mac** from **GitHub**. A local `develop` a
 
 ## What the reader proves
 
-`electron/github/history.ts` compares immutable target and branch SHAs through GitHub's read-only comparison endpoint. With the target as BASE and branch as HEAD, `behind` or `identical` proves that the branch commit is in the target's history; `ahead` or `diverged` means that exact commit is absent. The reader checks direction, counts, target identity, and merge-base consistency. A truncated or empty page of commits never proves absence. Squash and rebase equivalence remain separate PR evidence.
+`src/github/history.ts` compares immutable target and branch SHAs through GitHub's read-only comparison endpoint. With the target as BASE and branch as HEAD, `behind` or `identical` proves that the branch commit is in the target's history; `ahead` or `diverged` means that exact commit is absent. The reader checks direction, counts, target identity, and merge-base consistency. A truncated or empty page of commits never proves absence. Squash and rebase equivalence remain separate PR evidence.
 
 Requests use `per_page=1&page=2`, which omits the first page's changed-file patches. Only SHA pairs, states, provenance, check times, and retry times enter the cache. Commit messages, patches, file contents, and comparison response bodies are discarded. The app performs no Git fetch or repository mutation.
 

@@ -7,8 +7,8 @@ import type {
 } from '../../src/domain/types';
 import { mergePullEvidence, pullKey } from '../../src/domain/collaboration';
 import { titleFromBranch } from '../../src/domain/branches';
-import type { RemoteSnapshot } from './reader';
-import { historyKey, publishedTargets } from './history';
+import type { RemoteSnapshot } from '../../src/github/reader';
+import { historyKey, publishedTargets } from '../../src/github/history';
 
 /** Git remains the source for working files and local ancestry. GitHub adds a
  * separate observed remote tip; a new tip never inherits old ancestry. */

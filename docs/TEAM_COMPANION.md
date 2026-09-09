@@ -46,7 +46,7 @@ Disconnecting persists its removal intent before contacting the service and surv
 
 ## Verification
 
-This milestone has 223 desktop/domain/client tests and 30 PostgreSQL/HTTP team tests, with both builds, type checks, formatting, and diff checks required. Publisher checks cover live/expired/changed reviews, field choices, failed persistence, lost replies, upload order, late cancellation, offline withdrawal, wrong-project acknowledgements, permission restoration without re-enabling, unsaved Stop recovery, atomic removal, corrupt choices, label changes, explicit retry, fair bounded passes, and refresh coalescing. The database test verifies withdrawal after access loss, rejection of a late enable, and tenant isolation.
+The first publisher milestone passed 223 desktop/domain/client tests and 30 PostgreSQL/HTTP team tests, both builds, type checks, formatting, and diff checks. Current suite totals are recorded in `TEAM_SERVICE.md`. Publisher checks cover live/expired/changed reviews, field choices, failed persistence, lost replies, upload order, late cancellation, offline withdrawal, wrong-project acknowledgements, permission restoration without re-enabling, unsaved Stop recovery, atomic removal, corrupt choices, label changes, explicit retry, fair bounded passes, and refresh coalescing. The database test verifies withdrawal after access loss, rejection of a late enable, and tenant isolation.
 
 Actual Electron/Chrome checks with isolated fictional data verified:
 

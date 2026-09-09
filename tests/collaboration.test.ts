@@ -1,13 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GitHubHttp } from '../electron/github/http';
-import {
-  cachedPullSchema,
-  parsePulls,
-  readPulls,
-  retainPartialPulls,
-} from '../electron/github/pulls';
+import { cachedPullSchema, parsePulls, readPulls, retainPartialPulls } from '../src/github/pulls';
 import { enrichRepository } from '../electron/github/enrich';
-import { remoteSnapshotSchema, type RemoteSnapshot } from '../electron/github/reader';
+import { remoteSnapshotSchema, type RemoteSnapshot } from '../src/github/reader';
 import { createDemoSnapshot } from '../src/data/demo';
 import {
   collaborationIndex,

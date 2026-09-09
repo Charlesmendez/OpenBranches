@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GitHubHttp } from '../electron/github/http';
-import { comparisonState, readHistory, type RemoteHistory } from '../electron/github/history';
+import { comparisonState, readHistory, type RemoteHistory } from '../src/github/history';
 import { enrichRepository } from '../electron/github/enrich';
-import { readRemote, type RemoteSnapshot } from '../electron/github/reader';
+import { readRemote, type RemoteSnapshot } from '../src/github/reader';
 import type { Repository } from '../src/domain/types';
 import { recommendationRevision } from '../src/domain/reviews';
 import { prepareAnalysis } from '../electron/advisor/packet';

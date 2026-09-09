@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { readJson } from '../shared/readJson';
 export class TeamApiError extends Error {
   constructor(
     readonly status: number,
@@ -13,35 +14,11 @@ export async function readTeamResponse<T>(
   schema: z.ZodType<T>,
   maxBytes = 8_000_000,
 ): Promise<T> {
-  const reader = response.body?.getReader();
-  if (!reader) throw new Error('The team service sent an empty response.');
-  const parts: Uint8Array[] = [];
-  let bytes = 0;
-  try {
-    for (;;) {
-      const chunk = await reader.read();
-      if (chunk.done) break;
-      bytes += chunk.value.byteLength;
-      if (bytes > maxBytes)
-        throw new Error('This response is too large. Narrow the project or person filter.');
-      parts.push(chunk.value);
-    }
-  } finally {
-    await reader.cancel().catch(() => {});
-    reader.releaseLock();
-  }
-  const all = new Uint8Array(bytes);
-  let offset = 0;
-  for (const part of parts) {
-    all.set(part, offset);
-    offset += part.length;
-  }
-  let value: unknown;
-  try {
-    value = JSON.parse(new TextDecoder().decode(all));
-  } catch {
-    throw new Error('The team service sent an unreadable response.');
-  }
+  const value = await readJson(response, maxBytes, {
+    empty: 'The team service sent an empty response.',
+    large: 'This response is too large. Narrow the project or person filter.',
+    unreadable: 'The team service sent an unreadable response.',
+  });
   if (!response.ok) {
     const error = z
       .object({ error: z.string().max(100), message: z.string().max(500) })

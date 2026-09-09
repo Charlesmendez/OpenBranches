@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { CodexInspectionClient } from './transport';
-import { githubRepository } from '../github/reader';
+import { githubRepository } from '../../src/github/reader';
 
 const timestamp = z.number().int().min(0).max(253402300799);
 const threadSchema = z.object({

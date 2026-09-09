@@ -1,14 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GitHubError } from '../electron/github/http';
-import { limitSignalCache, readPullSignals } from '../electron/github/signals';
+import { limitSignalCache, readPullSignals } from '../src/github/signals';
 import {
   parseChecks,
   parseReviews,
   parseStatuses,
   pullSignalsSchema,
-} from '../electron/github/signalsSchema';
-import type { CachedPull } from '../electron/github/pulls';
-import { remoteSnapshotSchema } from '../electron/github/reader';
+} from '../src/github/signalsSchema';
+import type { CachedPull } from '../src/github/pulls';
+import { remoteSnapshotSchema } from '../src/github/reader';
 import { checksSummary, hasFailedChecks, type PullSignals } from '../src/domain/pullSignals';
 import { collaborationIndex, matchingPulls, mergePullEvidence } from '../src/domain/collaboration';
 import { createDemoSnapshot } from '../src/data/demo';

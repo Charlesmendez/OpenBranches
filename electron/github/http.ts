@@ -1,72 +1,19 @@
 import { z } from 'zod';
 
-export type Fetch = typeof fetch;
-export class GitHubError extends Error {
-  constructor(
-    message: string,
-    readonly status: number,
-    readonly retryAt?: number,
-  ) {
-    super(message);
-  }
-}
+import { GitHubTransport, type Fetch } from '../../src/github/transport';
+export { GitHubError, type Fetch } from '../../src/github/transport';
 
-/** Only fixed GitHub origins are allowed. Tokens never follow redirects. */
+/** Desktop callers receive only GET access. */
 export class GitHubHttp {
-  private blockedUntil = 0;
+  private transport: GitHubTransport;
   constructor(
     private token: () => Promise<string | undefined>,
-    private request: Fetch = fetch,
-  ) {}
-
+    request: Fetch = fetch,
+  ) {
+    this.transport = new GitHubTransport(request);
+  }
   async get(path: string): Promise<{ body: unknown; hasNext: boolean }> {
-    if (!path.startsWith('/') || path.startsWith('//')) throw new Error('Invalid GitHub API path');
-    if (Date.now() < this.blockedUntil)
-      throw new GitHubError(
-        'GitHub is rate limited. It will retry automatically after the limit resets.',
-        429,
-        this.blockedUntil,
-      );
-    const token = await this.token();
-    const response = await this.request(`https://api.github.com${path}`, {
-      headers: {
-        Accept: 'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2026-03-10',
-        'User-Agent': 'OpenBranches',
-        ...(token && { Authorization: `Bearer ${token}` }),
-      },
-      signal: AbortSignal.timeout(15_000),
-      redirect: 'error',
-    });
-    if (!response.ok) {
-      if (
-        response.status === 429 ||
-        (response.status === 403 &&
-          (response.headers.has('retry-after') ||
-            response.headers.get('x-ratelimit-remaining') === '0'))
-      ) {
-        const retrySeconds = Number(response.headers.get('retry-after') || 60);
-        const reset = Number(response.headers.get('x-ratelimit-reset') || 0) * 1000;
-        this.blockedUntil = Math.max(Date.now() + Math.max(60, retrySeconds) * 1000, reset);
-        throw new GitHubError(
-          'GitHub is rate limited. It will retry automatically after the limit resets.',
-          response.status,
-          this.blockedUntil,
-        );
-      }
-      throw new GitHubError(
-        response.status === 401
-          ? 'GitHub sign-in expired. Reconnect your account.'
-          : response.status === 404
-            ? 'Repository unavailable on GitHub. Check the app’s repository access.'
-            : `GitHub could not refresh this source (${response.status}).`,
-        response.status,
-      );
-    }
-    return {
-      body: await response.json(),
-      hasNext: /rel="next"/.test(response.headers.get('link') ?? ''),
-    };
+    return this.transport.json(path, this.token);
   }
 }
 

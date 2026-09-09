@@ -2,7 +2,7 @@ import { resolve, isAbsolute } from 'node:path';
 import type { Branch, Repository, TaskLink } from '../../src/domain/types';
 import type { SavedAgentTask } from './types';
 import { toolNames } from '../../src/domain/agents';
-import { githubRepository } from '../github/reader';
+import { githubRepository } from '../../src/github/reader';
 
 function context(repository: Repository) {
   return {

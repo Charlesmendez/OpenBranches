@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { actorSchema, sourceActorSchema, parseActor } from './actors';
-import type { PullCheck, SubmittedReview } from '../../src/domain/pullSignals';
+import type { PullCheck, SubmittedReview } from '../domain/pullSignals';
 
 const sha = z
   .string()

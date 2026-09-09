@@ -8,7 +8,7 @@ import { AppStore } from '../electron/services/store';
 import { RepositoryService } from '../electron/services/repositories';
 import { GitHubService } from '../electron/github/service';
 import { GitHubHttp } from '../electron/github/http';
-import type { RemoteSnapshot } from '../electron/github/reader';
+import type { RemoteSnapshot } from '../src/github/reader';
 import { CodexService } from '../electron/codex/service';
 import { ReviewService } from '../electron/services/reviews';
 import { stopMonitoring } from '../electron/services/monitoring';

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { GitHubHttp } from './http';
+import type { GitHubReader } from './transport';
 import { cachedPullSchema, readPulls } from './pulls';
 import { historySchema, readHistory, type HistoryOptions } from './history';
 import { readPullSignals, type SignalsBudget } from './signals';
@@ -27,7 +27,7 @@ export function githubRepository(remoteUrl: string): string | undefined {
 }
 
 const branchSchema = z.object({
-  name: z.string(),
+  name: z.string().max(8192),
   commit: z.object({ sha: z.string().regex(/^[a-f\d]{40,64}$/i) }),
 });
 const cachedText = z.string().max(8192);
@@ -48,7 +48,7 @@ export type RemoteSnapshot = z.infer<typeof remoteSnapshotSchema>;
 /** Paginate branches completely up to a visible resource bound. Pull-request
  * history is deliberately bounded and never used to prove that no PR exists. */
 export async function readRemote(
-  http: GitHubHttp,
+  http: GitHubReader,
   repository: string,
   remoteName: string,
   options: RemoteOptions = {},
@@ -68,6 +68,7 @@ export async function readRemote(
     branches.push(
       ...z
         .array(branchSchema)
+        .max(100)
         .parse(response.body)
         .map((b) => ({ name: b.name, sha: b.commit.sha.toLowerCase() })),
     );

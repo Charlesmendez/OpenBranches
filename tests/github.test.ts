@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GitHubAuth, type TokenVault } from '../electron/github/auth';
 import { GitHubHttp } from '../electron/github/http';
-import { githubRepository, readRemote, type RemoteSnapshot } from '../electron/github/reader';
+import { githubRepository, readRemote, type RemoteSnapshot } from '../src/github/reader';
 import { enrichRepository } from '../electron/github/enrich';
 import { createDemoSnapshot } from '../src/data/demo';
 
@@ -218,10 +218,12 @@ describe('remote evidence', () => {
     const request = vi
       .fn<typeof fetch>()
       .mockResolvedValue(response({}, { status: 429, headers: { 'retry-after': '120' } }));
-    const http = new GitHubHttp(async () => 'token', request);
+    const token = vi.fn(async () => 'token');
+    const http = new GitHubHttp(token, request);
     await expect(http.get('/user')).rejects.toThrow('rate limited');
     await expect(http.get('/user')).rejects.toThrow('rate limited');
     expect(request).toHaveBeenCalledTimes(1);
     await expect(http.get('//attacker.example')).rejects.toThrow('Invalid');
+    expect(token).toHaveBeenCalledTimes(1);
   });
 });

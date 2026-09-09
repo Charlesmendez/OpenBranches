@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { GitHubHttp } from './http';
+import type { GitHubReader } from './transport';
 import type { RemoteSnapshot } from './reader';
 import { actorSchema, parseActor, sourceActorSchema } from './actors';
 import { pullSignalsSchema } from './signalsSchema';
@@ -79,7 +79,7 @@ export function parsePulls(body: unknown, repository: string): CachedPull[] {
 
 // Open work has its own listing so recent closed PRs cannot hide older drafts.
 // Missing heads still have useful PR metadata; they are never assigned by name alone.
-export async function readPulls(http: GitHubHttp, repository: string, isCurrent = () => true) {
+export async function readPulls(http: GitHubReader, repository: string, isCurrent = () => true) {
   const pulls = new Map<number, CachedPull>();
   const prefix = `/repos/${repository.split('/').map(encodeURIComponent).join('/')}`;
   let openPullsComplete = false;

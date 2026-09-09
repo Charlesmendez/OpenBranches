@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import type { Repository } from '../../src/domain/types';
-import { GitHubError, type GitHubHttp } from './http';
+import type { Repository } from '../domain/types';
+import { GitHubError, type GitHubReader } from './transport';
 
 export const integrationNames = ['develop', 'dev', 'main', 'master'] as const;
 const sha = z.string().regex(/^[a-f\d]{40,64}$/);
@@ -95,7 +95,7 @@ function localChecks(repository?: Repository): Map<string, HistoryCheck> {
  * deduplicate aliases, prune obsolete pairs, and visit unchecked work before
  * failed retries. One bad pair must not prevent later branches being checked. */
 export async function readHistory(
-  http: GitHubHttp,
+  http: GitHubReader,
   repository: string,
   branches: RemoteBranch[],
   options: HistoryOptions = {},
