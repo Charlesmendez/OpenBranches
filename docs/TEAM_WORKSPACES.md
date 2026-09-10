@@ -31,7 +31,7 @@ GitHub membership, reviewers, PR state, CI/check results, and permissions must b
 ## Delivery and acceptance
 
 1. Automatic local discovery, global project search, and durable removal exclusions.
-2. Common attribution model and verified Codex/Claude adapters, extensible event ingestion, and accurate multi-agent icon presentation.
+2. Common attribution model and verified Codex, Claude Code, and Cursor adapters, extensible event ingestion, and accurate tool/model icon presentation.
 3. GitHub people/PR/check evidence and the team UI using clearly fictional fixtures.
 4. Authenticated shared service, team membership, device pairing, scoped project sharing, and streaming snapshots.
 5. Real two-member verification across separate devices: publish selected work, observe it in the team view, disconnect, revoke, unshare, race old uploads, and prove that personal/unselected data never appears.

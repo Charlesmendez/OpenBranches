@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { sharedSnapshotSchema, teamId } from '../../src/team/protocol';
-import type { TeamPage } from '../../src/team/responses';
+import { teamId } from '../../src/team/protocol';
+import { sharedWorkSchema, type SharedWork, type TeamPage } from '../../src/team/responses';
 import { denied } from './errors';
 import { TeamDatabase } from './db';
 import {
@@ -19,6 +19,7 @@ const pageSchema = z.object({
   after: z.tuple([teamId, teamId]).optional(),
   query: z.string().max(160).optional(),
 });
+const LIVE_LIMIT = 24;
 const visibleProjects = (client: PoolClient, principal: Principal) =>
   client.query(
     `SELECT p.id,p.name,p.github_id AS "githubId",p.github_slug AS "githubSlug",($3::boolean OR a.can_share) AS "canShare"
@@ -62,21 +63,55 @@ export class TeamViews {
         ${visibleShares} AND ($7::uuid IS NULL OR (d.id,p.id)>($7::uuid,$8::uuid)) ORDER BY d.id,p.id LIMIT 11`,
         [...params, page.after?.[0] ?? null, page.after?.[1] ?? null],
       );
+      const liveRows = await client.query(
+        `WITH visible AS (
+          SELECT s.project_id AS "projectId",d.id AS "deviceId",d.user_id AS "memberId",
+            d.name AS "deviceName",d.expires_at AS "deviceExpiresAt",s.epoch::text,
+            s.sequence::text,s.received_at AS "receivedAt",s.observed_at AS "observedAt",
+            s.snapshot,matched.branches ${visibleShares}
+        ), live_branches AS (
+          SELECT visible.*,branch.value AS branch,activity.waiting,activity."checkedAt"
+          FROM visible CROSS JOIN LATERAL jsonb_array_elements(visible.branches) branch(value)
+          CROSS JOIN LATERAL (
+            SELECT bool_or(COALESCE((task.value->>'waiting')::boolean,false)) AS waiting,
+              max((task.value->>'checkedAt')::timestamptz) AS "checkedAt"
+            FROM jsonb_array_elements(branch.value->'tasks') task(value)
+            WHERE task.value->>'association'='verified' AND task.value ? 'activitySource'
+              AND (COALESCE((task.value->>'waiting')::boolean,false)
+                OR task.value->>'status'='active')
+              AND (task.value->>'checkedAt')::timestamptz>=now()-interval '90 seconds'
+              AND (task.value->>'checkedAt')::timestamptz<=now()+interval '1 minute'
+          ) activity
+          WHERE activity."checkedAt" IS NOT NULL
+            AND NOT (visible.snapshot->>'sourceError')::boolean
+            AND visible."deviceExpiresAt">now()
+            AND visible."receivedAt">=now()-interval '5 minutes'
+            AND visible."receivedAt"<=now()+interval '1 minute'
+            AND visible."observedAt">=now()-interval '5 minutes'
+            AND visible."observedAt"<=now()+interval '1 minute'
+        )
+        SELECT "projectId","deviceId","memberId","deviceName","deviceExpiresAt",epoch,sequence,
+          "receivedAt",jsonb_set(snapshot,'{branches}',jsonb_build_array(branch)) AS snapshot,
+          count(*) OVER()::integer AS "liveTotal"
+        FROM live_branches
+        ORDER BY waiting,"checkedAt" DESC,"deviceId","projectId",branch->>'key'
+        LIMIT ${LIVE_LIMIT + 1}`,
+        params,
+      );
       const selected = rows.rows.slice(0, 10);
+      const selectedLive = liveRows.rows.slice(0, LIVE_LIMIT);
       const last = selected.at(-1);
       return {
         workspace: { id: workspaceId, name: principal.workspaceName, revision: principal.revision },
         people: people.rows.slice(0, 1000),
         projects: projects.rows.slice(0, 1000),
         coverage: { people: people.rows.length <= 1000, projects: projects.rows.length <= 1000 },
-        work: selected.map((row) => ({
-          ...row,
-          epoch: Number(row.epoch),
-          sequence: Number(row.sequence),
-          receivedAt: row.receivedAt.toISOString(),
-          deviceExpiresAt: row.deviceExpiresAt.toISOString(),
-          snapshot: sharedSnapshotSchema.parse(row.snapshot),
-        })),
+        work: selected.map(sharedWork),
+        live: {
+          work: selectedLive.map(sharedWork),
+          total: Number(liveRows.rows[0]?.liveTotal ?? 0),
+          complete: liveRows.rows.length <= LIVE_LIMIT,
+        },
         totals: {
           ...totals.rows[0],
           reports: Number(totals.rows[0].reports),
@@ -144,4 +179,23 @@ export class TeamViews {
       return { members: result.rows.slice(0, 1000), complete: result.rows.length <= 1000 };
     });
   }
+}
+
+function sharedWork(row: Record<string, unknown>): SharedWork {
+  return sharedWorkSchema.parse({
+    projectId: row.projectId,
+    deviceId: row.deviceId,
+    memberId: row.memberId,
+    deviceName: row.deviceName,
+    deviceExpiresAt: timestamp(row.deviceExpiresAt),
+    epoch: Number(row.epoch),
+    sequence: Number(row.sequence),
+    receivedAt: timestamp(row.receivedAt),
+    snapshot: row.snapshot,
+  });
+}
+
+function timestamp(value: unknown) {
+  if (!(value instanceof Date)) throw new Error('The database returned an invalid timestamp.');
+  return value.toISOString();
 }

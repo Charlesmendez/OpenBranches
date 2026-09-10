@@ -39,6 +39,13 @@ export const teamViewSchema = z.strictObject({
   people: z.array(teamPersonSchema).max(1000),
   projects: z.array(teamProjectSchema).max(1000),
   work: z.array(sharedWorkSchema).max(10),
+  live: z
+    .strictObject({
+      work: z.array(sharedWorkSchema).max(24),
+      total: sequence,
+      complete: z.boolean(),
+    })
+    .optional(),
   checkedAt: z.iso.datetime(),
   coverage: z.strictObject({ people: z.boolean(), projects: z.boolean() }),
   nextCursor: z

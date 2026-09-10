@@ -90,7 +90,7 @@ export class TeamClient {
       (value) => {
         if (
           value.workspace.id !== workspace ||
-          value.work.some(
+          [...value.work, ...(value.live?.work ?? [])].some(
             (work) =>
               (filter.person && work.memberId !== filter.person) ||
               (filter.project && work.projectId !== filter.project),

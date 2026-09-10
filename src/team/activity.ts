@@ -46,7 +46,10 @@ export function sharedTaskActivity(
 
 /** Builds one consistent branch row model for the live summary, groups, and
  * inspector. Names come from the caller's already permission-scoped page. */
-export function sharedBranchRows(data: TeamPage, now = Date.now()): SharedBranchRow[] {
+export function sharedBranchRows(
+  data: Pick<TeamPage, 'people' | 'projects' | 'work'>,
+  now = Date.now(),
+): SharedBranchRow[] {
   const people = new Map(data.people.map((person) => [person.id, person.login])),
     projects = new Map(data.projects.map((project) => [project.id, project.name]));
   return data.work.flatMap((work) =>

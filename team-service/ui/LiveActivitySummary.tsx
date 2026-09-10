@@ -17,7 +17,7 @@ export function LiveActivitySummary({
 }) {
   const rows = useMemo(
     () =>
-      sharedBranchRows(data, now)
+      sharedBranchRows({ ...data, work: data.live?.work ?? data.work }, now)
         .filter((row): row is ActiveRow => !!row.activity)
         .sort(
           (a, b) =>
@@ -28,7 +28,8 @@ export function LiveActivitySummary({
     [data, now],
   );
   if (!rows.length) return null;
-  const shown = rows.slice(0, 6);
+  const shown = rows.slice(0, 6),
+    total = data.live?.total ?? rows.length;
   return (
     <section className="shared-activity-rail" aria-labelledby="shared-active-heading">
       <header>
@@ -38,8 +39,8 @@ export function LiveActivitySummary({
         <span>
           <strong id="shared-active-heading">Happening now</strong>
           <small>
-            {rows.length} {rows.length === 1 ? 'branch has' : 'branches have'} fresh, verified
-            runtime evidence from opted-in Macs
+            {total} {total === 1 ? 'branch has' : 'branches have'} fresh, verified runtime evidence
+            from opted-in Macs
           </small>
         </span>
       </header>
@@ -67,9 +68,9 @@ export function LiveActivitySummary({
           </button>
         ))}
       </div>
-      {rows.length > shown.length && (
+      {total > shown.length && (
         <small className="active-more">
-          +{rows.length - shown.length} more in the branch groups
+          +{total - shown.length} more · narrow by person or project to focus
         </small>
       )}
     </section>

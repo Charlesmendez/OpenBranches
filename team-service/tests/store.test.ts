@@ -37,6 +37,21 @@ const snapshot = (): SharedSnapshot => ({
     },
   ],
 });
+const liveSnapshot = (): SharedSnapshot => {
+  const value = snapshot();
+  value.branches[0].tasks = [
+    {
+      key: 'c'.repeat(64),
+      tool: 'cursor',
+      model: { id: 'grok-code-fast-1', provider: 'xai' },
+      association: 'verified',
+      status: 'active',
+      activitySource: 'cursor-hook',
+      checkedAt: value.observedAt,
+    },
+  ];
+  return value;
+};
 beforeAll(async () => {
   await db.migrate();
   await db.migrate();
@@ -630,7 +645,7 @@ describe('PostgreSQL team authorization and sharing', () => {
     await f.store.sharing.publish(f.device.credential, f.workspace.id, f.project.id, {
       epoch: 1,
       sequence: 1,
-      snapshot: snapshot(),
+      snapshot: liveSnapshot(),
     });
     for (let index = 0; index < 10; index++) {
       const device = await f.pair(f.member, 'Fictional pagination Mac ' + index);
@@ -642,11 +657,14 @@ describe('PostgreSQL team authorization and sharing', () => {
       await f.store.sharing.publish(device.credential, f.workspace.id, f.project.id, {
         epoch: 1,
         sequence: 1,
-        snapshot: snapshot(),
+        snapshot: liveSnapshot(),
       });
     }
     const first = await f.store.views.view(f.member, f.workspace.id);
     expect(first.work).toHaveLength(10);
+    expect(first.live).toMatchObject({ total: 11, complete: true });
+    expect(first.live?.work).toHaveLength(11);
+    expect(first.live?.work.every((item) => item.snapshot.branches.length === 1)).toBe(true);
     expect(first.nextCursor).not.toBeNull();
     const second = await f.store.views.view(f.member, f.workspace.id, {
       after: first.nextCursor!.split(':'),
@@ -663,6 +681,24 @@ describe('PostgreSQL team authorization and sharing', () => {
     expect(owner.projects).toHaveLength(1000);
     expect(owner.coverage).toEqual({ people: true, projects: false });
     expect((await f.store.views.view(f.member, f.workspace.id)).coverage.projects).toBe(true);
+  });
+  it('keeps the live summary small while reporting the full active count', async () => {
+    const f = await fixture(),
+      value = liveSnapshot();
+    value.branches = Array.from({ length: 25 }, (_, index) => ({
+      ...structuredClone(value.branches[0]),
+      key: index.toString(16).padStart(64, '0'),
+      name: `feat/live-${index + 1}`,
+    }));
+    await f.store.sharing.publish(f.device.credential, f.workspace.id, f.project.id, {
+      epoch: 1,
+      sequence: 1,
+      snapshot: value,
+    });
+    const view = await f.store.views.view(f.member, f.workspace.id);
+    expect(view.live).toMatchObject({ total: 25, complete: false });
+    expect(view.live?.work).toHaveLength(24);
+    expect(view.live?.work.every((item) => item.snapshot.branches.length === 1)).toBe(true);
   });
   it('searches authorized branch metadata and counts only matching reports', async () => {
     const f = await fixture(),
@@ -708,16 +744,18 @@ describe('PostgreSQL team authorization and sharing', () => {
     await f.store.sharing.publish(ownerDevice.credential, f.workspace.id, privateProject.id, {
       epoch: 1,
       sequence: 1,
-      snapshot: snapshot(),
+      snapshot: liveSnapshot(),
     });
-    expect(
-      (await f.store.views.view(f.member, f.workspace.id, { query: 'Private billing project' }))
-        .totals.reports,
-    ).toBe(0);
-    expect(
-      (await f.store.views.view(f.owner, f.workspace.id, { query: 'Private billing project' }))
-        .totals.reports,
-    ).toBe(1);
+    const hidden = await f.store.views.view(f.member, f.workspace.id, {
+      query: 'Private billing project',
+    });
+    expect(hidden.totals.reports).toBe(0);
+    expect(hidden.live).toMatchObject({ total: 0, work: [] });
+    const visible = await f.store.views.view(f.owner, f.workspace.id, {
+      query: 'Private billing project',
+    });
+    expect(visible.totals.reports).toBe(1);
+    expect(visible.live).toMatchObject({ total: 1 });
   });
   it('exposes project permission settings only to the workspace owner browser', async () => {
     const f = await fixture();

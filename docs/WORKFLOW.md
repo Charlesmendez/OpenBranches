@@ -14,7 +14,7 @@ When available, the Codex adapter attaches read-only to the existing local app-s
 
 Running or waiting labels require a fresh runtime observation and a fresh Git checkout whose folder, branch, and HEAD match. A saved task's old branch cannot inherit live status after a checkout switch. Runtime evidence expires after 90 seconds; incomplete or unavailable coverage never means nobody is working. The development Mac's current Codex desktop session did not expose the managed daemon socket, so real live-status verification remains unavailable there.
 
-Other tools retain their explicit task/model attribution; their saved metadata is not live presence. PR authors and commit authors are labeled by source and do not establish who is working now. Recent task updates and uncommitted work are distinct activity labels. Human presence and unpublished teammate activity still require an opted-in companion with its own observed evidence.
+Claude Code and Cursor can supply fresh activity through their separate opt-in local hooks. Other saved tool/model metadata is not live presence. PR authors and commit authors are labeled by source and do not establish who is working now. Recent task updates and uncommitted work are distinct activity labels. Human presence and unpublished teammate activity still require an opted-in companion with its own observed evidence.
 
 An idle marker requires seven days without a commit or verified task update, pending integration, no open PR or confirmed running/waiting task, and no dirty or unreadable worktree. “Unassigned” means no linked task or open PR was observed; it does not prove abandonment.
 
