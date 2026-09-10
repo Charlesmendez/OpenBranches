@@ -49,6 +49,12 @@ export const githubSetupState = z.strictObject({
         fullName: z.string().max(140),
         accountLogin: z.string().max(100),
         selectedAt: z.iso.datetime(),
+        lastAttemptAt: z.iso.datetime().nullable(),
+        snapshotAt: z.iso.datetime().nullable(),
+        syncState: z.enum(['waiting', 'current', 'partial', 'error']),
+        branchCount: z.number().int().nonnegative().max(5000),
+        pullCount: z.number().int().nonnegative().max(5300),
+        openPullCount: z.number().int().nonnegative().max(5000),
       }),
     )
     .max(500),

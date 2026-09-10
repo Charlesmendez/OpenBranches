@@ -14,6 +14,7 @@ import type { SharedSnapshot } from '../../src/team/protocol';
 import { fictionalGitHub, pem, repository, response as fixtureResponse } from './githubFixture';
 import { TeamGitHubApp } from '../src/github/app';
 import { TeamGitHubSetup } from '../src/github/setup';
+import { TeamGitHubSync } from '../src/github/sync';
 const databaseUrl = process.env.OPENBRANCHES_TEAM_PREVIEW_DATABASE_URL;
 if (!databaseUrl || process.env.OPENBRANCHES_TEAM_FICTIONAL_PREVIEW !== '1')
   throw new Error('Use the isolated preview command.');
@@ -181,7 +182,21 @@ html.body = Buffer.from(
     .toString()
     .replace('<head>', '<head><meta name="openbranches-fictional-preview" content="1">'),
 );
-const fixtureProvider = fictionalGitHub((path) => {
+const previewRepositories = Array.from({ length: 36 }, (_, index) => {
+  const name =
+    ['atlas-web', 'payments-api', 'design-system', 'developer-tools'][index] ??
+    'service-' + String(index + 1).padStart(2, '0');
+  return {
+    ...repository,
+    id: 51 + index,
+    name,
+    full_name: 'FictionalOrg/' + name,
+    private: index % 3 !== 0,
+    archived: index === 30,
+  };
+});
+let scopedRepositoryId: number | undefined;
+const fixtureProvider = fictionalGitHub((path, options) => {
   if (path.includes('/memberships/'))
     return fixtureResponse({
       role: 'admin',
@@ -189,29 +204,55 @@ const fixtureProvider = fictionalGitHub((path) => {
       organization: { id: 41 },
       user: { id: ownerId },
     });
-  if (path.startsWith('/installation/repositories?'))
+  if (path === '/app/installations/31/access_tokens') {
+    const ids = JSON.parse(String(options?.body)).repository_ids;
+    scopedRepositoryId = Array.isArray(ids) ? ids[0] : undefined;
+    return undefined;
+  }
+  if (path.startsWith('/installation/repositories?')) {
+    const repositories = scopedRepositoryId
+      ? previewRepositories.filter((item) => item.id === scopedRepositoryId)
+      : previewRepositories;
     return fixtureResponse({
-      total_count: 36,
-      repositories: Array.from({ length: 36 }, (_, index) => {
-        const name =
-          ['atlas-web', 'payments-api', 'design-system', 'developer-tools'][index] ??
-          'service-' + String(index + 1).padStart(2, '0');
-        return {
-          ...repository,
-          id: 51 + index,
-          name,
-          full_name: 'FictionalOrg/' + name,
-          private: index % 3 !== 0,
-          archived: index === 30,
-        };
-      }),
+      total_count: repositories.length,
+      repositories,
     });
+  }
+  const identity = /^\/repos\/FictionalOrg\/([^/?]+)$/.exec(path);
+  if (identity)
+    return fixtureResponse(
+      previewRepositories.find((item) => item.name === decodeURIComponent(identity[1])),
+    );
+  const pulls = /^\/repos\/FictionalOrg\/([^/]+)\/pulls\?/.exec(path);
+  if (pulls) {
+    const selected = previewRepositories.find((item) => item.name === decodeURIComponent(pulls[1]));
+    return fixtureResponse(
+      path.includes('state=open') && selected
+        ? [
+            {
+              number: 1,
+              title: 'Review ' + selected.name.replaceAll('-', ' '),
+              state: 'open',
+              draft: false,
+              merged_at: null,
+              updated_at: new Date().toISOString(),
+              user: { id: ownerId, login: names[0], type: 'User' },
+              base: { ref: 'develop' },
+              head: {
+                ref: 'feature/shared',
+                sha: 'b'.repeat(40),
+                repo: { full_name: selected.full_name },
+              },
+            },
+          ]
+        : [],
+    );
+  }
   return undefined;
 });
-const github = new TeamGitHubSetup(
-  db,
-  new TeamGitHubApp('fixture-client', pem, fixtureProvider.request),
-);
+const githubApp = new TeamGitHubApp('fixture-client', pem, fixtureProvider.request),
+  github = new TeamGitHubSetup(db, githubApp),
+  githubSync = new TeamGitHubSync(db, githubApp, { pollMilliseconds: 1_000 });
 const oauth = new TeamOAuth(
   db,
   config,
@@ -284,6 +325,7 @@ const server = createServer((request, response) => {
   api.emit('request', request, response);
 });
 await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+githubSync.start();
 const address = server.address();
 if (!address || typeof address === 'string') throw new Error('Preview address unavailable');
 config.origin.port = String(address.port);
@@ -296,7 +338,10 @@ const close = () => {
   server.closeAllConnections();
   server.close(() => {
     api.emit('close');
-    void events.close().then(() => db.close());
+    void githubSync
+      .close()
+      .then(() => events.close())
+      .then(() => db.close());
   });
 };
 process.once('SIGINT', close);

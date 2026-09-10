@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { GitFork } from 'lucide-react';
 import type { GitHubSetupState } from '../../src/team/github';
-import { Empty, ListSearch, Notice } from './primitives';
+import { dateLabel, Empty, ListSearch, Notice } from './primitives';
 type Selection = GitHubSetupState['selections'][number];
 export function GitHubSelections({
   selections,
@@ -21,8 +21,8 @@ export function GitHubSelections({
         <span>{selections.length}</span>
       </header>
       <Notice>
-        Selections are saved. Branch and PR synchronization is still being connected in this
-        preview.
+        OpenBranches refreshes branch and pull-request metadata in the background. A failed refresh
+        keeps the last verified snapshot and retries automatically.
       </Notice>
       <ListSearch
         label="Search selected GitHub projects"
@@ -38,7 +38,7 @@ export function GitHubSelections({
           <GitFork size={17} />
           <span>
             <strong>{p.fullName}</strong>
-            <small>Selected · {new Date(p.selectedAt).toLocaleDateString()}</small>
+            <small>{selectionStatus(p)}</small>
           </span>
           <button className="text-button" onClick={() => onRemove(p)}>
             Remove selection
@@ -53,4 +53,14 @@ export function GitHubSelections({
       )}
     </section>
   );
+}
+
+function selectionStatus(selection: Selection) {
+  const counts = `${selection.branchCount.toLocaleString()} branches · ${selection.openPullCount.toLocaleString()} open ${selection.openPullCount === 1 ? 'PR' : 'PRs'}`;
+  if (selection.syncState === 'waiting') return 'Waiting for first refresh';
+  if (selection.syncState === 'error')
+    return selection.snapshotAt
+      ? `Refresh failed · ${counts} · Last verified ${dateLabel(selection.snapshotAt)}`
+      : `First refresh failed · Retrying automatically`;
+  return `${selection.syncState === 'partial' ? 'Partial snapshot' : 'Current'} · ${counts} · ${dateLabel(selection.snapshotAt)}`;
 }

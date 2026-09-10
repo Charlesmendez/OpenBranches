@@ -119,7 +119,13 @@ export class TeamGitHubSetup {
         [workspace, owner.userId, secretHash(credential.token)],
       );
       const selections = await client.query(
-        `SELECT p.id AS "projectId",p.github_id AS "repositoryId",p.github_slug AS "fullName",s.account_login AS "accountLogin",s.selected_at AS "selectedAt"
+        `SELECT p.id AS "projectId",p.github_id AS "repositoryId",p.github_slug AS "fullName",s.account_login AS "accountLogin",
+        s.selected_at AS "selectedAt",s.checked_at AS "lastAttemptAt",s.snapshot->>'checkedAt' AS "snapshotAt",s.last_error AS "lastError",
+        CASE WHEN jsonb_typeof(s.snapshot->'branches')='array' THEN jsonb_array_length(s.snapshot->'branches') ELSE 0 END AS "branchCount",
+        CASE WHEN jsonb_typeof(s.snapshot->'pulls')='array' THEN jsonb_array_length(s.snapshot->'pulls') ELSE 0 END AS "pullCount",
+        CASE WHEN jsonb_typeof(s.snapshot->'pulls')='array' THEN (SELECT count(*)::integer FROM jsonb_array_elements(s.snapshot->'pulls') pull WHERE pull->>'state'='open') ELSE 0 END AS "openPullCount",
+        COALESCE((s.snapshot->>'branchesComplete')::boolean,false) AS "branchesComplete",
+        COALESCE((s.snapshot->>'pullHistoryComplete')::boolean,false) AS "pullHistoryComplete"
         FROM ob_github_sources s JOIN ob_projects p ON p.workspace_id=s.workspace_id AND p.id=s.project_id AND p.active
         WHERE s.workspace_id=$1 ORDER BY lower(p.github_slug),p.id LIMIT 500`,
         [workspace],
@@ -139,7 +145,25 @@ export class TeamGitHubSetup {
               }),
             }
           : {}),
-        selections: selections.rows.map((r) => ({ ...r, selectedAt: r.selectedAt.toISOString() })),
+        selections: selections.rows.map((r) => ({
+          projectId: r.projectId,
+          repositoryId: r.repositoryId,
+          fullName: r.fullName,
+          accountLogin: r.accountLogin,
+          selectedAt: r.selectedAt.toISOString(),
+          lastAttemptAt: r.lastAttemptAt?.toISOString() ?? null,
+          snapshotAt: r.snapshotAt ?? null,
+          syncState: r.lastError
+            ? 'error'
+            : !r.snapshotAt
+              ? 'waiting'
+              : r.branchesComplete && r.pullHistoryComplete
+                ? 'current'
+                : 'partial',
+          branchCount: r.branchCount,
+          pullCount: r.pullCount,
+          openPullCount: r.openPullCount,
+        })),
       });
     });
   }
@@ -242,7 +266,7 @@ export class TeamGitHubSetup {
           `INSERT INTO ob_github_sources(workspace_id,project_id,installation_id,account_id,account_type,account_login,approved_by,generation)
           VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(workspace_id,project_id) DO UPDATE SET installation_id=EXCLUDED.installation_id,
           account_id=EXCLUDED.account_id,account_type=EXCLUDED.account_type,account_login=EXCLUDED.account_login,approved_by=EXCLUDED.approved_by,
-          generation=EXCLUDED.generation,selected_at=now(),snapshot=NULL,checked_at=NULL`,
+          generation=EXCLUDED.generation,selected_at=now(),snapshot=NULL,checked_at=NULL,last_error=false`,
           [
             workspace,
             saved.rows[0].id,

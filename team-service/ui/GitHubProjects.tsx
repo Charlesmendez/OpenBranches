@@ -310,8 +310,8 @@ export function GitHubProjects({
             require their own approval.
           </Notice>
           <p className="github-preview-note">
-            This preview saves your selection. Background GitHub synchronization is the next
-            implementation step.
+            After you add them, OpenBranches reads branch and pull-request metadata in the
+            background. Repository contents stay on GitHub.
           </p>
           {action.error && <Notice error>{action.error}</Notice>}
           <div className="modal-actions">
@@ -331,7 +331,9 @@ export function GitHubProjects({
                   setReviewing(false);
                   setCatalog(undefined);
                   setSelection([]);
-                  setNotice('GitHub projects selected. Manage their members in People & access.');
+                  setNotice(
+                    'GitHub projects selected. Their first background refresh is now queued.',
+                  );
                   refresh();
                 })
               }

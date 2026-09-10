@@ -5,33 +5,35 @@ import { TeamOAuth } from './oauth';
 import { TeamEvents } from './events';
 import { createTeamServer } from './http';
 import { loadTeamAssets } from './static';
-import { loadGitHubSetup } from './github/load';
+import { loadTeamGitHub } from './github/load';
 
 async function main() {
   const config = teamConfig(process.env);
   const db = new TeamDatabase(config.databaseUrl);
   const store = new TeamStore(db, config.ownerGitHubId);
   const events = new TeamEvents(db);
-  const github = await loadGitHubSetup(config, db);
+  const github = await loadTeamGitHub(config, db);
   const server = createTeamServer(
     config,
     store,
-    new TeamOAuth(db, config, store.identities, fetch, github),
+    new TeamOAuth(db, config, store.identities, fetch, github.setup),
     events,
     await loadTeamAssets(),
-    github,
+    github.setup,
   );
   let closing: Promise<void> | undefined;
   const close = () =>
     (closing ??= (async () => {
       server.closeAllConnections();
       await new Promise<void>((resolve) => server.close(() => resolve()));
+      await github.sync?.close();
       await events.close();
       await db.close();
     })());
   try {
     await db.migrate();
     await events.start();
+    github.sync?.start();
     await new Promise<void>((resolve, reject) => {
       server.once('error', reject);
       server.listen(config.port, config.host, () => {

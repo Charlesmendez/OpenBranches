@@ -10,6 +10,7 @@ import { TeamOAuth } from '../src/oauth';
 import { TeamEvents } from '../src/events';
 import { TeamGitHubApp } from '../src/github/app';
 import { TeamGitHubSetup } from '../src/github/setup';
+import { TeamGitHubSync } from '../src/github/sync';
 import { loadGitHubSetup } from '../src/github/load';
 import { createTeamServer } from '../src/http';
 import type { TeamConfig } from '../src/config';
@@ -415,5 +416,90 @@ describe('GitHub workspace setup', () => {
     });
     expect(catalog.status).toBe(200);
     expect((await catalog.json()).projects).toHaveLength(1);
+  });
+  it('refreshes selected repositories and exposes bounded background status without private bodies', async () => {
+    const f = await fixture(),
+      catalog = await f.review();
+    await f.setup.select(f.owner, f.workspace.id, {
+      reviewId: catalog.id,
+      repositoryIds: ['51'],
+    });
+    const sync = new TeamGitHubSync(db, f.app);
+    await sync.refresh(true);
+    const [selection] = (await f.setup.state(f.owner, f.workspace.id)).selections;
+    expect(selection).toMatchObject({
+      repositoryId: '51',
+      syncState: 'current',
+      branchCount: 2,
+      pullCount: 1,
+      openPullCount: 1,
+    });
+    expect(selection.snapshotAt).toMatch(/^\d{4}-\d\d-/);
+    expect(selection.lastAttemptAt).toMatch(/^\d{4}-\d\d-/);
+    const saved = await db.pool.query(
+      'SELECT snapshot FROM ob_github_sources WHERE workspace_id=$1',
+      [f.workspace.id],
+    );
+    expect(JSON.stringify(saved.rows)).not.toMatch(/PRIVATE_BODY|PRIVATE_LOG|PRIVATE_PATCH/);
+  });
+  it('preserves the last verified snapshot after a failed refresh and retries by status', async () => {
+    let failing = false;
+    const f = await fixture((path) => {
+      if (failing && path.includes('/branches?')) throw new Error('PRIVATE_PROVIDER_FAILURE');
+      return undefined;
+    });
+    const catalog = await f.review();
+    await f.setup.select(f.owner, f.workspace.id, {
+      reviewId: catalog.id,
+      repositoryIds: ['51'],
+    });
+    const sync = new TeamGitHubSync(db, f.app);
+    await sync.refresh(true);
+    const before = await db.pool.query(
+      'SELECT snapshot FROM ob_github_sources WHERE workspace_id=$1',
+      [f.workspace.id],
+    );
+    failing = true;
+    await sync.refresh(true);
+    const [selection] = (await f.setup.state(f.owner, f.workspace.id)).selections;
+    expect(selection).toMatchObject({
+      syncState: 'error',
+      branchCount: 2,
+      openPullCount: 1,
+    });
+    const after = await db.pool.query(
+      'SELECT snapshot FROM ob_github_sources WHERE workspace_id=$1',
+      [f.workspace.id],
+    );
+    expect(after.rows[0].snapshot).toEqual(before.rows[0].snapshot);
+    expect(JSON.stringify(after.rows)).not.toContain('PRIVATE_PROVIDER_FAILURE');
+  });
+  it('discards a completed background read when its selection is removed', async () => {
+    let hold = false,
+      entered!: () => void,
+      release!: () => void;
+    const waiting = new Promise<void>((resolve) => (entered = resolve)),
+      gate = new Promise<void>((resolve) => (release = resolve));
+    const f = await fixture(async (path) => {
+      if (hold && path.includes('/branches?')) {
+        entered();
+        await gate;
+      }
+      return undefined;
+    });
+    const catalog = await f.review();
+    await f.setup.select(f.owner, f.workspace.id, {
+      reviewId: catalog.id,
+      repositoryIds: ['51'],
+    });
+    const project = (await f.setup.state(f.owner, f.workspace.id)).selections[0].projectId;
+    hold = true;
+    const sync = new TeamGitHubSync(db, f.app),
+      running = sync.refresh(true);
+    await waiting;
+    await f.setup.remove(f.owner, f.workspace.id, project);
+    release();
+    await running;
+    expect((await f.setup.state(f.owner, f.workspace.id)).selections).toEqual([]);
   });
 });
