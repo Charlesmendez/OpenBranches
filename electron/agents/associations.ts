@@ -48,19 +48,21 @@ function matchTask(
   const sameCommit = !!task.gitInfo?.sha && commitIds(branch).includes(task.gitInfo.sha);
   const sameDetachedWorktree =
     branch.detached && sameCommit && branch.worktrees.some((w) => resolve(w.path) === cwd);
-  const liveCheckout =
+  const liveWorktree =
     repository.checkoutFresh &&
     task.runtime &&
     Date.parse(task.runtime.checkedAt) >= Date.now() - LIVE_ACTIVITY_TTL &&
     Date.parse(task.runtime.checkedAt) <= Date.now() + 60_000 &&
-    !branch.detached &&
-    branch.worktrees.some(
-      (tree) =>
-        tree.available &&
-        resolve(tree.path) === cwd &&
-        tree.branch?.replace(/^refs\/heads\//, '') === branch.name &&
-        tree.head === branch.local?.sha,
-    );
+    !branch.detached
+      ? branch.worktrees.find(
+          (tree) =>
+            tree.available &&
+            resolve(tree.path) === cwd &&
+            tree.branch?.replace(/^refs\/heads\//, '') === branch.name &&
+            tree.head === branch.local?.sha,
+        )
+      : undefined;
+  const liveCheckout = !!liveWorktree;
   if (!sameBranch && !sameDetachedWorktree && !liveCheckout) return;
   const verified =
     !!liveCheckout || (!branch.detached && sameRepository && sameBranch && sameCommit);
@@ -80,7 +82,11 @@ function matchTask(
           : 'idle'
         : 'unknown',
     ...(liveCheckout && task.runtime
-      ? { activitySource: task.runtime.source, waiting: task.runtime.state === 'waiting' }
+      ? {
+          activitySource: task.runtime.source,
+          waiting: task.runtime.state === 'waiting',
+          worktreePath: liveWorktree.path,
+        }
       : {}),
     association: verified ? 'verified' : 'possible',
     archived: task.archived,

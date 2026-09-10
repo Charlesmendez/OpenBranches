@@ -1,8 +1,8 @@
 import { AgentBadges } from './AgentBadges';
 import { PullPeople } from './PullPeople';
-import { ArrowUpRight, Check, Copy, FolderOpen, GitBranch, Cloud, Laptop, X } from 'lucide-react';
+import { ArrowUpRight, Check, Copy, GitBranch, X } from 'lucide-react';
 import type { Branch, Repository } from '../../domain/types';
-import { relativeTime, shortPath } from '../../domain/branches';
+import { relativeTime } from '../../domain/branches';
 import { BranchStatus, IconButton } from './Primitives';
 import { lazy, Suspense, useState } from 'react';
 import { TaskDetails } from './TaskDetails';
@@ -10,6 +10,7 @@ import { IntegrationEvidence } from './IntegrationEvidence';
 import { pullSourceStale } from '../../domain/sourceFreshness';
 import { BranchActivity } from './BranchActivity';
 import { PullRequestEvidence } from './PullRequestEvidence';
+import { WorktreeLocations } from './WorktreeLocations';
 const PullSignals = lazy(() =>
   import('./PullSignals').then((module) => ({ default: module.PullSignals })),
 );
@@ -28,26 +29,6 @@ export function Inspector({
   onError: (text: string) => void;
 }) {
   const [copied, setCopied] = useState(false);
-  const worktree = branch.worktrees.find((w) => w.available);
-  const differs = branch.local && branch.remote && branch.local.sha !== branch.remote.sha;
-  const folderLabel = worktree ? 'Reveal worktree' : 'Reveal repository folder';
-  const remoteNote =
-    branch.remote?.presence === 'missing'
-      ? 'Not listed on GitHub at the last successful check. This is a cached Git reference.'
-      : branch.remote?.source === 'github'
-        ? `GitHub checked ${relativeTime(branch.remote.checkedAt ?? '')}${repository.github?.error ? ' · source unavailable' : ''}`
-        : 'Cached locally · not a live GitHub check';
-  const reveal = async () => {
-    if (demo) {
-      onError('This is a fictional demo path. Connect a repository to reveal its worktrees.');
-      return;
-    }
-    try {
-      await window.openbranches?.revealWorktree(repository.id, branch.id);
-    } catch (error) {
-      onError(String(error));
-    }
-  };
   const openPr = async () => {
     if (demo) {
       onError('PR numbers in the demo are fictional.');
@@ -118,55 +99,7 @@ export function Inspector({
         </Suspense>
       )}
       <IntegrationEvidence key={`history:${branch.id}`} branch={branch} repository={repository} />
-      <section className="inspector-section">
-        <h3>Where it lives</h3>
-        {(branch.local || branch.detached) && (
-          <div className="location-detail">
-            <Laptop size={18} />
-            <div>
-              <strong>This Mac</strong>
-              <code>{shortPath(worktree?.path ?? repository.path)}</code>
-              {!worktree && <small>Stored in this repository · no available worktree</small>}
-              {branch.worktrees.some((w) => w.dirty) && (
-                <small className="amber-text">Uncommitted changes</small>
-              )}
-              {branch.worktrees.some((w) => w.dirty === null) && (
-                <small className="amber-text">Worktree changes could not be checked</small>
-              )}
-              {worktree?.statusNote && <small>{worktree.statusNote}</small>}
-            </div>
-            <button
-              className="text-icon"
-              title={folderLabel}
-              aria-label={folderLabel}
-              onClick={() => void reveal()}
-            >
-              <ArrowUpRight size={15} />
-            </button>
-          </div>
-        )}
-        {branch.remote && (
-          <div className="location-detail">
-            <Cloud size={18} />
-            <div>
-              <strong>{branch.remote.source === 'github' ? 'GitHub' : 'Remote reference'}</strong>
-              <code>
-                {branch.remote.remote}/{branch.remote.name}
-              </code>
-              <small>{demo ? 'Sample remote state' : remoteNote}</small>
-              {differs && (
-                <small>
-                  Remote tip: {branch.remote.sha.slice(0, 7)}
-                  {Object.entries(branch.remoteIntegration ?? {})
-                    .filter(([, s]) => s === 'integrated')
-                    .map(([target]) => ` · in locally observed ${target} history`)
-                    .join('')}
-                </small>
-              )}
-            </div>
-          </div>
-        )}
-      </section>
+      <WorktreeLocations branch={branch} repository={repository} demo={demo} onError={onError} />
       <TaskDetails
         key={`${demo}:${repository.id}:${branch.id}`}
         tasks={branch.tasks ?? []}
@@ -180,20 +113,14 @@ export function Inspector({
           <span>{relativeTime(repository.scannedAt)}</span>
         </div>
       </section>
-      <div className="inspector-actions">
-        {branch.pullRequest && (
+      {branch.pullRequest && (
+        <div className="inspector-actions">
           <button className="primary-button" onClick={() => void openPr()}>
             View PR #{branch.pullRequest.number}
             <ArrowUpRight size={15} />
           </button>
-        )}
-        {(branch.local || branch.detached) && (
-          <button className="secondary-button" onClick={() => void reveal()}>
-            <FolderOpen size={16} />
-            {folderLabel}
-          </button>
-        )}
-      </div>
+        </div>
+      )}
     </aside>
   );
 }

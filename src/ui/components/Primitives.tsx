@@ -1,4 +1,13 @@
-import { Check, GitBranch, Cloud, Laptop, CircleHelp, Minus, type LucideIcon } from 'lucide-react';
+import {
+  Check,
+  GitBranch,
+  Cloud,
+  Laptop,
+  CircleHelp,
+  Minus,
+  TriangleAlert,
+  type LucideIcon,
+} from 'lucide-react';
 import type { Branch, IntegrationState } from '../../domain/types';
 import type { ReactNode } from 'react';
 import brand from '../../../assets/brand.svg';
@@ -42,6 +51,18 @@ export function IconButton({
 }
 export function Locations({ branch, compact = false }: { branch: Branch; compact?: boolean }) {
   const local = !!branch.local || branch.detached;
+  const availableCopies = branch.worktrees.filter((tree) => tree.available).length;
+  const missingCopies = branch.worktrees.length - availableCopies;
+  const localLabel = [
+    availableCopies
+      ? `${availableCopies} available ${availableCopies === 1 ? 'worktree' : 'worktrees'} on this Mac`
+      : 'Local branch ref; not checked out',
+    missingCopies
+      ? `${missingCopies} ${missingCopies === 1 ? 'worktree is' : 'worktrees are'} missing from disk`
+      : '',
+  ]
+    .filter(Boolean)
+    .join('; ');
   const remoteLabel =
     branch.remote?.presence === 'missing'
       ? 'Cached reference; branch no longer listed on GitHub'
@@ -53,14 +74,27 @@ export function Locations({ branch, compact = false }: { branch: Branch; compact
       className="locations"
       title={
         branch.remote
-          ? `${local ? 'Local branch + ' : ''}${remoteLabel}`
-          : 'Local branch; remote association not found in this scan'
+          ? `${local ? `${localLabel} + ` : ''}${remoteLabel}`
+          : `${localLabel}; remote association not found in this scan`
       }
     >
       {local && (
         <span>
           <Laptop size={14} />
-          {!compact && 'Mac'}
+          {!compact &&
+            (availableCopies > 1
+              ? `${availableCopies} worktrees`
+              : availableCopies === 1
+                ? 'Mac'
+                : 'Mac ref')}
+          {compact && availableCopies > 1 && <small>{availableCopies}</small>}
+        </span>
+      )}
+      {missingCopies > 0 && (
+        <span className="location-missing" title={localLabel}>
+          <TriangleAlert size={12} />
+          {!compact && `${missingCopies} missing`}
+          {compact && <small>{missingCopies}</small>}
         </span>
       )}
       {local && branch.remote && <span className="location-plus">+</span>}

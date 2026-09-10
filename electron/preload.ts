@@ -59,7 +59,8 @@ const api: DesktopApi = {
   addRepository: () => ipcRenderer.invoke('repository:add'),
   removeRepository: (id) => ipcRenderer.invoke('repository:remove', id),
   refresh: () => ipcRenderer.invoke('snapshot:refresh'),
-  revealWorktree: (id, branchId) => ipcRenderer.invoke('worktree:reveal', id, branchId),
+  revealWorktree: (id, branchId, worktreePath) =>
+    ipcRenderer.invoke('worktree:reveal', id, branchId, worktreePath),
   openExternal: (url) => ipcRenderer.invoke('external:open', url),
   getProviderStatus: () => ipcRenderer.invoke('providers:status'),
   connectGitHub: () => ipcRenderer.invoke('github:connect'),

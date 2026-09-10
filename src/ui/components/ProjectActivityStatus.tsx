@@ -1,7 +1,7 @@
 import { CircleAlert, MessageCircleQuestion, Radio, Settings2 } from 'lucide-react';
 import type { Branch, ProviderStatus } from '../../domain/types';
 import { workSpotlights } from '../../domain/workSpotlight';
-import { toolNames } from '../../domain/agents';
+import { liveCoverage } from '../../domain/liveCoverage';
 import { useClock } from '../hooks/useClock';
 
 export function ProjectActivityStatus({
@@ -40,25 +40,23 @@ export function ProjectActivityStatus({
     );
   }
 
-  const sources = activeSources(providers);
-  const enabled =
-    providers.codex.enabled || providers.liveAgents?.some((status) => status.enabled) === true;
+  const { sources, configured } = liveCoverage(providers);
   if (!providers.liveAgents && !providers.codex.enabled) return null;
   return (
     <button
-      className={`project-activity-status ${sources.length ? 'watching' : enabled ? 'issue' : 'off'}`}
+      className={`project-activity-status ${sources.length ? 'watching' : configured ? 'issue' : 'off'}`}
       title={
         sources.length
           ? `Watching for verified activity from ${sources.join(', ')}. Manage live activity.`
-          : enabled
+          : configured
             ? 'An enabled live source is unavailable. Open Settings for details.'
-            : 'Enable Claude Code or Cursor activity so the branch being worked on can glow.'
+            : 'Turn on Codex, Claude Code, or Cursor live activity so the exact branch can glow while work runs.'
       }
       onClick={onSettings}
     >
       {sources.length ? (
         <Radio size={13} />
-      ) : enabled ? (
+      ) : configured ? (
         <CircleAlert size={13} />
       ) : (
         <Settings2 size={13} />
@@ -66,25 +64,12 @@ export function ProjectActivityStatus({
       <span>
         {sources.length
           ? `Watching ${sourceLabel(sources)}`
-          : enabled
+          : configured
             ? 'Live activity unavailable'
-            : 'Live activity off'}
+            : 'Turn on live detection'}
       </span>
     </button>
   );
-}
-
-function activeSources(providers: ProviderStatus) {
-  const sources = new Set<string>();
-  if (
-    providers.codex.enabled &&
-    (providers.codex.liveState === 'connected' || providers.codex.liveState === 'partial')
-  )
-    sources.add(toolNames.codex);
-  for (const status of providers.liveAgents ?? [])
-    if (status.enabled && status.installed && status.state === 'listening')
-      sources.add(toolNames[status.tool]);
-  return [...sources];
 }
 
 function activityLabel(live: number, waiting: number) {

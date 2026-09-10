@@ -28,6 +28,7 @@ import { HandoffService } from './agents/handoffService';
 import { createClaudeHistorySource } from './claude/reader';
 import { LiveAgentService } from './agents/liveService';
 import { GitInstallation, GIT_SETUP_GUIDE } from './git/installation';
+import { revealPathFor } from './git/revealPath';
 import { ReviewService } from './services/reviews';
 import { stopMonitoring } from './services/monitoring';
 import { createSecretVault } from './services/secretVault';
@@ -281,14 +282,14 @@ app.whenReady().then(() => {
     void codex!.refresh();
     void refreshHistories();
   });
-  handle('worktree:reveal', async (id: unknown, branchId: unknown) => {
+  handle('worktree:reveal', async (id: unknown, branchId: unknown, worktreePath: unknown) => {
     const repository = service.current().repositories.find((r) => r.id === z.string().parse(id));
     if (!repository) throw new Error('Repository not found');
-    const branch = branchId
-      ? repository.branches.find((b) => b.id === z.string().parse(branchId))
-      : undefined;
-    if (branchId && !branch) throw new Error('Branch no longer exists. Refresh the repository.');
-    const path = branch?.worktrees.find((w) => w.available)?.path ?? repository.path;
+    const path = revealPathFor(
+      repository,
+      branchId === undefined ? undefined : z.string().parse(branchId),
+      worktreePath === undefined ? undefined : z.string().min(1).max(32_768).parse(worktreePath),
+    );
     await access(path);
     shell.showItemInFolder(path);
   });

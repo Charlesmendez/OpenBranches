@@ -12,6 +12,7 @@ import { recommendationsFor } from '../src/domain/branches';
 import { groupReviews } from '../src/domain/reviews';
 import { triageFindings, triageHighlights } from '../src/domain/triage';
 import { prioritizeWork, workSignal, workSpotlights } from '../src/domain/workSpotlight';
+import { liveCoverage } from '../src/domain/liveCoverage';
 const now = Date.parse('2026-09-09T20:00:00Z');
 const at = new Date(now).toISOString();
 const old = new Date(now - 30 * 86400000).toISOString();
@@ -280,6 +281,55 @@ describe('current work spotlight', () => {
       label: 'Current checkout',
       tools: [],
     });
+  });
+});
+describe('live coverage labels', () => {
+  const github = { configured: false, connected: false };
+  it('does not describe Codex task history as configured live detection', () => {
+    expect(
+      liveCoverage({
+        github,
+        codex: {
+          installed: true,
+          enabled: true,
+          state: 'ready',
+          liveState: 'unavailable',
+        },
+        liveAgents: [
+          {
+            tool: 'codex',
+            enabled: false,
+            installed: false,
+            state: 'not-connected',
+            activeCount: 0,
+          },
+        ],
+      }),
+    ).toEqual({ sources: [], configured: false });
+  });
+  it('reports only live sources that are actually listening', () => {
+    expect(
+      liveCoverage({
+        github,
+        codex: { installed: true, enabled: true, state: 'ready', liveState: 'connected' },
+        liveAgents: [
+          {
+            tool: 'codex',
+            enabled: true,
+            installed: true,
+            state: 'listening',
+            activeCount: 1,
+          },
+          {
+            tool: 'claude-code',
+            enabled: true,
+            installed: true,
+            state: 'error',
+            activeCount: 0,
+          },
+        ],
+      }),
+    ).toEqual({ sources: ['Codex'], configured: true });
   });
 });
 describe('attention triage at scale', () => {

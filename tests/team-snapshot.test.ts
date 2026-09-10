@@ -25,6 +25,7 @@ describe('opt-in local metadata preparation', () => {
       status: 'active',
       activitySource: 'codex-runtime',
       waiting: true,
+      worktreePath: '/Users/PrivateOwner/private-repository/linked-worktree',
     };
     const value = prepareSharedSnapshot(repository, consent, key),
       serialized = JSON.stringify(value);

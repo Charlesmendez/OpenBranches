@@ -11,6 +11,7 @@ const scenarios = [
   'Waiting for GitHub',
   'Remote only',
   'Older PR checked',
+  'Multiple worktrees',
   'GitHub unavailable',
   'New target',
 ] as const;
@@ -45,6 +46,72 @@ function Fixture() {
         }
       : undefined;
   branch.worktrees = [];
+  if (scenario === 'Multiple worktrees') {
+    const checkedAt = new Date().toISOString();
+    branch.worktrees = [
+      {
+        path: repository.path,
+        head: branch.local.sha,
+        branch: `refs/heads/${branch.name}`,
+        detached: false,
+        available: true,
+        dirty: false,
+        changedFiles: 0,
+      },
+      {
+        path: '/Users/fixture/Worktrees/streaming-live',
+        head: branch.local.sha,
+        branch: `refs/heads/${branch.name}`,
+        detached: false,
+        available: true,
+        dirty: true,
+        changedFiles: 3,
+      },
+      {
+        path: '/Users/fixture/Worktrees/streaming-review',
+        head: branch.local.sha,
+        branch: `refs/heads/${branch.name}`,
+        detached: false,
+        available: true,
+        dirty: null,
+        changedFiles: null,
+      },
+      {
+        path: '/Users/fixture/Worktrees/streaming-locked',
+        head: branch.local.sha,
+        branch: `refs/heads/${branch.name}`,
+        detached: false,
+        available: true,
+        dirty: false,
+        changedFiles: 0,
+        locked: 'Agent task is using this checkout',
+      },
+      {
+        path: '/Users/fixture/Worktrees/streaming-old',
+        head: branch.local.sha,
+        branch: `refs/heads/${branch.name}`,
+        detached: false,
+        available: false,
+        dirty: null,
+        changedFiles: null,
+        prunable: 'Administrative files are missing',
+      },
+    ];
+    branch.tasks = [
+      {
+        id: 'fictional-live-task',
+        tool: 'codex',
+        model: { id: 'gpt-6-astra', provider: 'openai' },
+        title: 'Improve branch locations',
+        status: 'active',
+        association: 'verified',
+        updatedAt: checkedAt,
+        checkedAt,
+        activitySource: 'codex-hook',
+        worktreePath: '/Users/fixture/Worktrees/streaming-live',
+      },
+    ];
+  }
   branch.integration = { develop: 'pending', master: 'pending' };
   branch.publishedHistory = {
     repository: 'example/atlas-api',

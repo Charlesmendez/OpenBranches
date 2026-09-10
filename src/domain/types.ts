@@ -85,6 +85,8 @@ export interface TaskLink {
   evidence?: string[];
   activitySource?: RuntimeActivitySource;
   waiting?: boolean;
+  /** Local-only checkout path for a fresh verified runtime signal. */
+  worktreePath?: string;
 }
 export interface OpenTaskCommand {
   repositoryId: string;
@@ -344,7 +346,7 @@ export interface DesktopApi {
   addRepository(): Promise<Repository | null>;
   removeRepository(id: string): Promise<void>;
   refresh(): Promise<void>;
-  revealWorktree(repositoryId: string, branchId?: string): Promise<void>;
+  revealWorktree(repositoryId: string, branchId?: string, worktreePath?: string): Promise<void>;
   openExternal(url: string): Promise<void>;
   getProviderStatus(): Promise<ProviderStatus>;
   connectGitHub(): Promise<GitHubStatus>;

@@ -8,6 +8,8 @@ Switching from the inventory to the map reveals the selected working branch in i
 
 The project toolbar keeps current activity reachable across both primary views. The map uses the **Happening now** rail as the single active-work callout. The branch inventory adds a compact live/waiting control that focuses the highest-priority current branch on the map. A quiet project shows the connected live sources, while an unconfigured project links directly to live activity settings.
 
+Map and inventory location marks include a small count when a branch has more than one local worktree. The inspector lists each exact checkout separately, puts the checkout with verified live work first, and distinguishes clean, dirty, unchecked, locked, prunable, and missing copies. Four rows stay visible initially; larger sets expand in place. Reveal actions select one available path that was present in the latest trusted Git scan. A renderer-supplied path that is missing, unavailable, belongs to another branch, or was never scanned is rejected.
+
 The inventory has one scrolling surface for its sticky header and rows. All discovered integration targets have a column, including projects with develop, dev, main, and master together. Horizontal scrolling moves headers and values together. Refreshes anchor the viewport to its visible branch when earlier rows are inserted or reordered. Closing and reopening the inventory preserves filters, horizontal position, and the visible row offset. A global search result clears conflicting inventory filters and focuses the selected result.
 
 ## Keyboard behavior

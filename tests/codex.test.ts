@@ -277,6 +277,7 @@ describe('task association evidence', () => {
     expect(associateTask(repo, repo.branches[0], live, checkedAt)).toMatchObject({
       status: 'active',
       activitySource: 'codex-runtime',
+      worktreePath: repo.worktrees[0].path,
     });
     repo.branches[0].worktrees = [];
     expect(associateTask(repo, repo.branches[0], live, checkedAt)).toMatchObject({
@@ -315,6 +316,7 @@ describe('task association evidence', () => {
       checkedAt,
     );
     expect(linked.branches.map((b) => b.tasks?.[0]?.status)).toEqual(['unknown', 'active']);
+    expect(linked.branches[1].tasks?.[0]?.worktreePath).toBe(repo.worktrees[0].path);
   });
   it('uses detached worktree heads when there is no named ref', () => {
     const repo = repository();

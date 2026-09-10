@@ -293,6 +293,7 @@ describe('private live activity listener', () => {
         association: 'verified',
         status: 'active',
         activitySource: 'cursor-hook',
+        worktreePath: '/fixture/atlas',
         model: { id: 'grok-code-fast-1', provider: 'xai' },
       }),
     ]);
@@ -380,6 +381,7 @@ describe('private live activity listener', () => {
         association: 'verified',
         status: 'active',
         activitySource: 'codex-hook',
+        worktreePath: '/fixture/atlas',
         model: { id: 'gpt-6-astra', provider: 'openai' },
       }),
     ]);

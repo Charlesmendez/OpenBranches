@@ -7,6 +7,23 @@ import type { MapPosition } from '../../src/ui/navigation';
 import '../../src/ui/styles.css';
 import '../../src/ui/components/workflow.css';
 const original = createDemoSnapshot().repositories[0];
+const copiedBranch = original.branches.find((branch) => branch.remote && !branch.pullRequest);
+if (copiedBranch) {
+  const primary = {
+    path: '/fictional/worktrees/copy-one',
+    head: copiedBranch.local!.sha,
+    branch: copiedBranch.local!.fullName,
+    detached: false,
+    available: true,
+    dirty: false,
+    changedFiles: 0,
+  };
+  copiedBranch.worktrees = [
+    primary,
+    { ...primary, path: '/fictional/worktrees/copy-two' },
+    { ...primary, path: '/fictional/worktrees/copy-three' },
+  ];
+}
 function Fixture() {
   const [repository, setRepository] = useState(original);
   const [position, setPosition] = useState<MapPosition>({
