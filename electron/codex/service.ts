@@ -12,6 +12,7 @@ import {
 } from './reader';
 import { associateTask, linkRepository } from './associations';
 import { readCodexAccount } from './account';
+import { createCodexActivitySource, type CodexActivitySource } from './activity';
 
 const emptyIndex = (): CodexIndex => ({ tasks: [], checkedAt: '', partial: false });
 type DiscoveryClient = Pick<CodexInspectionClient, 'initialize' | 'request' | 'close'>;
@@ -20,7 +21,16 @@ interface Dependencies {
   launch: (executable: string, cwd: string) => DiscoveryClient;
   read: (client: DiscoveryClient) => Promise<CodexIndex>;
   launchLive?: (executable: string, cwd: string) => DiscoveryClient;
+  activity?: CodexActivitySource;
 }
+
+const defaultDependencies = (): Dependencies => ({
+  find: findCodex,
+  launch: CodexInspectionClient.launch,
+  read: readTaskIndex,
+  launchLive: CodexInspectionClient.launchLive,
+  activity: createCodexActivitySource(),
+});
 
 export class CodexService {
   private index: CodexIndex;
@@ -35,19 +45,16 @@ export class CodexService {
   private liveTasks: CodexTask[] = [];
   private liveClient?: DiscoveryClient;
   private liveJob?: Promise<void>;
+  private dependencies: Dependencies;
 
   constructor(
     private store: Pick<AppStore, 'read' | 'write'>,
     private directory: string,
     private current: () => Snapshot,
     private publish: () => void,
-    private dependencies: Dependencies = {
-      find: findCodex,
-      launch: CodexInspectionClient.launch,
-      read: readTaskIndex,
-      launchLive: CodexInspectionClient.launchLive,
-    },
+    dependencies?: Dependencies,
   ) {
+    this.dependencies = dependencies ?? defaultDependencies();
     const enabled = store.read<boolean>('codex.enabled', false) === true;
     const cached = indexSchema.safeParse(store.read('codex.index', null));
     this.index = enabled && cached.success ? cached.data : emptyIndex();
@@ -57,7 +64,7 @@ export class CodexService {
     }, 60_000);
     this.liveTimer = setInterval(() => {
       void this.refreshLive();
-    }, 15_000);
+    }, 5_000);
   }
 
   status(): CodexStatus {
@@ -198,23 +205,30 @@ export class CodexService {
   }
 
   refreshLive(): Promise<void> {
-    if (this.closed || !this.statusValue.enabled || !this.dependencies.launchLive)
+    if (
+      this.closed ||
+      !this.statusValue.enabled ||
+      (!this.dependencies.launchLive && !this.dependencies.activity)
+    )
       return Promise.resolve();
     if (this.liveJob) return this.liveJob;
     const generation = this.generation;
     const valid = () => !this.closed && this.statusValue.enabled && generation === this.generation;
     this.liveJob = (async () => {
-      let client: DiscoveryClient | undefined;
-      try {
-        const executable = await this.detect();
-        if (!valid() || !executable?.supported) return;
-        await mkdir(this.directory, { recursive: true, mode: 0o700 });
-        if (!valid()) return;
-        client = this.dependencies.launchLive!(executable.path, this.directory);
-        this.liveClient = client;
-        await client.initialize();
-        const live = await readLiveTasks(client);
-        if (!valid()) return;
+      const activity = this.dependencies.activity
+        ? this.dependencies.activity.read(this.index.tasks)
+        : undefined;
+      const daemon = this.dependencies.launchLive ? this.readDaemonLive(valid) : undefined;
+      const [activityResult, daemonResult] = await Promise.allSettled([
+        activity ?? Promise.reject(new Error('Activity log source unavailable')),
+        daemon ?? Promise.reject(new Error('Codex daemon unavailable')),
+      ]);
+      if (!valid()) return;
+      const available = [daemonResult, activityResult].flatMap((result) =>
+        result.status === 'fulfilled' ? [result.value] : [],
+      );
+      if (available.length) {
+        const live = mergeLiveIndexes(available);
         const selected = this.selectedIndex(this.current(), live);
         this.liveTasks = selected.tasks;
         this.statusValue = {
@@ -222,20 +236,32 @@ export class CodexService {
           liveState: live.partial ? 'partial' : 'connected',
           liveCheckedAt: live.checkedAt,
         };
-      } catch {
-        if (valid()) {
-          this.liveTasks = [];
-          this.statusValue = { ...this.statusValue, liveState: 'unavailable' };
-        }
-      } finally {
-        client?.close();
-        if (this.liveClient === client) this.liveClient = undefined;
-        if (valid()) this.publish();
+      } else {
+        this.liveTasks = [];
+        this.statusValue = { ...this.statusValue, liveState: 'unavailable' };
       }
+      this.publish();
     })().finally(() => {
       this.liveJob = undefined;
     });
     return this.liveJob;
+  }
+
+  private async readDaemonLive(valid: () => boolean) {
+    let client: DiscoveryClient | undefined;
+    try {
+      const executable = await this.detect();
+      if (!valid() || !executable?.supported) throw new Error('Codex daemon unavailable');
+      await mkdir(this.directory, { recursive: true, mode: 0o700 });
+      if (!valid()) throw new Error('Codex connection changed');
+      client = this.dependencies.launchLive!(executable.path, this.directory);
+      this.liveClient = client;
+      await client.initialize();
+      return await readLiveTasks(client);
+    } finally {
+      client?.close();
+      if (this.liveClient === client) this.liveClient = undefined;
+    }
   }
 
   private async refreshIndex(generation: number) {
@@ -289,5 +315,33 @@ export class CodexService {
     clearInterval(this.liveTimer);
     this.client?.close();
     this.liveClient?.close();
+    this.dependencies.activity?.close();
   }
+}
+
+function mergeLiveIndexes(indexes: CodexIndex[]): CodexIndex {
+  const tasks = new Map<string, CodexTask>();
+  for (const index of indexes)
+    for (const task of index.tasks) {
+      const previous = tasks.get(task.id);
+      tasks.set(task.id, previous ? mergeLiveTask(previous, task) : task);
+    }
+  const checkedAt = indexes
+    .map((index) => index.checkedAt)
+    .sort((a, b) => Date.parse(b) - Date.parse(a))[0];
+  return {
+    tasks: [...tasks.values()],
+    checkedAt,
+    partial: indexes.some((index) => index.partial),
+  };
+}
+
+function mergeLiveTask(previous: CodexTask, next: CodexTask): CodexTask {
+  return {
+    ...previous,
+    ...next,
+    name: next.name ?? previous.name,
+    gitInfo: next.gitInfo ?? previous.gitInfo,
+    model: next.model ?? previous.model,
+  };
 }

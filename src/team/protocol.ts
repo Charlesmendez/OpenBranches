@@ -23,7 +23,7 @@ const task = z
     association: z.enum(['verified', 'possible']),
     status: z.enum(['active', 'idle', 'unknown']).optional(),
     activitySource: z
-      .enum(['codex-runtime', 'codex-hook', 'claude-hook', 'cursor-hook'])
+      .enum(['codex-runtime', 'codex-session-log', 'codex-hook', 'claude-hook', 'cursor-hook'])
       .optional(),
     waiting: z.boolean().optional(),
     title: z.string().max(512).optional(),
@@ -33,7 +33,9 @@ const task = z
   .superRefine((value, context) => {
     if (
       value.activitySource &&
-      (((value.activitySource === 'codex-runtime' || value.activitySource === 'codex-hook') &&
+      (((value.activitySource === 'codex-runtime' ||
+        value.activitySource === 'codex-session-log' ||
+        value.activitySource === 'codex-hook') &&
         value.tool !== 'codex') ||
         (value.activitySource === 'claude-hook' && value.tool !== 'claude-code') ||
         (value.activitySource === 'cursor-hook' && value.tool !== 'cursor') ||

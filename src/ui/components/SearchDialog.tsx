@@ -145,9 +145,18 @@ export function SearchDialog({
               </span>
               <div className="search-result-copy">
                 <span className="search-result-title">
+                  {activity && (
+                    <b className={activity.kind}>
+                      {activity.kind === 'live' ? 'LIVE NOW' : 'WAITING'}
+                    </b>
+                  )}
                   <strong>{branch.title}</strong>
-                  {activity && <b className={activity.kind}>{activity.label}</b>}
                 </span>
+                {activity && (
+                  <span className={`search-result-activity ${activity.kind}`}>
+                    {activity.label}
+                  </span>
+                )}
                 <code>
                   {repository.name} / {branch.name}
                 </code>

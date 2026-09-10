@@ -104,7 +104,7 @@ describe('opt-in local metadata preparation', () => {
                 tool: 'codex',
                 association: 'verified',
                 status: 'active',
-                activitySource: 'codex-hook',
+                activitySource: 'codex-session-log',
                 checkedAt: new Date().toISOString(),
               },
             ],

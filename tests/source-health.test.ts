@@ -60,6 +60,32 @@ describe('workspace source health', () => {
     expect(health.rows.find((row) => row.id === 'activity')?.timeLabel).toBe('Signal');
   });
 
+  it('treats the connected Codex activity reader as live coverage without a separate hook', () => {
+    const repository = createDemoSnapshot(now).repositories[0];
+    repository.scannedAt = at;
+    const health = workspaceSourceHealth(
+      [repository],
+      providers({
+        codex: {
+          installed: true,
+          enabled: true,
+          state: 'ready',
+          checkedAt: at,
+          liveState: 'connected',
+          liveCheckedAt: at,
+        },
+      }),
+      'ready',
+      false,
+      now,
+    );
+    expect(health.rows.find((row) => row.id === 'activity')).toMatchObject({
+      state: 'current',
+      value: 'Listening',
+      detail: 'Codex is watching on this Mac.',
+    });
+  });
+
   it('reports delayed local and remote evidence while preserving their observation times', () => {
     const repository = createDemoSnapshot(now).repositories[0];
     repository.scannedAt = ago(3 * 60_000);

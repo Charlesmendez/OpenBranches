@@ -16,6 +16,7 @@ import {
 import { associateTask, linkRepository } from '../electron/codex/associations';
 import { supportedVersion } from '../electron/codex/executable';
 import { CodexService } from '../electron/codex/service';
+import type { CodexActivitySource } from '../electron/codex/activity';
 import type { Repository, Snapshot } from '../src/domain/types';
 
 const cleanup: (() => void | Promise<void>)[] = [];
@@ -461,7 +462,7 @@ describe('live task metadata', () => {
   });
 });
 
-async function serviceFixture(read: () => Promise<CodexIndex>) {
+async function serviceFixture(read: () => Promise<CodexIndex>, activity?: CodexActivitySource) {
   const directory = await mkdtemp(join(tmpdir(), 'openbranches-codex-test-'));
   cleanup.push(() => rm(directory, { recursive: true, force: true }));
   const values = new Map<string, unknown>();
@@ -494,12 +495,55 @@ async function serviceFixture(read: () => Promise<CodexIndex>) {
       return client;
     },
     read,
+    ...(activity ? { activity } : {}),
   });
   cleanup.unshift(() => service.close());
   return { service, values, snapshot, clients };
 }
 
 describe('Codex connection lifecycle', () => {
+  it('uses recent local task activity to follow Codex into the exact tool checkout', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(checkedAt));
+    const activity = {
+      read: vi.fn(async () => ({
+        tasks: [
+          task({
+            cwd: '/fixture/atlas-search',
+            runtime: { state: 'active', checkedAt, source: 'codex-session-log' },
+          }),
+        ],
+        checkedAt,
+        partial: false,
+      })),
+      close: vi.fn(),
+    } satisfies CodexActivitySource;
+    const fixture = await serviceFixture(
+      async () => ({
+        tasks: [task({ cwd: '/fixture/original-project' })],
+        checkedAt,
+        partial: false,
+      }),
+      activity,
+    );
+    await fixture.service.connect();
+    await fixture.service.refreshLive();
+    expect(fixture.service.status()).toMatchObject({
+      liveState: 'connected',
+      liveCheckedAt: checkedAt,
+    });
+    expect(
+      fixture.service.enrich(fixture.snapshot).repositories[0].branches[0].tasks?.[0],
+    ).toMatchObject({
+      id: 'fixture-task',
+      status: 'active',
+      association: 'verified',
+      activitySource: 'codex-session-log',
+      worktreePath: '/fixture/atlas-search',
+    });
+    expect(activity.read).toHaveBeenCalled();
+  });
+
   it('checks task-opening evidence from the current index and repository, including possible and archived links', async () => {
     const fixture = await serviceFixture(async () => ({
       tasks: [

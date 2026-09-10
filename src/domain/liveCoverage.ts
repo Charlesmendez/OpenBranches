@@ -6,9 +6,8 @@ export interface LiveCoverage {
   configured: boolean;
 }
 
-/** Task-history indexing and live detection are separate connections. Modern
- * clients report hook status explicitly; the Codex flag is only a legacy
- * fallback when that status has not loaded yet. */
+/** Codex reports automatic local activity through its connection. Tool hooks
+ * add direct lifecycle signals for Codex, Claude Code, and Cursor. */
 export function liveCoverage(providers: ProviderStatus): LiveCoverage {
   const sources = new Set<string>();
   if (
@@ -22,8 +21,9 @@ export function liveCoverage(providers: ProviderStatus): LiveCoverage {
 
   return {
     sources: [...sources],
-    configured: providers.liveAgents
-      ? providers.liveAgents.some((status) => status.enabled)
-      : providers.codex.enabled,
+    configured:
+      sources.size > 0 ||
+      providers.codex.enabled ||
+      !!providers.liveAgents?.some((status) => status.enabled),
   };
 }

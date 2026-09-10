@@ -3040,6 +3040,16 @@ code {
   border-color: #6f6596;
   background: #2c2638;
 }
+.search-result-activity {
+  display: block;
+  margin-top: 4px;
+  color: #aebee8;
+  font-size: 9px;
+  font-weight: 560;
+}
+.search-result-activity.waiting {
+  color: #c0b6df;
+}
 .search-result-copy code {
   overflow: hidden;
   white-space: nowrap;

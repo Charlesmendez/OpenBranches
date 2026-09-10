@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Check, LoaderCircle, Radio, ShieldCheck } from 'lucide-react';
-import type { AgentLiveStatus, LiveAgentTool } from '../../domain/types';
+import type { AgentLiveStatus, CodexStatus, LiveAgentTool } from '../../domain/types';
 import { toolNames } from '../../domain/agents';
 import { relativeTime } from '../../domain/branches';
 import { ToolIcon } from './AgentBadges';
@@ -9,9 +9,11 @@ const supported: LiveAgentTool[] = ['codex', 'claude-code', 'cursor'];
 
 export function AgentLiveConnections({
   statuses,
+  codex,
   focusOnMount = false,
 }: {
   statuses?: AgentLiveStatus[];
+  codex?: CodexStatus;
   focusOnMount?: boolean;
 }) {
   const container = useRef<HTMLDivElement>(null);
@@ -60,8 +62,8 @@ export function AgentLiveConnections({
         <div>
           <h3>Live coding activity</h3>
           <p>
-            Make the exact branch glow while Codex, Claude Code, or Cursor is working in its current
-            checkout. Each tool is opt-in on this Mac.
+            Codex activity is included with its connection. Add private lifecycle hooks for Claude
+            Code, Cursor, or extra Codex signals on this Mac.
           </p>
         </div>
         <span className="pill neutral">
@@ -72,9 +74,13 @@ export function AgentLiveConnections({
         {values.map((status) => {
           const name = toolNames[status.tool];
           const repair = status.enabled && !status.installed;
+          const automatic =
+            status.tool === 'codex' &&
+            codex?.enabled &&
+            (codex.liveState === 'connected' || codex.liveState === 'partial');
           return (
             <article
-              className={`agent-live-card ${status.enabled ? 'connected' : ''}`}
+              className={`agent-live-card ${status.enabled || automatic ? 'connected' : ''}`}
               key={status.tool}
             >
               <div className="agent-live-card-title">
@@ -83,26 +89,32 @@ export function AgentLiveConnections({
                 </span>
                 <div>
                   <h4>{name}</h4>
-                  <span className={`agent-live-state ${status.state}`}>
+                  <span className={`agent-live-state ${automatic ? 'listening' : status.state}`}>
                     <i aria-hidden="true" />
-                    {status.state === 'listening'
-                      ? status.activeCount
-                        ? `${status.activeCount} ${status.activeCount === 1 ? 'session' : 'sessions'} live`
-                        : 'Listening'
-                      : status.state === 'error'
-                        ? 'Needs setup'
-                        : 'Off'}
+                    {automatic
+                      ? status.enabled
+                        ? 'Automatic + hook'
+                        : 'Automatic'
+                      : status.state === 'listening'
+                        ? status.activeCount
+                          ? `${status.activeCount} ${status.activeCount === 1 ? 'session' : 'sessions'} live`
+                          : 'Listening'
+                        : status.state === 'error'
+                          ? 'Needs setup'
+                          : 'Off'}
                   </span>
                 </div>
               </div>
               <p>
-                {status.enabled
-                  ? status.receivedAt
-                    ? `Last signal ${relativeTime(status.receivedAt).toLowerCase()}.`
-                    : status.tool === 'codex'
-                      ? 'Hook installed. Codex may ask you to review it; then start a new turn in the checkout.'
-                      : `Ready. Start work in ${name} to see the exact branch glow in Current work and on its map.`
-                  : `Add a private local hook to ${name}. Existing hook settings are preserved.`}
+                {automatic && !status.enabled
+                  ? 'Included with the Codex connection. The optional hook adds direct lifecycle signals for future turns.'
+                  : status.enabled
+                    ? status.receivedAt
+                      ? `Last signal ${relativeTime(status.receivedAt).toLowerCase()}.`
+                      : status.tool === 'codex'
+                        ? 'Hook installed. Codex may ask you to review it; then start a new turn in the checkout.'
+                        : `Ready. Start work in ${name} to see the exact branch glow in Current work and on its map.`
+                    : `Add a private local hook to ${name}. Existing hook settings are preserved.`}
               </p>
               <div className="agent-live-card-action">
                 <button
@@ -115,7 +127,9 @@ export function AgentLiveConnections({
                     ? `Repair ${name}`
                     : status.enabled
                       ? `Turn off ${name}`
-                      : `Enable ${name}`}
+                      : automatic
+                        ? 'Add optional hook'
+                        : `Enable ${name}`}
                 </button>
                 {status.enabled && status.installed && (
                   <span className="agent-hook-installed">

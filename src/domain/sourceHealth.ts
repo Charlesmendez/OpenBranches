@@ -189,41 +189,37 @@ function githubHealth(
 
 function liveHealth(providers: ProviderStatus, now: number): SourceHealthRow {
   const enabled = (providers.liveAgents ?? []).filter((status) => status.enabled);
-  if (!providers.liveAgents) {
-    if (!providers.codex.enabled)
-      return {
-        id: 'activity',
-        label: 'Live activity',
-        value: 'Off',
-        detail: 'No live coding-tool listener is enabled.',
-        state: 'off',
-      };
-    const current = providers.codex.liveState === 'connected';
-    return {
-      id: 'activity',
-      label: 'Live activity',
-      value: current ? 'Listening' : 'Limited',
-      detail: current
-        ? 'Listening for verified Codex runtime activity.'
-        : 'Reliable live Codex activity is unavailable.',
-      state: current ? 'current' : 'delayed',
-      checkedAt: providers.codex.liveCheckedAt,
-      timeLabel: 'Signal',
-    };
-  }
-  if (!enabled.length)
+  if (!providers.codex.enabled && !enabled.length)
     return {
       id: 'activity',
       label: 'Live activity',
       value: 'Off',
-      detail: 'Codex, Claude Code, and Cursor live listeners are optional.',
+      detail: 'Connect Codex or enable a Claude Code or Cursor listener.',
       state: 'off',
     };
   const listening = enabled.filter((status) => status.installed && status.state === 'listening');
-  const active = listening.reduce((sum, status) => sum + status.activeCount, 0);
-  const problems = enabled.filter((status) => !status.installed || status.state !== 'listening');
+  const codexCurrent =
+    providers.codex.enabled &&
+    (providers.codex.liveState === 'connected' || providers.codex.liveState === 'partial');
+  const codexHookCurrent = listening.some((status) => status.tool === 'codex');
+  const sources = new Set([
+    ...(codexCurrent ? [toolNames.codex] : []),
+    ...listening.map((status) => toolNames[status.tool]),
+  ]);
+  const active = listening
+    .filter((status) => status.tool !== 'codex' || !codexCurrent)
+    .reduce((sum, status) => sum + status.activeCount, 0);
+  const problems = [
+    ...enabled
+      .filter((status) => !status.installed || status.state !== 'listening')
+      .map((status) => toolNames[status.tool]),
+    ...(providers.codex.enabled && !codexCurrent && !codexHookCurrent ? [toolNames.codex] : []),
+  ];
   const checkedAt = oldest(
-    listening.map((status) => status.receivedAt),
+    [
+      ...(codexCurrent ? [providers.codex.liveCheckedAt] : []),
+      ...listening.map((status) => status.receivedAt),
+    ],
     now,
   );
   if (problems.length)
@@ -231,7 +227,7 @@ function liveHealth(providers: ProviderStatus, now: number): SourceHealthRow {
       id: 'activity',
       label: 'Live activity',
       value: `${problems.length} need setup`,
-      detail: `${listening.length ? `${names(listening.map((status) => toolNames[status.tool]))} ${listening.length === 1 ? 'is' : 'are'} listening. ` : ''}${names(problems.map((status) => toolNames[status.tool]))} ${problems.length === 1 ? 'is' : 'are'} not listening.`,
+      detail: `${sources.size ? `${names([...sources])} ${sources.size === 1 ? 'is' : 'are'} watching. ` : ''}${names(problems)} ${problems.length === 1 ? 'is' : 'are'} unavailable.`,
       state: 'delayed',
       checkedAt,
       timeLabel: 'Signal',
@@ -240,8 +236,8 @@ function liveHealth(providers: ProviderStatus, now: number): SourceHealthRow {
     id: 'activity',
     label: 'Live activity',
     value: active ? `${active} live` : 'Listening',
-    detail: `${names(listening.map((status) => toolNames[status.tool]))} ${listening.length === 1 ? 'is' : 'are'} listening on this Mac.`,
-    state: 'current',
+    detail: `${names([...sources])} ${sources.size === 1 ? 'is' : 'are'} watching on this Mac.`,
+    state: providers.codex.liveState === 'partial' ? 'delayed' : 'current',
     checkedAt,
     timeLabel: 'Signal',
   };

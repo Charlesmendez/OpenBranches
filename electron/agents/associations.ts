@@ -96,9 +96,11 @@ function matchTask(
       ? [
           task.runtime?.source === 'codex-runtime'
             ? 'Codex runtime status read from the running local daemon.'
-            : task.runtime?.source === 'codex-hook'
-              ? 'Codex activity received from its opted-in local lifecycle hook.'
-              : `${toolNames[task.tool]} activity received from its opted-in local hook.`,
+            : task.runtime?.source === 'codex-session-log'
+              ? 'Codex activity read from recent local session metadata.'
+              : task.runtime?.source === 'codex-hook'
+                ? 'Codex activity received from its opted-in local lifecycle hook.'
+                : `${toolNames[task.tool]} activity received from its opted-in local hook.`,
           'Task folder matches this branch’s current checkout.',
         ]
       : verified

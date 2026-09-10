@@ -89,16 +89,16 @@ export function CodexConnection({ status }: { status: CodexStatus }) {
         )}
         <p className="muted-note">
           Only task metadata for your selected projects is saved in OpenBranches. Task linking does
-          not run AI or send prompts. Live presence is a separate connection below because the Codex
-          desktop app normally keeps each app-server connection private.
+          not run AI or send prompts. The same connection watches recent local task activity so the
+          exact checkout used by Codex can glow automatically.
         </p>
         {status.enabled && (
           <p className="muted-note">
             {status.liveState === 'connected'
-              ? 'Live Codex status connected on this Mac.'
+              ? 'Live Codex branch detection is on for this Mac.'
               : status.liveState === 'partial'
-                ? 'Some running task statuses could not be checked. Activity is shown only for confirmed matches.'
-                : 'Shared-daemon status is unavailable. Saved task links still work; enable Codex under Live coding activity for reliable future turn signals.'}
+                ? 'Some recent task activity could not be checked. Only exact confirmed checkouts glow.'
+                : 'Live Codex activity is unavailable. Saved task links still work; the optional lifecycle hook below can add future turn signals.'}
           </p>
         )}
         {(error || status.error) && (

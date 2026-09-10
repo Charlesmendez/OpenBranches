@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { CodexInspectionClient } from './transport';
 import { githubRepository } from '../../src/github/reader';
+import type { ModelIdentity, RuntimeActivitySource } from '../../src/domain/types';
 
 const timestamp = z.number().int().min(0).max(253402300799);
 export const threadSchema = z.object({
@@ -31,10 +32,11 @@ export const threadSchema = z.object({
 });
 export type CodexTask = z.infer<typeof threadSchema> & {
   archived: boolean;
+  model?: ModelIdentity;
   runtime?: {
     state: 'active' | 'idle' | 'waiting';
     checkedAt: string;
-    source: 'codex-runtime';
+    source: Extract<RuntimeActivitySource, 'codex-runtime' | 'codex-session-log'>;
   };
 };
 const pageSchema = z.object({

@@ -396,7 +396,7 @@ describe('current work spotlight', () => {
 });
 describe('live coverage labels', () => {
   const github = { configured: false, connected: false };
-  it('does not describe Codex task history as configured live detection', () => {
+  it('surfaces a connected Codex source when its live activity reader is unavailable', () => {
     expect(
       liveCoverage({
         github,
@@ -416,7 +416,7 @@ describe('live coverage labels', () => {
           },
         ],
       }),
-    ).toEqual({ sources: [], configured: false });
+    ).toEqual({ sources: [], configured: true });
   });
   it('reports only live sources that are actually listening', () => {
     expect(

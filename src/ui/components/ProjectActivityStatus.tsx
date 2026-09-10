@@ -52,7 +52,7 @@ export function ProjectActivityStatus({
           : configured
             ? 'An enabled live source is unavailable. Open Settings for details.'
             : taskHistoryConnected
-              ? 'Codex task history is connected. Enable live activity to make the exact branch glow while Codex works.'
+              ? 'Codex is connected, but its local live activity source is unavailable. Open Settings for details.'
               : 'Enable Codex, Claude Code, or Cursor live activity so the exact branch can glow while work runs.'
       }
       onClick={onSettings}

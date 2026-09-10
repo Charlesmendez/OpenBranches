@@ -266,6 +266,7 @@ export function Settings({
               <div className="settings-group-label">Live branch signals</div>
               <AgentLiveConnections
                 statuses={providers.liveAgents}
+                codex={providers.codex}
                 focusOnMount={focusSection === 'live-activity'}
               />
               <div className="settings-group-label">Saved tool history</div>
