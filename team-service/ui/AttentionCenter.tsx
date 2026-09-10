@@ -3,8 +3,10 @@ import {
   AlertTriangle,
   CheckCircle2,
   ChevronDown,
+  CloudOff,
   Clock3,
   GitBranch,
+  History,
   Inbox,
   RotateCcw,
   Search,
@@ -55,6 +57,20 @@ const signalOptions: Array<{
     icon: GitBranch,
     tone: 'cleanup',
   },
+  {
+    kind: 'local-only',
+    label: 'Only on a Mac',
+    count: 'localOnly',
+    icon: CloudOff,
+    tone: 'local',
+  },
+  {
+    kind: 'forgotten-work',
+    label: 'Possibly forgotten',
+    count: 'forgottenWork',
+    icon: History,
+    tone: 'quiet',
+  },
 ];
 
 export function AttentionCenter({
@@ -62,11 +78,13 @@ export function AttentionCenter({
   workspace,
   projects,
   refreshKey,
+  onOpenLocal,
 }: {
   client: TeamClient;
   workspace: string;
   projects: TeamPage['projects'];
   refreshKey: string;
+  onOpenLocal: (item: Extract<AttentionItem, { source: 'local' }>) => void;
 }) {
   const [bucket, setBucket] = useState<AttentionBucket>('active'),
     [kind, setKind] = useState<AttentionKind | ''>(''),
@@ -88,8 +106,9 @@ export function AttentionCenter({
     ),
     items = state.data?.items ?? [],
     shown = items.slice(0, limit);
+  const itemKey = (item: AttentionItem) => `${item.source}:${item.id}`;
   useEffect(() => {
-    const visible = new Set(items.map((item) => item.id));
+    const visible = new Set(items.map(itemKey));
     setSelected((current) => new Set([...current].filter((id) => visible.has(id))));
   }, [state.data]);
   useEffect(() => {
@@ -97,14 +116,18 @@ export function AttentionCenter({
     setSelected(new Set());
   }, [bucket, kind, project, query]);
   const selectedItems = useMemo(
-    () => items.filter((item) => selected.has(item.id)),
+    () => items.filter((item) => selected.has(itemKey(item))),
     [items, selected],
   );
   const decide = (choice: AttentionDecisionCommand['choice'], targets: AttentionItem[]) =>
     void action.run(async () => {
       await client.decideAttention(workspace, {
         choice,
-        items: targets.map((item) => ({ id: item.id, revision: item.revision })),
+        items: targets.map((item) => ({
+          source: item.source,
+          id: item.id,
+          revision: item.revision,
+        })),
       });
       setSelected(new Set());
       state.refresh();
@@ -120,8 +143,8 @@ export function AttentionCenter({
           <span className="eyebrow">START HERE</span>
           <h2 id="attention-title">The work that needs movement.</h2>
           <p>
-            A small queue from current GitHub evidence. OpenBranches explains the signal; your team
-            decides what happens next.
+            A small queue from GitHub and the Macs your team chose to share. OpenBranches explains
+            the evidence; your team decides what happens next.
           </p>
         </div>
         <span className="attention-readonly">
@@ -186,13 +209,11 @@ export function AttentionCenter({
           onChange={(event) => setProject(event.target.value)}
         >
           <option value="">All projects</option>
-          {projects
-            .filter((value) => value.githubId)
-            .map((value) => (
-              <option key={value.id} value={value.id}>
-                {value.name}
-              </option>
-            ))}
+          {projects.map((value) => (
+            <option key={value.id} value={value.id}>
+              {value.name}
+            </option>
+          ))}
         </select>
       </div>
 
@@ -222,7 +243,7 @@ export function AttentionCenter({
       {state.error && <Notice error>{state.error}</Notice>}
       {!state.data && !state.error && (
         <div className="attention-loading" role="status">
-          <span /> Reading current GitHub evidence…
+          <span /> Reading team evidence…
         </div>
       )}
       {state.data && (
@@ -230,16 +251,19 @@ export function AttentionCenter({
           <div className="attention-caption">
             <label>
               <SelectionBox
-                checked={shown.length > 0 && shown.every((item) => selected.has(item.id))}
+                checked={shown.length > 0 && shown.every((item) => selected.has(itemKey(item)))}
                 mixed={
-                  shown.some((item) => selected.has(item.id)) &&
-                  !shown.every((item) => selected.has(item.id))
+                  shown.some((item) => selected.has(itemKey(item))) &&
+                  !shown.every((item) => selected.has(itemKey(item)))
                 }
                 disabled={!shown.length}
                 onChange={(checked) =>
                   setSelected((current) => {
                     const next = new Set(current);
-                    for (const item of shown) checked ? next.add(item.id) : next.delete(item.id);
+                    for (const item of shown) {
+                      const key = itemKey(item);
+                      checked ? next.add(key) : next.delete(key);
+                    }
                     return next;
                   })
                 }
@@ -247,10 +271,11 @@ export function AttentionCenter({
               Select shown
             </label>
             <span>
-              {focused ? 'Filtered evidence' : `${state.data.sources} GitHub repositories`}
+              {focused ? 'Filtered evidence' : `${state.data.sources} evidence sources`}
               {state.data.pendingSources ? ` · ${state.data.pendingSources} preparing` : ''}
-              {state.data.failedSources ? ` · ${state.data.failedSources} refresh failed` : ''} ·
-              view refreshed {dateLabel(state.data.checkedAt)}
+              {state.data.failedSources ? ` · ${state.data.failedSources} refresh failed` : ''}
+              {state.data.staleSources ? ` · ${state.data.staleSources} Mac reports outdated` : ''}
+              {' · '}view refreshed {dateLabel(state.data.checkedAt)}
             </span>
           </div>
           {!items.length ? (
@@ -272,8 +297,8 @@ export function AttentionCenter({
                   {focused
                     ? 'Clear a filter to widen the evidence.'
                     : state.data.pendingSources
-                      ? 'The queue will fill as the selected GitHub repositories finish their first read.'
-                      : 'This changes when GitHub reports a failing check, review request, quiet draft, or merged branch copy.'}
+                      ? 'The queue will fill as connected sources finish preparing their evidence.'
+                      : 'This changes when GitHub needs action or an opted-in Mac reports local-only or possibly forgotten work.'}
                 </p>
               </div>
             </div>
@@ -281,18 +306,20 @@ export function AttentionCenter({
             <div className="attention-list">
               {shown.map((item) => (
                 <AttentionRow
-                  key={item.id}
+                  key={itemKey(item)}
                   item={item}
-                  checked={selected.has(item.id)}
+                  checked={selected.has(itemKey(item))}
                   busy={action.busy}
                   onCheck={(checked) =>
                     setSelected((current) => {
                       const next = new Set(current);
-                      checked ? next.add(item.id) : next.delete(item.id);
+                      const key = itemKey(item);
+                      checked ? next.add(key) : next.delete(key);
                       return next;
                     })
                   }
                   onDecide={(choice) => decide(choice, [item])}
+                  onOpenLocal={onOpenLocal}
                 />
               ))}
             </div>
@@ -306,7 +333,7 @@ export function AttentionCenter({
             <p className="attention-omitted">
               {state.data.omitted.toLocaleString()} lower-ranked finding
               {state.data.omitted === 1 ? '' : 's'} are outside the detailed rows in this bounded
-              GitHub snapshot.
+              evidence snapshot.
             </p>
           )}
         </>

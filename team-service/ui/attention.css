@@ -45,7 +45,7 @@
 }
 .attention-signals {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 7px;
 }
 .attention-signals button {
@@ -92,6 +92,9 @@
 }
 .attention-signals .cleanup span {
   color: #aab9e8;
+}
+.attention-signals .local span {
+  color: #b9c8f4;
 }
 .attention-controls {
   display: flex;
@@ -314,6 +317,11 @@
   gap: 5px;
 }
 .attention-row-actions a {
+  color: #c3cdee;
+  border-color: #536187;
+  background: #252c40;
+}
+.attention-row-actions button.open-local {
   color: #c3cdee;
   border-color: #536187;
   background: #252c40;

@@ -22,11 +22,13 @@ export function SharedBoard({
   group,
   now,
   focused = false,
+  focusKey,
 }: {
   data: TeamPage;
   group: 'person' | 'project';
   now: number;
   focused?: boolean;
+  focusKey?: string;
 }) {
   const [selection, setSelection] = useState<string>();
   const detail = useRef<HTMLElement>(null),
@@ -46,6 +48,9 @@ export function SharedBoard({
       detail.current?.scrollIntoView({ block: 'start' });
   }, [selection]);
   const rows = useMemo(() => sharedBranchRows(data, now), [data, now]);
+  useEffect(() => {
+    if (focusKey && rows.some((row) => row.key === focusKey)) setSelection(focusKey);
+  }, [focusKey, rows]);
   const groups = useMemo(() => {
     const groups = new Map<string, { name: string; rows: SharedBranchRow[] }>();
     for (const row of rows) {
@@ -236,9 +241,6 @@ function BranchGroup({
 }) {
   const [open, setOpen] = useState(initiallyOpen),
     [limit, setLimit] = useState(8);
-  useEffect(() => {
-    if (initiallyOpen) setOpen(true);
-  }, [initiallyOpen]);
   const orderedRows = useMemo(
       () => [...rows].sort((a, b) => a.rank - b.rank || a.branch.name.localeCompare(b.branch.name)),
       [rows],
@@ -246,6 +248,15 @@ function BranchGroup({
     activities = rows.flatMap((row) => (row.activity ? [row.activity] : [])),
     working = activities.filter((activity) => activity.kind === 'live').length,
     waiting = activities.filter((activity) => activity.kind === 'waiting').length;
+  useEffect(() => {
+    if (initiallyOpen) setOpen(true);
+  }, [initiallyOpen]);
+  useEffect(() => {
+    const index = orderedRows.findIndex((row) => row.key === selected);
+    if (index < 0) return;
+    setOpen(true);
+    setLimit((current) => Math.max(current, index + 1));
+  }, [orderedRows, selected]);
   const outdated = new Set(
     rows
       .filter((row) => sharedWorkStale(row.work, now))

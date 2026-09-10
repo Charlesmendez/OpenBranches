@@ -43,6 +43,7 @@ export function prepareSharedSnapshot(
       localSha: validSha(
         branch.local?.sha ?? (branch.detached ? branch.worktrees[0]?.head : undefined),
       ),
+      ...(validTime(branch.updatedAt) ? { updatedAt: validTime(branch.updatedAt) } : {}),
       ...(branch.remote && validSha(branch.remote.sha)
         ? {
             remote: {

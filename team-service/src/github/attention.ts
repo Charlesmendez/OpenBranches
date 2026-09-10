@@ -112,7 +112,14 @@ export function projectAttention(
       evidence: evidence.slice(0, 4),
       observedAt,
       updatedAt: new Date(pull.updatedAt).toISOString(),
-      signals: { failingChecks: failed, reviewRequested: review, staleDraft, mergedBranch },
+      signals: {
+        failingChecks: failed,
+        reviewRequested: review,
+        staleDraft,
+        mergedBranch,
+        localOnly: false,
+        forgottenWork: false,
+      },
     });
   }
   findings.sort(

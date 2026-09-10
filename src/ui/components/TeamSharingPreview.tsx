@@ -158,9 +158,9 @@ export function TeamSharingPreview({
           </label>
         </div>
         <p className="muted-note">
-          The default preview includes branch names, commits, working-copy counts, target history,
-          and recorded tool/model associations. These names and identifiers can reveal what you are
-          working on.
+          The default preview includes branch names, commits and update times, working-copy counts,
+          target history, and recorded tool/model associations. These names and identifiers can
+          reveal what you are working on.
         </p>
         <button
           className="secondary-button"
@@ -217,7 +217,12 @@ export function TeamSharingPreview({
               <li key={branch.key}>
                 <GitBranch size={13} />
                 <code>{branch.name}</code>
-                <span>{branch.tasks.length} recorded sessions</span>
+                <span>
+                  {branch.tasks.length} recorded sessions · commit{' '}
+                  {branch.updatedAt
+                    ? new Date(branch.updatedAt).toLocaleDateString()
+                    : 'date unknown'}
+                </span>
               </li>
             ))}
           </ul>

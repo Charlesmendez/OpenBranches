@@ -3,6 +3,7 @@ import { TeamDatabase } from './db';
 import { changed, projectAccess, requireDevice, workspaceAccess, type Credential } from './access';
 import { conflict, denied, TeamError } from './errors';
 import { withdrawShares } from './withdraw';
+import { projectLocalAttention } from './localAttention';
 
 export class TeamSharing {
   constructor(private db: TeamDatabase) {}
@@ -50,7 +51,7 @@ export class TeamSharing {
         : { taskTitles: false, taskSummaries: false };
       await client.query(
         `INSERT INTO ob_shares(workspace_id,device_id,project_id,epoch,enabled,consent) VALUES ($1,$2,$3,$4,$5,$6)
-        ON CONFLICT(workspace_id,device_id,project_id) DO UPDATE SET epoch=EXCLUDED.epoch,enabled=EXCLUDED.enabled,consent=EXCLUDED.consent,sequence=0,snapshot=NULL,observed_at=NULL,received_at=NULL`,
+        ON CONFLICT(workspace_id,device_id,project_id) DO UPDATE SET epoch=EXCLUDED.epoch,enabled=EXCLUDED.enabled,consent=EXCLUDED.consent,sequence=0,snapshot=NULL,attention=NULL,observed_at=NULL,received_at=NULL`,
         [workspaceId, deviceId, projectId, next, command.enabled, consent],
       );
       return {
@@ -83,7 +84,9 @@ export class TeamSharing {
       const deviceId = requireDevice(principal);
       await projectAccess(client, principal, projectId, true);
       const found = await client.query(
-        'SELECT epoch::text,sequence::text,enabled,consent FROM ob_shares WHERE workspace_id=$1 AND device_id=$2 AND project_id=$3',
+        `SELECT s.epoch::text,s.sequence::text,s.enabled,s.consent,d.expires_at AS "deviceExpiresAt"
+        FROM ob_shares s JOIN ob_devices d ON d.workspace_id=s.workspace_id AND d.id=s.device_id
+        WHERE s.workspace_id=$1 AND s.device_id=$2 AND s.project_id=$3`,
         [workspaceId, deviceId, projectId],
       );
       const share = found.rows[0];
@@ -101,7 +104,7 @@ export class TeamSharing {
           'The snapshot includes task text that is not enabled for sharing.',
         );
       await client.query(
-        'UPDATE ob_shares SET sequence=$4,snapshot=$5,observed_at=$6,received_at=now() WHERE workspace_id=$1 AND device_id=$2 AND project_id=$3',
+        'UPDATE ob_shares SET sequence=$4,snapshot=$5,attention=$7,observed_at=$6,received_at=now() WHERE workspace_id=$1 AND device_id=$2 AND project_id=$3',
         [
           workspaceId,
           deviceId,
@@ -109,6 +112,13 @@ export class TeamSharing {
           command.sequence,
           command.snapshot,
           command.snapshot.observedAt,
+          projectLocalAttention(command.snapshot, {
+            workspaceId,
+            projectId,
+            deviceId,
+            receivedAt: new Date().toISOString(),
+            deviceExpiresAt: share.deviceExpiresAt.toISOString(),
+          }),
         ],
       );
       await client.query('UPDATE ob_devices SET last_seen_at=now() WHERE id=$1', [deviceId]);

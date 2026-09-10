@@ -15,6 +15,7 @@ import {
   X,
 } from 'lucide-react';
 import type { TeamClient } from '../../src/team/client';
+import type { AttentionItem } from '../../src/team/attention';
 import type { GitHubWorkSource } from '../../src/team/github';
 import type { TeamPage } from '../../src/team/responses';
 import { useGitHubWorkData } from './hooks';
@@ -28,12 +29,14 @@ export function PublishedWork({
   people,
   projects,
   refreshKey,
+  onOpenLocal,
 }: {
   client: TeamClient;
   workspace: string;
   people: TeamPage['people'];
   projects: TeamPage['projects'];
   refreshKey: string;
+  onOpenLocal: (item: Extract<AttentionItem, { source: 'local' }>) => void;
 }) {
   const [person, setPerson] = useState(''),
     [project, setProject] = useState(''),
@@ -63,6 +66,7 @@ export function PublishedWork({
         workspace={workspace}
         projects={projects}
         refreshKey={refreshKey}
+        onOpenLocal={onOpenLocal}
       />
       <div className="published-hero">
         <span className="published-symbol">

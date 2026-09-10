@@ -37,9 +37,13 @@ export class TeamDatabase {
   }
   async migrate() {
     const sql = await Promise.all(
-      ['001-team.sql', '002-github.sql', '003-github-sync.sql', '004-attention.sql'].map((name) =>
-        readFile(new URL('../migrations/' + name, import.meta.url), 'utf8'),
-      ),
+      [
+        '001-team.sql',
+        '002-github.sql',
+        '003-github-sync.sql',
+        '004-attention.sql',
+        '005-local-attention.sql',
+      ].map((name) => readFile(new URL('../migrations/' + name, import.meta.url), 'utf8')),
     );
     await this.transaction(async (client) => {
       await client.query('SELECT pg_advisory_xact_lock(826041920)');

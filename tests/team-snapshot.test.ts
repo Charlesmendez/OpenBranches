@@ -30,6 +30,7 @@ describe('opt-in local metadata preparation', () => {
       serialized = JSON.stringify(value);
     expect(value.branches).toHaveLength(1);
     expect(value.branches[0].name).toBe(branch.name);
+    expect(value.branches[0].updatedAt).toBe(new Date(branch.updatedAt).toISOString());
     expect(serialized).not.toContain('/Users/');
     expect(serialized).not.toContain('PRIVATE');
     expect(serialized).not.toContain(repository.commonDir);

@@ -133,10 +133,18 @@ describe('team browser client boundary', () => {
         checkedAt,
         bucket: 'snoozed',
         queue: { active: 2, snoozed: 1, dismissed: 0 },
-        signals: { failingChecks: 1, reviewRequested: 1, staleDrafts: 0, mergedBranches: 0 },
+        signals: {
+          failingChecks: 1,
+          reviewRequested: 1,
+          staleDrafts: 0,
+          mergedBranches: 0,
+          localOnly: 0,
+          forgottenWork: 0,
+        },
         sources: 1,
         pendingSources: 0,
         failedSources: 0,
+        staleSources: 0,
         items: [],
         omitted: 0,
       },
@@ -158,7 +166,7 @@ describe('team browser client boundary', () => {
     });
     const command = {
       choice: 'dismissed' as const,
-      items: [{ id: 'a'.repeat(64), revision: 'b'.repeat(64) }],
+      items: [{ source: 'github' as const, id: 'a'.repeat(64), revision: 'b'.repeat(64) }],
     };
     request.mockResolvedValueOnce(Response.json({ revision: '1' }));
     await client.decideAttention(workspace, command);

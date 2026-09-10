@@ -608,12 +608,12 @@ describe('GitHub workspace setup', () => {
     await expect(
       f.store.attention.decide(f.member, f.workspace.id, {
         choice: 'dismissed',
-        items: [{ id: item.id, revision: '0'.repeat(64) }],
+        items: [{ source: 'github', id: item.id, revision: '0'.repeat(64) }],
       }),
     ).rejects.toMatchObject({ code: 'attention_changed' });
     await f.store.attention.decide(f.member, f.workspace.id, {
       choice: 'dismissed',
-      items: [{ id: item.id, revision: item.revision }],
+      items: [{ source: 'github', id: item.id, revision: item.revision }],
     });
     expect((await f.store.attention.view(f.member, f.workspace.id)).queue).toEqual({
       active: 0,
@@ -626,7 +626,13 @@ describe('GitHub workspace setup', () => {
     });
     await f.store.attention.decide(f.member, f.workspace.id, {
       choice: 'restore',
-      items: [{ id: dismissed.items[0].id, revision: dismissed.items[0].revision }],
+      items: [
+        {
+          source: 'github',
+          id: dismissed.items[0].id,
+          revision: dismissed.items[0].revision,
+        },
+      ],
     });
     expect((await f.store.attention.view(f.member, f.workspace.id)).queue.active).toBe(1);
 
@@ -640,7 +646,7 @@ describe('GitHub workspace setup', () => {
     ).rejects.toMatchObject({ status: 403 });
     await f.store.attention.decide(f.member, f.workspace.id, {
       choice: 'dismissed',
-      items: [{ id: item.id, revision: item.revision }],
+      items: [{ source: 'github', id: item.id, revision: item.revision }],
     });
     await f.setup.remove(f.owner, f.workspace.id, project);
     expect(
@@ -682,7 +688,13 @@ describe('GitHub workspace setup', () => {
           },
           body: JSON.stringify({
             choice: 'snoozed',
-            items: [{ id: page.items[0].id, revision: page.items[0].revision }],
+            items: [
+              {
+                source: 'github',
+                id: page.items[0].id,
+                revision: page.items[0].revision,
+              },
+            ],
           }),
         })
       ).status,

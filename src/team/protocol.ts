@@ -53,6 +53,7 @@ export const sharedBranchSchema = z.strictObject({
   name: label,
   detached: z.boolean(),
   localSha: sha.nullable(),
+  updatedAt: z.iso.datetime().optional(),
   remote: z
     .strictObject({ name: label, sha, presence: z.enum(['present', 'missing', 'unknown']) })
     .optional(),

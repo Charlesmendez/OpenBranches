@@ -105,7 +105,9 @@ for (let index = 0; index < names.length; index++) {
         const id = serial++,
           tool = (['codex', 'claude-code', 'cursor'] as const)[(id + index) % 3],
           live = tool === 'codex' && branchIndex < 3,
-          waiting = live && index % 3 === 1;
+          waiting = live && index % 3 === 1,
+          localOnly = index === 0 && projectIndex === 0 && branchIndex === 3,
+          forgotten = index === 2 && projectIndex === 0 && branchIndex === 9;
         return {
           key: hash('branch' + id),
           name:
@@ -115,25 +117,25 @@ for (let index = 0; index < names.length; index++) {
             (branchIndex + 1),
           detached: false,
           localSha: hash('commit' + id).slice(0, 40),
-          remote:
-            id % 3
-              ? {
-                  name: 'origin',
-                  sha: hash('commit' + id).slice(0, 40),
-                  presence: 'present' as const,
-                }
-              : undefined,
+          updatedAt: new Date(
+            Date.now() - (forgotten ? 12 * 86_400_000 : localOnly ? 2 * 86_400_000 : 60 * 60_000),
+          ).toISOString(),
+          remote: {
+            name: 'origin',
+            sha: hash('commit' + id).slice(0, 40),
+            presence: localOnly ? ('missing' as const) : ('present' as const),
+          },
           worktrees: {
             total: 1,
             available: 1,
-            dirty: id % 4 === 0 ? 1 : 0,
-            changedFiles: id % 4 === 0 ? 7 : 0,
+            dirty: forgotten ? 0 : id % 4 === 0 ? 1 : 0,
+            changedFiles: forgotten ? 0 : id % 4 === 0 ? 7 : 0,
           },
           integration: [
             {
               name: 'develop',
               sha: 'd'.repeat(40),
-              state: id % 4 === 1 ? ('integrated' as const) : ('pending' as const),
+              state: !forgotten && id % 4 === 1 ? ('integrated' as const) : ('pending' as const),
             },
             { name: 'main', sha: 'e'.repeat(40), state: 'pending' as const },
           ],

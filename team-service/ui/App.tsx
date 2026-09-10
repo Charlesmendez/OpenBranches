@@ -17,6 +17,7 @@ import {
   X,
 } from 'lucide-react';
 import { TeamApiError, TeamClient } from '../../src/team/client';
+import type { AttentionItem } from '../../src/team/attention';
 import type { TeamSession } from '../../src/team/responses';
 import { Brand } from '../../src/ui/components/Primitives';
 import { useAction, useTeamData } from './hooks';
@@ -278,6 +279,7 @@ function Workspace({
     [project, setProject] = useState(''),
     [query, setQuery] = useState(''),
     [group, setGroup] = useState<'person' | 'project'>('person'),
+    [focusedBranch, setFocusedBranch] = useState<string>(),
     [pair, setPair] = useState(false),
     [now, setNow] = useState(Date.now());
   const state = useTeamData(
@@ -366,7 +368,10 @@ function Workspace({
             <button
               key={id}
               aria-current={tab === id ? 'page' : undefined}
-              onClick={() => setTab(id)}
+              onClick={() => {
+                setFocusedBranch(undefined);
+                setTab(id);
+              }}
             >
               <Icon size={16} />
               {label}
@@ -410,6 +415,17 @@ function Workspace({
             people={data.people}
             projects={data.projects}
             refreshKey={`${data.workspace.revision}:${state.version}`}
+            onOpenLocal={(item: Extract<AttentionItem, { source: 'local' }>) => {
+              setGroup('person');
+              setPerson(item.memberId);
+              setProject(item.projectId);
+              setQuery(item.branch);
+              setFocusedBranch(`${item.deviceId}:${item.projectId}:${item.branchKey}`);
+              setTab('work');
+              requestAnimationFrame(() =>
+                document.getElementById('shared-work-board')?.scrollIntoView({ block: 'start' }),
+              );
+            }}
           />
         )}
         {data && tab === 'work' && (
@@ -422,6 +438,7 @@ function Workspace({
                 setPerson(row.work.memberId);
                 setProject(row.work.projectId);
                 setQuery(row.branch.name);
+                setFocusedBranch(row.key);
                 requestAnimationFrame(() =>
                   document.getElementById('shared-work-board')?.scrollIntoView({ block: 'start' }),
                 );
@@ -472,13 +489,19 @@ function Workspace({
                   placeholder="Search branches, people, projects, tools…"
                   value={query}
                   maxLength={160}
-                  onChange={(event) => setQuery(event.target.value)}
+                  onChange={(event) => {
+                    setFocusedBranch(undefined);
+                    setQuery(event.target.value);
+                  }}
                 />
                 {query && (
                   <button
                     className="icon"
                     aria-label="Clear team search"
-                    onClick={() => setQuery('')}
+                    onClick={() => {
+                      setFocusedBranch(undefined);
+                      setQuery('');
+                    }}
                   >
                     <X size={15} />
                   </button>
@@ -487,7 +510,10 @@ function Workspace({
               <select
                 aria-label="Filter team work by person"
                 value={person}
-                onChange={(event) => setPerson(event.target.value)}
+                onChange={(event) => {
+                  setFocusedBranch(undefined);
+                  setPerson(event.target.value);
+                }}
               >
                 <option value="">All people</option>
                 {person && !data.people.some((value) => value.id === person) && (
@@ -502,7 +528,10 @@ function Workspace({
               <select
                 aria-label="Filter team work by project"
                 value={project}
-                onChange={(event) => setProject(event.target.value)}
+                onChange={(event) => {
+                  setFocusedBranch(undefined);
+                  setProject(event.target.value);
+                }}
               >
                 <option value="">All projects</option>
                 {project && !data.projects.some((value) => value.id === project) && (
@@ -548,6 +577,7 @@ function Workspace({
                 group={group}
                 now={now}
                 focused={!!(query || person || project)}
+                focusKey={focusedBranch}
               />
             </div>
             {data.nextCursor && (

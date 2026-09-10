@@ -14,7 +14,7 @@ export async function withdrawShares(client: PoolClient, workspaceId: string, sc
   await client.query(
     `UPDATE ob_shares s
     SET enabled=false,epoch=epoch+1,sequence=0,consent='{"taskTitles":false,"taskSummaries":false}'::jsonb,
-      snapshot=NULL,observed_at=NULL,received_at=NULL
+      snapshot=NULL,attention=NULL,observed_at=NULL,received_at=NULL
     FROM ob_devices d WHERE s.device_id=d.id AND s.workspace_id=d.workspace_id AND s.workspace_id=$1
       AND ($2::uuid IS NULL OR s.device_id=$2) AND ($3::uuid IS NULL OR d.user_id=$3)
       AND ($4::uuid IS NULL OR s.project_id=$4)`,

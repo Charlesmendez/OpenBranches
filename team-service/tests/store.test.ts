@@ -175,6 +175,81 @@ describe('PostgreSQL team authorization and sharing', () => {
     expect(raw.rows[0].token_hash).toBe(secretHash(f.device.token));
     expect(JSON.stringify(view)).not.toContain(f.device.token);
   });
+  it('turns fresh opted-in local evidence into a private, revision-safe priority', async () => {
+    const f = await fixture(),
+      value = snapshot();
+    value.branches[0] = {
+      ...value.branches[0],
+      updatedAt: new Date(Date.now() - 8 * 86_400_000).toISOString(),
+      remote: { name: 'origin', sha: 'c'.repeat(40), presence: 'missing' },
+      worktrees: { total: 1, available: 1, dirty: 0, changedFiles: 0 },
+      integration: [{ name: 'develop', sha: 'd'.repeat(40), state: 'pending' }],
+    };
+    await f.store.sharing.publish(f.device.credential, f.workspace.id, f.project.id, {
+      epoch: f.share.epoch,
+      sequence: 1,
+      snapshot: value,
+    });
+    const saved = await db.pool.query('SELECT attention FROM ob_shares WHERE device_id=$1', [
+        f.device.deviceId,
+      ]),
+      ownerPage = await f.store.attention.view(f.owner, f.workspace.id),
+      memberPage = await f.store.attention.view(f.member, f.workspace.id),
+      item = memberPage.items[0];
+    expect(saved.rows[0].attention).toMatchObject({
+      counts: { findings: 1, localOnly: 1, forgottenWork: 1 },
+    });
+    expect(ownerPage.items[0]).toMatchObject({
+      source: 'local',
+      projectId: f.project.id,
+      memberId: f.memberId,
+      deviceId: f.device.deviceId,
+      forYou: false,
+    });
+    expect(item).toMatchObject({
+      source: 'local',
+      signals: { localOnly: true, forgottenWork: true },
+      forYou: true,
+    });
+    expect(
+      await f.store.attention.view(f.member, f.workspace.id, { query: 'nothing-matches' }),
+    ).toMatchObject({
+      queue: { active: 0, snoozed: 0, dismissed: 0 },
+      signals: { localOnly: 0, forgottenWork: 0 },
+      items: [],
+    });
+    expect(
+      await f.store.attention.view(f.member, f.workspace.id, { query: f.memberIdentity.login }),
+    ).toMatchObject({
+      queue: { active: 1, snoozed: 0, dismissed: 0 },
+      signals: { localOnly: 1, forgottenWork: 1 },
+    });
+    await expect(
+      f.store.attention.decide(f.member, f.workspace.id, {
+        choice: 'dismissed',
+        items: [{ source: 'local', id: item.id, revision: '0'.repeat(64) }],
+      }),
+    ).rejects.toMatchObject({ code: 'attention_changed' });
+    await f.store.attention.decide(f.member, f.workspace.id, {
+      choice: 'dismissed',
+      items: [{ source: 'local', id: item.id, revision: item.revision }],
+    });
+    expect((await f.store.attention.view(f.member, f.workspace.id)).queue).toEqual({
+      active: 0,
+      snoozed: 0,
+      dismissed: 1,
+    });
+    expect((await f.store.attention.view(f.owner, f.workspace.id)).queue.active).toBe(1);
+    await db.pool.query(
+      "UPDATE ob_shares SET received_at=now()-interval '6 minutes' WHERE device_id=$1",
+      [f.device.deviceId],
+    );
+    expect(await f.store.attention.view(f.owner, f.workspace.id)).toMatchObject({
+      staleSources: 1,
+      queue: { active: 0, snoozed: 0, dismissed: 0 },
+      items: [],
+    });
+  });
   it('starts with no shared snapshots and keeps signing in separate from device approval', async () => {
     const f = await fixture(),
       pending = await f.store.pairings.start({ deviceName: 'Second Mac' });
