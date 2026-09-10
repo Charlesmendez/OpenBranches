@@ -2,7 +2,7 @@
 
 The optional service now implements GitHub browser identity verification, workspace membership, scoped device pairing, project permissions, selected metadata snapshots, revocation, and live invalidation events. Workspace owners can verify authority over a GitHub user or organization installation, search its repository catalog, review exact choices, save stable selections, and remove them. It uses PostgreSQL and a separate Node.js process. Personal desktop use does not install or connect to it.
 
-The service includes a **browser workspace preview**: live-runtime highlights, grouped shared branch reports, permission-aware search and totals, a focused branch inspector, a read-only GitHub branch/PR explorer, people/project administration, pairing approval, device revocation, and the owner GitHub-selection flow. Selected GitHub repositories refresh in the background and show bounded status and branch/open-PR counts. The [Mac companion](TEAM_COMPANION.md) pairs, previews and approves selected metadata, publishes background updates, shows upload status, and withdraws sharing. Organization membership synchronization, company alerts, and real two-member/device verification remain incomplete. Running this service does not automatically share any desktop projects. This is not a usable team release yet.
+The service includes a **browser workspace preview**: live-runtime highlights, grouped shared branch reports, permission-aware search and totals, a focused branch inspector, a prioritized GitHub attention queue, a read-only branch/PR explorer, people/project administration, pairing approval, device revocation, and the owner GitHub-selection flow. Selected GitHub repositories refresh in the background and show bounded status and branch/open-PR counts. The attention queue ranks failing checks, review requests, quiet drafts, and exact merged-branch copies; each member's snooze and dismissal history is private. The [Mac companion](TEAM_COMPANION.md) pairs, previews and approves selected metadata, publishes background updates, shows upload status, and withdraws sharing. Organization membership synchronization, local-work company priorities, and real two-member/device verification remain incomplete. Running this service does not automatically share any desktop projects. This is not a usable team release yet.
 
 ## Try the fictional team
 
@@ -99,22 +99,24 @@ Events carry only an invalidation revision. Each event and 20-second heartbeat r
 
 All workspace operations are scoped to `/api/workspaces/:workspaceId`. Browser sessions use cookies and exact-Origin mutations. Device APIs use the approved credential as a Bearer header. Every write body is strict JSON.
 
-| Operation                           | Endpoint                                                                       |
-| ----------------------------------- | ------------------------------------------------------------------------------ |
-| Start/finish sign-in                | `GET /auth/github`, `GET /auth/callback`                                       |
-| Read session / sign out             | `GET /api/session`, `DELETE /api/session`                                      |
-| Create workspace (instance owner)   | `POST /api/workspaces`                                                         |
-| Start / poll / cancel pairing       | `POST /api/pairings`, `GET /api/pairings/current`, `POST /api/pairings/cancel` |
-| Inspect / approve pairing (browser) | `POST /api/pairings/inspect`, `POST /api/pairings/approve`                     |
-| Read work / events                  | `GET /view`, `GET /events`                                                     |
-| Read own companion profile (device) | `GET /companion`                                                               |
-| List / revoke devices               | `GET /devices`, `DELETE /devices/:deviceId`                                    |
-| Add / remove members                | `POST /members`, `DELETE /members/:memberId`                                   |
-| Create / remove local team projects | `POST /projects`, `DELETE /projects/:projectId`                                |
-| Grant project read/sharing access   | `PUT /projects/:projectId/access/:memberId`                                    |
-| Read project access (owner browser) | `GET /projects/:projectId/access`                                              |
-| Read / change device sharing        | `GET /shares`, `PUT /shares/:projectId`                                        |
-| Publish selected metadata           | `POST /shares/:projectId/snapshots`                                            |
+| Operation                            | Endpoint                                                                       |
+| ------------------------------------ | ------------------------------------------------------------------------------ |
+| Start/finish sign-in                 | `GET /auth/github`, `GET /auth/callback`                                       |
+| Read session / sign out              | `GET /api/session`, `DELETE /api/session`                                      |
+| Create workspace (instance owner)    | `POST /api/workspaces`                                                         |
+| Start / poll / cancel pairing        | `POST /api/pairings`, `GET /api/pairings/current`, `POST /api/pairings/cancel` |
+| Inspect / approve pairing (browser)  | `POST /api/pairings/inspect`, `POST /api/pairings/approve`                     |
+| Read work / events                   | `GET /view`, `GET /events`                                                     |
+| Read own companion profile (device)  | `GET /companion`                                                               |
+| List / revoke devices                | `GET /devices`, `DELETE /devices/:deviceId`                                    |
+| Add / remove members                 | `POST /members`, `DELETE /members/:memberId`                                   |
+| Create / remove local team projects  | `POST /projects`, `DELETE /projects/:projectId`                                |
+| Grant project read/sharing access    | `PUT /projects/:projectId/access/:memberId`                                    |
+| Read project access (owner browser)  | `GET /projects/:projectId/access`                                              |
+| Read / change device sharing         | `GET /shares`, `PUT /shares/:projectId`                                        |
+| Publish selected metadata            | `POST /shares/:projectId/snapshots`                                            |
+| Read prioritized GitHub findings     | `GET /attention`                                                               |
+| Snooze, dismiss, or restore findings | `POST /attention/decisions`                                                    |
 
 ## Verification and remaining gates
 
@@ -124,4 +126,4 @@ The desktop/domain/client and team suites run with both builds, type checks, and
 
 Browser checks against the isolated 400-report fixture verified collapsed groups, search with retained input focus, project filtering/grouping, loading additional snapshots, branch details, pairing review and approval, member device visibility, and revocation. Removing a member's access to Payments removed that project and its reports from their view; revoking their reporting Mac withdrew the remaining reports. Responsive checks covered desktop, tablet, and 390-pixel layouts without horizontal overflow. These fictional identities and device records do not satisfy real two-member/device acceptance.
 
-Native pairing, approval, publication, automatic commit updates, process restarts, offline withdrawal, search, and disconnection have also been verified with fictional repositories and an isolated Electron app. Before calling team mode complete: finish the permission-aware GitHub branch/PR explorer and organization ingestion, company alerts, actual registered-app sign-in, two real member devices, broader native permission-revocation/project-removal checks, load testing, deployment upgrades, and native accessibility. See the full [team acceptance criteria](TEAM_WORKSPACES.md) and [release roadmap](ROADMAP.md).
+Native pairing, approval, publication, automatic commit updates, process restarts, offline withdrawal, search, and disconnection have also been verified with fictional repositories and an isolated Electron app. The prioritized GitHub queue was verified in owner and member browser views, including exact bulk selection, independent decisions, requested-from-you ranking, and responsive layout. Before calling team mode complete: finish organization ingestion, local-work company priorities, actual registered-app sign-in, two real member devices, broader native permission-revocation/project-removal checks, load testing, deployment upgrades, and native accessibility. See the full [team acceptance criteria](TEAM_WORKSPACES.md) and [release roadmap](ROADMAP.md).

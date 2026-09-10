@@ -37,7 +37,7 @@ export class TeamDatabase {
   }
   async migrate() {
     const sql = await Promise.all(
-      ['001-team.sql', '002-github.sql', '003-github-sync.sql'].map((name) =>
+      ['001-team.sql', '002-github.sql', '003-github-sync.sql', '004-attention.sql'].map((name) =>
         readFile(new URL('../migrations/' + name, import.meta.url), 'utf8'),
       ),
     );

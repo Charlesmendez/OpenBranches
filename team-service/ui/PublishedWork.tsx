@@ -20,6 +20,7 @@ import type { TeamPage } from '../../src/team/responses';
 import { useGitHubWorkData } from './hooks';
 import { dateLabel, Empty, Notice } from './primitives';
 import './publishedWork.css';
+import { AttentionCenter } from './AttentionCenter';
 
 export function PublishedWork({
   client,
@@ -57,6 +58,12 @@ export function PublishedWork({
   const focused = !!(person || project || query);
   return (
     <section className="published-work">
+      <AttentionCenter
+        client={client}
+        workspace={workspace}
+        projects={projects}
+        refreshKey={refreshKey}
+      />
       <div className="published-hero">
         <span className="published-symbol">
           <GitPullRequest size={25} />

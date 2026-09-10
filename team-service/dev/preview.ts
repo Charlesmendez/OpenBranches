@@ -228,32 +228,95 @@ const fixtureProvider = fictionalGitHub((path, options) => {
     return fixtureResponse(
       previewRepositories.find((item) => item.name === decodeURIComponent(identity[1])),
     );
+  const branches = /^\/repos\/FictionalOrg\/([^/]+)\/branches\?/.exec(path);
+  if (branches) {
+    const selected = previewRepositories.find(
+      (item) => item.name === decodeURIComponent(branches[1]),
+    );
+    return fixtureResponse([
+      { name: 'develop', commit: { sha: 'a'.repeat(40) } },
+      {
+        name: selected?.id === 54 ? 'feature/release-helper' : 'feature/shared',
+        commit: { sha: 'b'.repeat(40) },
+      },
+    ]);
+  }
   const pulls = /^\/repos\/FictionalOrg\/([^/]+)\/pulls\?/.exec(path);
   if (pulls) {
     const selected = previewRepositories.find((item) => item.name === decodeURIComponent(pulls[1]));
-    return fixtureResponse(
-      path.includes('state=open') && selected
-        ? [
-            {
-              number: 1,
-              title: 'Review ' + selected.name.replaceAll('-', ' '),
-              state: 'open',
-              draft: false,
-              merged_at: null,
-              updated_at: new Date().toISOString(),
-              user: { id: ownerId, login: names[0], type: 'User' },
-              requested_reviewers:
-                selected.id % 2 === 1 ? [{ id: ownerId + 1, login: names[1], type: 'User' }] : [],
-              base: { ref: 'develop' },
-              head: {
-                ref: 'feature/shared',
-                sha: 'b'.repeat(40),
-                repo: { full_name: selected.full_name },
+    if (!selected) return fixtureResponse([]);
+    if (path.includes('state=closed'))
+      return fixtureResponse(
+        selected.id === 54
+          ? [
+              {
+                number: 17,
+                title: 'Ship the release helper',
+                state: 'closed',
+                draft: false,
+                merged_at: new Date(Date.now() - 2 * 86_400_000).toISOString(),
+                updated_at: new Date(Date.now() - 2 * 86_400_000).toISOString(),
+                user: { id: ownerId + 5, login: names[5], type: 'User' },
+                requested_reviewers: [],
+                base: { ref: 'develop' },
+                head: {
+                  ref: 'feature/release-helper',
+                  sha: 'b'.repeat(40),
+                  repo: { full_name: selected.full_name },
+                },
               },
-            },
-          ]
-        : [],
-    );
+            ]
+          : [],
+      );
+    if (selected.id === 54) return fixtureResponse([]);
+    const isReview = selected.id === 52,
+      isQuietDraft = selected.id === 53;
+    return fixtureResponse([
+      {
+        number: selected.id === 51 ? 12 : isReview ? 8 : 24,
+        title:
+          selected.id === 51
+            ? 'Stabilize the checkout flow'
+            : isReview
+              ? 'Add payment retry guardrails'
+              : 'Explore compact navigation',
+        state: 'open',
+        draft: isQuietDraft,
+        merged_at: null,
+        updated_at: new Date(
+          Date.now() - (isQuietDraft ? 11 * 86_400_000 : 35 * 60_000),
+        ).toISOString(),
+        user: {
+          id: ownerId + (isReview ? 2 : isQuietDraft ? 4 : 0),
+          login: names[isReview ? 2 : isQuietDraft ? 4 : 0],
+          type: 'User',
+        },
+        requested_reviewers: isReview ? [{ id: ownerId + 1, login: names[1], type: 'User' }] : [],
+        base: { ref: 'develop' },
+        head: {
+          ref: 'feature/shared',
+          sha: 'b'.repeat(40),
+          repo: { full_name: selected.full_name },
+        },
+      },
+    ]);
+  }
+  const checks = /^\/repos\/FictionalOrg\/([^/]+)\/commits\/[^/]+\/check-runs\?/.exec(path);
+  if (checks) {
+    const name = decodeURIComponent(checks[1]),
+      failed = name === 'atlas-web';
+    return fixtureResponse({
+      total_count: 1,
+      check_runs: [
+        {
+          id: 710 + previewRepositories.findIndex((item) => item.name === name),
+          name: failed ? 'Browser tests' : 'Build',
+          head_sha: 'b'.repeat(40),
+          status: 'completed',
+          conclusion: failed ? 'failure' : 'success',
+        },
+      ],
+    });
   }
   return undefined;
 });

@@ -4,6 +4,7 @@ import { changed } from '../access';
 import type { TeamDatabase } from '../db';
 import type { TeamGitHubApp } from './app';
 import type { InstallationBinding } from './schema';
+import { projectAttention } from './attention';
 
 interface SourceRow {
   workspaceId: string;
@@ -14,6 +15,7 @@ interface SourceRow {
   accountId: string;
   accountType: 'User' | 'Organization';
   snapshot: unknown;
+  attention: unknown;
 }
 
 export interface GitHubSyncOptions {
@@ -81,9 +83,9 @@ export class TeamGitHubSync {
   private async run(force: boolean, signal: AbortSignal) {
     const result = await this.db.pool.query<SourceRow>(
       `SELECT s.workspace_id AS "workspaceId",s.project_id AS "projectId",p.github_id AS "repositoryId",s.generation,
-      s.installation_id AS "installationId",s.account_id AS "accountId",s.account_type AS "accountType",s.snapshot
+      s.installation_id AS "installationId",s.account_id AS "accountId",s.account_type AS "accountType",s.snapshot,s.attention
       FROM ob_github_sources s JOIN ob_projects p ON p.workspace_id=s.workspace_id AND p.id=s.project_id AND p.active
-      WHERE $1::boolean OR s.checked_at IS NULL
+      WHERE $1::boolean OR s.checked_at IS NULL OR s.attention IS NULL
         OR (s.last_error AND s.checked_at<now()-($2::integer * interval '1 millisecond'))
         OR (NOT s.last_error AND s.checked_at<now()-($3::integer * interval '1 millisecond'))
       ORDER BY s.checked_at NULLS FIRST,s.selected_at,s.workspace_id,s.project_id LIMIT $4`,
@@ -148,9 +150,9 @@ export class TeamGitHubSync {
   private async current(client: PoolClient, source: SourceRow, force: boolean) {
     const result = await client.query<SourceRow>(
       `SELECT s.workspace_id AS "workspaceId",s.project_id AS "projectId",p.github_id AS "repositoryId",s.generation,
-      s.installation_id AS "installationId",s.account_id AS "accountId",s.account_type AS "accountType",s.snapshot
+      s.installation_id AS "installationId",s.account_id AS "accountId",s.account_type AS "accountType",s.snapshot,s.attention
       FROM ob_github_sources s JOIN ob_projects p ON p.workspace_id=s.workspace_id AND p.id=s.project_id AND p.active
-      WHERE s.workspace_id=$1 AND s.project_id=$2 AND s.generation=$3 AND ($4::boolean OR s.checked_at IS NULL
+      WHERE s.workspace_id=$1 AND s.project_id=$2 AND s.generation=$3 AND ($4::boolean OR s.checked_at IS NULL OR s.attention IS NULL
         OR (s.last_error AND s.checked_at<now()-($5::integer * interval '1 millisecond'))
         OR (NOT s.last_error AND s.checked_at<now()-($6::integer * interval '1 millisecond')))`,
       [
@@ -168,7 +170,7 @@ export class TeamGitHubSync {
   private async save(source: SourceRow, fullName: string, snapshot: RemoteSnapshot) {
     await this.db.transaction(async (client) => {
       const result = await client.query(
-        `UPDATE ob_github_sources SET snapshot=$5,checked_at=now(),last_error=false
+        `UPDATE ob_github_sources SET snapshot=$5,attention=$6,checked_at=now(),last_error=false
         WHERE workspace_id=$1 AND project_id=$2 AND generation=$3 AND installation_id=$4 RETURNING project_id`,
         [
           source.workspaceId,
@@ -176,6 +178,7 @@ export class TeamGitHubSync {
           source.generation,
           source.installationId,
           JSON.stringify(remoteSnapshotSchema.parse(snapshot)),
+          JSON.stringify(projectAttention(snapshot, Date.now(), source.repositoryId)),
         ],
       );
       if (!result.rowCount) return;
@@ -190,7 +193,9 @@ export class TeamGitHubSync {
   private async fail(source: SourceRow, keepSnapshot: boolean) {
     await this.db.transaction(async (client) => {
       const result = await client.query(
-        `UPDATE ob_github_sources SET checked_at=now(),last_error=true,snapshot=CASE WHEN $5::boolean THEN snapshot ELSE NULL END
+        `UPDATE ob_github_sources SET checked_at=now(),last_error=true,
+          snapshot=CASE WHEN $5::boolean THEN snapshot ELSE NULL END,
+          attention=CASE WHEN $5::boolean THEN attention ELSE NULL END
         WHERE workspace_id=$1 AND project_id=$2 AND generation=$3 AND installation_id=$4 RETURNING project_id`,
         [
           source.workspaceId,

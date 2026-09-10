@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { TeamApiError, type TeamClient, type TeamFilter } from '../../src/team/client';
 import { loadTeamView, type LoadedTeamView } from '../../src/team/loadView';
 import { loadGitHubWork, type LoadedGitHubWork } from '../../src/team/loadGitHubWork';
+import type { AttentionFilter } from '../../src/team/client';
+import type { AttentionPage } from '../../src/team/attention';
 export { useAction } from '../../src/ui/hooks/useAction';
 export function useTeamData(client: TeamClient, workspace: string, filter: TeamFilter) {
   const [data, setData] = useState<LoadedTeamView>(),
@@ -166,5 +168,52 @@ export function useGitHubWorkData(
     busy,
     loadMore: () => setPages((value) => Math.min(10, value + 1)),
     atLimit: pages >= 10 || data?.limitReached === true,
+  };
+}
+
+export function useAttentionData(
+  client: TeamClient,
+  workspace: string,
+  filter: AttentionFilter,
+  refreshKey: string,
+) {
+  const [data, setData] = useState<AttentionPage>(),
+    [error, setError] = useState(''),
+    [busy, setBusy] = useState(true),
+    [version, setVersion] = useState(0),
+    scope = JSON.stringify(filter);
+  useEffect(() => {
+    const abort = new AbortController(),
+      timer = setTimeout(
+        () => {
+          setBusy(true);
+          setError('');
+          void client
+            .attention(workspace, filter, abort.signal)
+            .then((value) => {
+              if (!abort.signal.aborted) setData(value);
+            })
+            .catch((failure) => {
+              if (!abort.signal.aborted)
+                setError(
+                  failure instanceof Error ? failure.message : 'Could not load team priorities.',
+                );
+            })
+            .finally(() => {
+              if (!abort.signal.aborted) setBusy(false);
+            });
+        },
+        filter.query ? 220 : 0,
+      );
+    return () => {
+      clearTimeout(timer);
+      abort.abort();
+    };
+  }, [client, workspace, scope, refreshKey, version]);
+  return {
+    data,
+    error,
+    busy,
+    refresh: () => setVersion((value) => value + 1),
   };
 }

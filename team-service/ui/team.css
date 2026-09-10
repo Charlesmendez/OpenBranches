@@ -374,8 +374,13 @@ code {
 .team-tabs {
   display: flex;
   gap: 28px;
+  overflow-x: auto;
   border-bottom: 1px solid var(--line);
   margin-bottom: 27px;
+  scrollbar-width: none;
+}
+.team-tabs::-webkit-scrollbar {
+  display: none;
 }
 .team-tabs button {
   display: flex;
@@ -385,6 +390,8 @@ code {
   color: var(--muted);
   border-bottom: 2px solid transparent;
   font-size: 12px;
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 .team-tabs button[aria-current] {
   color: #d7ddef;
@@ -1558,6 +1565,9 @@ code {
   .team-sidebar > .brand {
     font-size: 16px;
   }
+  .team-tabs {
+    gap: 14px;
+  }
   .team-heading {
     flex-wrap: wrap;
   }
@@ -1665,7 +1675,7 @@ code {
     font-size: 27px;
   }
   .team-tabs {
-    gap: 21px;
+    gap: 12px;
   }
   .team-tabs button {
     font-size: 11px;

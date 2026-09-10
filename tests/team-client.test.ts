@@ -125,6 +125,49 @@ describe('team browser client boundary', () => {
       ).githubWork(workspace, { project }),
     ).rejects.toThrow('does not match the selected project');
   });
+  it('scopes attention filters and sends an exact bulk decision command', async () => {
+    const checkedAt = new Date().toISOString(),
+      response = {
+        workspaceId: workspace,
+        revision: '1',
+        checkedAt,
+        bucket: 'snoozed',
+        queue: { active: 2, snoozed: 1, dismissed: 0 },
+        signals: { failingChecks: 1, reviewRequested: 1, staleDrafts: 0, mergedBranches: 0 },
+        sources: 1,
+        pendingSources: 0,
+        failedSources: 0,
+        items: [],
+        omitted: 0,
+      },
+      request = vi.fn<typeof fetch>().mockResolvedValue(Response.json(response)),
+      client = new TeamClient(request);
+    await client.attention(workspace, {
+      project,
+      query: '#12 checkout',
+      bucket: 'snoozed',
+      kind: 'checks-failing',
+    });
+    const address = new URL('http://fixture.invalid' + String(request.mock.calls[0][0]));
+    expect(address.pathname).toBe(`/api/workspaces/${workspace}/attention`);
+    expect(Object.fromEntries(address.searchParams)).toEqual({
+      project,
+      q: '#12 checkout',
+      bucket: 'snoozed',
+      kind: 'checks-failing',
+    });
+    const command = {
+      choice: 'dismissed' as const,
+      items: [{ id: 'a'.repeat(64), revision: 'b'.repeat(64) }],
+    };
+    request.mockResolvedValueOnce(Response.json({ revision: '1' }));
+    await client.decideAttention(workspace, command);
+    expect(request.mock.calls[1][0]).toBe(`/api/workspaces/${workspace}/attention/decisions`);
+    expect(request.mock.calls[1][1]).toMatchObject({
+      method: 'POST',
+      body: JSON.stringify(command),
+    });
+  });
   it('invalidates the matching access scope on unauthorized responses', async () => {
     const changed = vi.fn(),
       client = new TeamClient(

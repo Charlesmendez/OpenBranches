@@ -266,7 +266,7 @@ export class TeamGitHubSetup {
           `INSERT INTO ob_github_sources(workspace_id,project_id,installation_id,account_id,account_type,account_login,approved_by,generation)
           VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(workspace_id,project_id) DO UPDATE SET installation_id=EXCLUDED.installation_id,
           account_id=EXCLUDED.account_id,account_type=EXCLUDED.account_type,account_login=EXCLUDED.account_login,approved_by=EXCLUDED.approved_by,
-          generation=EXCLUDED.generation,selected_at=now(),snapshot=NULL,checked_at=NULL,last_error=false`,
+          generation=EXCLUDED.generation,selected_at=now(),snapshot=NULL,attention=NULL,checked_at=NULL,last_error=false`,
           [
             workspace,
             saved.rows[0].id,

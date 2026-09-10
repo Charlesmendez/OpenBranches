@@ -5,6 +5,7 @@ import { TeamPairings } from './pairings';
 import { TeamSharing } from './sharing';
 import { TeamViews } from './view';
 import { TeamGitHubView } from './github/view';
+import { TeamAttention } from './attention';
 
 export class TeamStore {
   readonly identities: TeamIdentities;
@@ -13,6 +14,7 @@ export class TeamStore {
   readonly sharing: TeamSharing;
   readonly views: TeamViews;
   readonly githubWork: TeamGitHubView;
+  readonly attention: TeamAttention;
   constructor(
     readonly db: TeamDatabase,
     ownerGitHubId: string,
@@ -23,5 +25,6 @@ export class TeamStore {
     this.sharing = new TeamSharing(db);
     this.views = new TeamViews(db);
     this.githubWork = new TeamGitHubView(db);
+    this.attention = new TeamAttention(db);
   }
 }

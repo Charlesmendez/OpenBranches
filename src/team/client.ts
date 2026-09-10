@@ -8,6 +8,15 @@ import {
 } from './responses';
 import { readTeamResponse, TeamApiError } from './readResponse';
 import { githubCatalog, githubSetupState, githubNumericId, githubWorkPage } from './github';
+import {
+  attentionBucket,
+  attentionDecisionCommand,
+  attentionKind,
+  attentionPage,
+  type AttentionBucket,
+  type AttentionDecisionCommand,
+  type AttentionKind,
+} from './attention';
 export { TeamApiError } from './readResponse';
 const changed = z.object({ revision: z.string() });
 export interface TeamFilter {
@@ -15,6 +24,12 @@ export interface TeamFilter {
   project?: string;
   query?: string;
   cursor?: string;
+}
+export interface AttentionFilter {
+  project?: string;
+  query?: string;
+  bucket?: AttentionBucket;
+  kind?: AttentionKind;
 }
 export class TeamClient {
   constructor(
@@ -213,6 +228,33 @@ export class TeamClient {
       if (value.sources.some((source) => filter.project && source.projectId !== filter.project))
         throw new Error('The GitHub response does not match the selected project.');
       return value;
+    });
+  }
+  attention(workspace: string, filter: AttentionFilter = {}, signal?: AbortSignal) {
+    const params = new URLSearchParams();
+    if (filter.project) params.set('project', teamId.parse(filter.project));
+    if (filter.query) params.set('q', filter.query);
+    if (filter.bucket) params.set('bucket', attentionBucket.parse(filter.bucket));
+    if (filter.kind) params.set('kind', attentionKind.parse(filter.kind));
+    return this.json(this.root(workspace) + '/attention?' + params, attentionPage, { signal }).then(
+      (value) => {
+        this.githubScope(workspace, value);
+        if (
+          (filter.bucket && value.bucket !== filter.bucket) ||
+          value.items.some(
+            (item) =>
+              (filter.project && item.projectId !== filter.project) || item.state !== value.bucket,
+          )
+        )
+          throw new Error('The attention response does not match the selected queue or project.');
+        return value;
+      },
+    );
+  }
+  decideAttention(workspace: string, command: AttentionDecisionCommand) {
+    return this.json(this.root(workspace) + '/attention/decisions', changed, {
+      method: 'POST',
+      value: attentionDecisionCommand.parse(command),
     });
   }
   private githubScope<T extends { workspaceId: string }>(workspace: string, value: T): T {

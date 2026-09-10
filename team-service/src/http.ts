@@ -183,6 +183,29 @@ export function createTeamServer(
     }
     const auth = credential(request, config);
     if (!['GET', 'HEAD'].includes(method) && auth.kind === 'session') sameOrigin(request, config);
+    const attentionRoute = /^\/api\/workspaces\/([^/]+)\/attention(?:\/(decisions))?$/.exec(path);
+    if (attentionRoute) {
+      const workspace = teamId.parse(attentionRoute[1]),
+        action = attentionRoute[2];
+      if (!action && method === 'GET') {
+        json(
+          response,
+          200,
+          await store.attention.view(auth, workspace, {
+            projectId: url.searchParams.get('project') ?? undefined,
+            bucket: url.searchParams.get('bucket') ?? undefined,
+            kind: url.searchParams.get('kind') ?? undefined,
+            query: url.searchParams.get('q') ?? undefined,
+          }),
+        );
+        return;
+      }
+      if (action === 'decisions' && method === 'POST') {
+        json(response, 200, await store.attention.decide(auth, workspace, await body(request)));
+        return;
+      }
+      throw new TeamError(404, 'not_found', 'This attention endpoint is unavailable.');
+    }
     const githubRoute =
       /^\/api\/workspaces\/([^/]+)\/github(?:\/(authorize|catalog|select|projects|work)(?:\/([^/]+))?)?$/.exec(
         path,

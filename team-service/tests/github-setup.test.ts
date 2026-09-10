@@ -437,9 +437,10 @@ describe('GitHub workspace setup', () => {
     expect(selection.snapshotAt).toMatch(/^\d{4}-\d\d-/);
     expect(selection.lastAttemptAt).toMatch(/^\d{4}-\d\d-/);
     const saved = await db.pool.query(
-      'SELECT snapshot FROM ob_github_sources WHERE workspace_id=$1',
+      'SELECT snapshot,attention FROM ob_github_sources WHERE workspace_id=$1',
       [f.workspace.id],
     );
+    expect(saved.rows[0].attention).toMatchObject({ counts: { failingChecks: 1 } });
     expect(JSON.stringify(saved.rows)).not.toMatch(/PRIVATE_BODY|PRIVATE_LOG|PRIVATE_PATCH/);
   });
   it('presents permission-scoped GitHub branches, PRs, checks and target history without private provider data', async () => {
@@ -554,7 +555,7 @@ describe('GitHub workspace setup', () => {
     const sync = new TeamGitHubSync(db, f.app);
     await sync.refresh(true);
     const before = await db.pool.query(
-      'SELECT snapshot FROM ob_github_sources WHERE workspace_id=$1',
+      'SELECT snapshot,attention FROM ob_github_sources WHERE workspace_id=$1',
       [f.workspace.id],
     );
     failing = true;
@@ -566,11 +567,130 @@ describe('GitHub workspace setup', () => {
       openPullCount: 1,
     });
     const after = await db.pool.query(
-      'SELECT snapshot FROM ob_github_sources WHERE workspace_id=$1',
+      'SELECT snapshot,attention FROM ob_github_sources WHERE workspace_id=$1',
       [f.workspace.id],
     );
     expect(after.rows[0].snapshot).toEqual(before.rows[0].snapshot);
     expect(JSON.stringify(after.rows)).not.toContain('PRIVATE_PROVIDER_FAILURE');
+  });
+  it('keeps the attention queue permission-scoped, personal, revision-safe, and browser-only', async () => {
+    const f = await fixture(),
+      catalog = await f.review();
+    await f.setup.select(f.owner, f.workspace.id, {
+      reviewId: catalog.id,
+      repositoryIds: ['51'],
+    });
+    await new TeamGitHubSync(db, f.app).refresh(true);
+    const project = (await f.setup.state(f.owner, f.workspace.id)).selections[0].projectId,
+      ownerPage = await f.store.attention.view(f.owner, f.workspace.id);
+    expect(ownerPage).toMatchObject({
+      queue: { active: 1, snoozed: 0, dismissed: 0 },
+      signals: { failingChecks: 1 },
+      sources: 1,
+    });
+    expect(ownerPage.items[0]).toMatchObject({
+      projectId: project,
+      kind: 'checks-failing',
+      state: 'active',
+      forYou: false,
+    });
+    expect((await f.store.attention.view(f.member, f.workspace.id)).items).toEqual([]);
+    await f.store.members.grant(
+      f.owner,
+      f.workspace.id,
+      project,
+      f.memberSigned.user.id,
+      true,
+      false,
+    );
+    const memberPage = await f.store.attention.view(f.member, f.workspace.id),
+      item = memberPage.items[0];
+    await expect(
+      f.store.attention.decide(f.member, f.workspace.id, {
+        choice: 'dismissed',
+        items: [{ id: item.id, revision: '0'.repeat(64) }],
+      }),
+    ).rejects.toMatchObject({ code: 'attention_changed' });
+    await f.store.attention.decide(f.member, f.workspace.id, {
+      choice: 'dismissed',
+      items: [{ id: item.id, revision: item.revision }],
+    });
+    expect((await f.store.attention.view(f.member, f.workspace.id)).queue).toEqual({
+      active: 0,
+      snoozed: 0,
+      dismissed: 1,
+    });
+    expect((await f.store.attention.view(f.owner, f.workspace.id)).queue.active).toBe(1);
+    const dismissed = await f.store.attention.view(f.member, f.workspace.id, {
+      bucket: 'dismissed',
+    });
+    await f.store.attention.decide(f.member, f.workspace.id, {
+      choice: 'restore',
+      items: [{ id: dismissed.items[0].id, revision: dismissed.items[0].revision }],
+    });
+    expect((await f.store.attention.view(f.member, f.workspace.id)).queue.active).toBe(1);
+
+    const pair = await f.store.pairings.start({ deviceName: 'Fictional queue device' });
+    await f.store.pairings.approve(f.owner, {
+      workspaceId: f.workspace.id,
+      userCode: pair.userCode,
+    });
+    await expect(
+      f.store.attention.view({ kind: 'device', token: pair.pairingSecret }, f.workspace.id),
+    ).rejects.toMatchObject({ status: 403 });
+    await f.store.attention.decide(f.member, f.workspace.id, {
+      choice: 'dismissed',
+      items: [{ id: item.id, revision: item.revision }],
+    });
+    await f.setup.remove(f.owner, f.workspace.id, project);
+    expect(
+      (
+        await db.pool.query('SELECT 1 FROM ob_attention_decisions WHERE workspace_id=$1', [
+          f.workspace.id,
+        ])
+      ).rowCount,
+    ).toBe(0);
+  });
+  it('serves attention decisions through same-origin browser endpoints', async () => {
+    const f = await fixture(),
+      catalog = await f.review();
+    await f.setup.select(f.owner, f.workspace.id, {
+      reviewId: catalog.id,
+      repositoryIds: ['51'],
+    });
+    await new TeamGitHubSync(db, f.app).refresh(true);
+    const server = createTeamServer(f.config, f.store, f.oauth, events, undefined, f.setup);
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    servers.push(server);
+    const address = server.address();
+    if (!address || typeof address === 'string') throw new Error('No fixture port');
+    f.config.origin.port = String(address.port);
+    const root = f.config.origin.origin,
+      path = `/api/workspaces/${f.workspace.id}/attention`,
+      first = await fetch(root + path, { headers: { Cookie: 'ob_session=' + f.owner.token } }),
+      page = await first.json();
+    expect(first.status).toBe(200);
+    expect(page.items).toHaveLength(1);
+    expect(
+      (
+        await fetch(root + path + '/decisions', {
+          method: 'POST',
+          headers: {
+            Cookie: 'ob_session=' + f.owner.token,
+            Origin: root,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            choice: 'snoozed',
+            items: [{ id: page.items[0].id, revision: page.items[0].revision }],
+          }),
+        })
+      ).status,
+    ).toBe(200);
+    const active = await (
+      await fetch(root + path, { headers: { Cookie: 'ob_session=' + f.owner.token } })
+    ).json();
+    expect(active.queue).toMatchObject({ active: 0, snoozed: 1 });
   });
   it('discards a completed background read when its selection is removed', async () => {
     let hold = false,
