@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import type { ActivityEvent, Branch, Repository } from '../../domain/types';
 import { activityItems } from '../../domain/activity';
-import { featureBranches, groupCounts } from '../../domain/branches';
+import { featureBranches, groupCounts, lifecycleLabels } from '../../domain/branches';
 import { primaryIntegrationTargets } from '../../domain/integrationTargets';
 import { workPreviews } from '../../domain/workSpotlight';
 import { useClock } from '../hooks/useClock';
@@ -64,7 +64,8 @@ export function Overview({
                 <div>
                   <h2>{repo.name}</h2>
                   <span>
-                    {counts.active} active <i /> {repo.branches.length} branch copies
+                    {counts.active} {lifecycleLabels.active.toLowerCase()} <i />{' '}
+                    {repo.branches.length} branch copies
                   </span>
                 </div>
                 <span className="project-open">

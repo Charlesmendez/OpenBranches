@@ -3,6 +3,7 @@ import { Check, ChevronDown, LoaderCircle, ShieldCheck, X } from 'lucide-react';
 import type { HandoffPreview, HandoffProvider, HandoffSelection } from '../../domain/types';
 import type { HandoffsController } from '../hooks/useHandoffs';
 import { ToolIcon } from './AgentBadges';
+import { useModalFocus } from '../hooks/useModalFocus';
 
 export function AgentHandoffDialog({
   selections,
@@ -18,13 +19,11 @@ export function AgentHandoffDialog({
   const [preview, setPreview] = useState<HandoffPreview>();
   const [provider, setProvider] = useState<HandoffProvider>('codex');
   const [error, setError] = useState('');
-  const dialog = useRef<HTMLDivElement>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
+  const modal = useModalFocus<HTMLDivElement>(closeButton);
 
   useEffect(() => {
     let current = true;
-    const previous = document.activeElement;
-    closeButton.current?.focus();
     void handoffs
       .preview(selections)
       .then((value) => {
@@ -39,13 +38,6 @@ export function AgentHandoffDialog({
       });
     return () => {
       current = false;
-      if (
-        previous instanceof HTMLElement &&
-        previous.isConnected &&
-        (document.activeElement === document.body ||
-          dialog.current?.contains(document.activeElement))
-      )
-        previous.focus({ preventScroll: true });
     };
   }, [handoffs.preview, selections]);
 
@@ -73,13 +65,14 @@ export function AgentHandoffDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="handoff-title"
-        ref={dialog}
+        ref={modal.container}
         onKeyDown={(event) => {
           if (event.key === 'Escape' && !handoffs.busy) {
             event.preventDefault();
             event.stopPropagation();
             close();
           }
+          modal.trapTab(event);
         }}
       >
         <header>

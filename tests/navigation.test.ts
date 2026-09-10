@@ -7,6 +7,7 @@ import {
   initialInventory,
   inventoryCursor,
   mapPositionFor,
+  nextSearchResultLimit,
   revealCurrentWork,
   revealSelection,
   typeaheadIndex,
@@ -140,5 +141,12 @@ describe('large workspace navigation', () => {
     expect(typeaheadIndex(branches, 'Alpha s', 0)).toBe(0);
     expect(typeaheadIndex(branches, 'Missing', 1)).toBe(1);
     expect(typeaheadIndex([], 'a', -1)).toBe(-1);
+  });
+
+  it('reveals global search results in bounded batches without dropping the final page', () => {
+    expect(nextSearchResultLimit(50, 403)).toBe(100);
+    expect(nextSearchResultLimit(400, 403)).toBe(403);
+    expect(nextSearchResultLimit(0, 24)).toBe(24);
+    expect(nextSearchResultLimit(50, 0)).toBe(0);
   });
 });

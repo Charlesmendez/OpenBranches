@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { createDemoSnapshot } from '../../data/demo';
+import { createDemoSnapshot, refreshDemoPresence } from '../../data/demo';
 import type { Snapshot } from '../../domain/types';
 
 const empty: Snapshot = {
@@ -19,10 +19,10 @@ function demoSnapshot() {
     return createDemoSnapshot();
   }
 }
-const demo = demoSnapshot();
 const loadError = 'Your saved workspace could not be loaded. Please try again.';
 export function useWorkspace(initialMode: 'live' | 'demo') {
   const [mode, setMode] = useState(initialMode);
+  const [demo, setDemo] = useState(demoSnapshot);
   const [live, setLive] = useState<Snapshot>(empty);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(!!window.openbranches);
@@ -66,6 +66,17 @@ export function useWorkspace(initialMode: 'live' | 'demo') {
       off();
     };
   }, [reload]);
+  useEffect(() => {
+    if (mode !== 'demo') return;
+    const update = () => setDemo((current) => refreshDemoPresence(current));
+    update();
+    const timer = window.setInterval(update, 30_000);
+    window.addEventListener('focus', update);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', update);
+    };
+  }, [mode]);
   const add = useCallback(async () => {
     if (!window.openbranches) {
       setError(

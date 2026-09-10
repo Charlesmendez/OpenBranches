@@ -36,6 +36,10 @@ The inventory is a single-select listbox with one tab stop. Its options are whol
 
 Option positions and total counts describe the complete filtered result set. The active option stays mounted when pointer scrolling moves it outside the visible window, adding at most one extra option. Result counts are announced when filtering changes them. No-results content fits the viewport without requiring horizontal scrolling.
 
+Global search renders at most fifty matching branches initially. **Show next** reveals another bounded batch, and pressing Down on the last visible result continues directly into that batch. The result total always describes the complete match set. Listbox options use arrow-key focus while Tab stays within the dialog controls; closing restores the search trigger, while choosing a branch transfers focus to its exact map card.
+
+The fictional demo refreshes only its verified runtime timestamps while it remains open, so live-agent examples do not disappear after the production 90-second expiry. Commit dates, task update times, branch facts, and review revisions stay fixed across that refresh. Real workspace activity is never extended this way.
+
 ## Implementation and checks
 
 `src/ui/navigation.ts` owns shared position types, map grouping/page selection, scroll anchoring, and keyboard index calculations. `navigationMemory.ts` owns versioned preference decoding, bounded storage, recency, and failure recovery. `useProjectMemory` binds that memory to the authoritative project list and flushes on page exit or hiding; `useInventoryNavigation` coordinates filtering, virtualization, cursor, scroll, and focus. Presentational components use those shared behaviors.

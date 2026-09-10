@@ -3,8 +3,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createDemoSnapshot } from '../src/data/demo';
+import { createDemoSnapshot, refreshDemoPresence } from '../src/data/demo';
 import { recommendationsFor } from '../src/domain/branches';
+import { liveTasks } from '../src/domain/branchActivity';
 import { groupReviews, recommendationRevision, SNOOZE_MS } from '../src/domain/reviews';
 import { AppStore } from '../electron/services/store';
 import { ReviewService } from '../electron/services/reviews';
@@ -206,5 +207,17 @@ describe('review choices and evidence', () => {
     expect(list(createDemoSnapshot(origin)).map((item) => item.revision)).toEqual(
       list(createDemoSnapshot(origin)).map((item) => item.revision),
     );
+  });
+  it('keeps fictional live examples fresh without changing review evidence', () => {
+    const origin = Date.now() - 10 * 60_000;
+    const snapshot = createDemoSnapshot(origin);
+    const before = list(snapshot).map((item) => item.revision);
+    const refreshedAt = Date.now() + 1_000;
+    const refreshed = refreshDemoPresence(snapshot, refreshedAt);
+    expect(refreshed.repositories[0].branches[0].tasks?.[0].checkedAt).toBe(
+      new Date(refreshedAt).toISOString(),
+    );
+    expect(liveTasks(refreshed.repositories[0].branches[0], refreshedAt)).toHaveLength(1);
+    expect(list(refreshed).map((item) => item.revision)).toEqual(before);
   });
 });

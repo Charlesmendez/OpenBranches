@@ -7,6 +7,7 @@ import type {
   HandoffPreview,
   HandoffProviderStatus,
   HandoffSelection,
+  Recommendation,
   Repository,
   Snapshot,
 } from '../../src/domain/types';
@@ -83,8 +84,21 @@ const refEvidence = (branch: Branch) => ({
   omittedLinkedWork: Math.max(0, (branch.tasks?.length ?? 0) - 10),
 });
 
-function promptFor(repository: Repository, branches: Branch[], now: number): string {
-  const findings = recommendationsFor(repository, now);
+function indexFindings(repository: Repository, now: number) {
+  const indexed = new Map<string, Recommendation[]>();
+  for (const finding of recommendationsFor(repository, now)) {
+    const values = indexed.get(finding.branchId) ?? [];
+    values.push(finding);
+    indexed.set(finding.branchId, values);
+  }
+  return indexed;
+}
+
+function promptFor(
+  repository: Repository,
+  branches: Branch[],
+  findings: ReadonlyMap<string, Recommendation[]>,
+): string {
   const evidence = {
     source: 'OpenBranches Git evidence snapshot',
     repository: repository.name,
@@ -98,16 +112,14 @@ function promptFor(repository: Repository, branches: Branch[], now: number): str
     })),
     branches: branches.map((branch) => ({
       ...refEvidence(branch),
-      findings: findings
-        .filter((finding) => finding.branchId === branch.id)
-        .map((finding) => ({
-          category: finding.category,
-          title: finding.title,
-          explanation: finding.explanation,
-          evidence: finding.evidence,
-          revision: finding.revision,
-          checkedAt: finding.checkedAt,
-        })),
+      findings: (findings.get(branch.id) ?? []).map((finding) => ({
+        category: finding.category,
+        title: finding.title,
+        explanation: finding.explanation,
+        evidence: finding.evidence,
+        revision: finding.revision,
+        checkedAt: finding.checkedAt,
+      })),
     })),
   };
   return `You are receiving a branch-triage handoff from OpenBranches.
@@ -142,37 +154,41 @@ export function createHandoffPreview(
 ): HandoffPreview {
   const selections = parseHandoffSelections(input);
   const repositories = new Map(
-    snapshot.repositories.map((repository) => [repository.id, repository]),
+    snapshot.repositories.map((repository) => [
+      repository.id,
+      {
+        repository,
+        branches: new Map(repository.branches.map((branch) => [branch.id, branch])),
+        findings: indexFindings(repository, now),
+      },
+    ]),
   );
   const grouped = new Map<string, Branch[]>();
   for (const selection of selections) {
-    const repository = repositories.get(selection.repositoryId);
-    const branch = repository?.branches.find((item) => item.id === selection.branchId);
-    if (!repository || !branch)
+    const context = repositories.get(selection.repositoryId);
+    const branch = context?.branches.get(selection.branchId);
+    if (!context || !branch)
       throw new Error(
         'A selected branch is no longer available. Refresh and review the selection.',
       );
-    const hasFinding = recommendationsFor(repository, now).some(
-      (finding) => finding.branchId === branch.id,
-    );
-    if (!hasFinding)
+    if (!context.findings.has(branch.id))
       throw new Error(`${branch.name} no longer needs review. Refresh and review the selection.`);
-    const group = grouped.get(repository.id) ?? [];
+    const group = grouped.get(context.repository.id) ?? [];
     group.push(branch);
-    grouped.set(repository.id, group);
+    grouped.set(context.repository.id, group);
   }
   const plans: HandoffPlan[] = [...grouped].map(([repositoryId, branches]) => {
-    const repository = repositories.get(repositoryId)!;
+    const context = repositories.get(repositoryId)!;
     branches.sort((left, right) => left.name.localeCompare(right.name));
     return {
       repositoryId,
-      repositoryName: repository.name,
+      repositoryName: context.repository.name,
       branches: branches.map((branch) => ({
         id: branch.id,
         name: branch.name,
         title: branch.title,
       })),
-      prompt: promptFor(repository, branches, now),
+      prompt: promptFor(context.repository, branches, context.findings),
     };
   });
   plans.sort((left, right) => left.repositoryName.localeCompare(right.repositoryName));

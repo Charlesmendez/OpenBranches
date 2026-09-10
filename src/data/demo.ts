@@ -228,3 +228,25 @@ export function createDemoSnapshot(referenceTime = now): Snapshot {
     scanning: false,
   };
 }
+
+/** Keep fictional runtime examples visible while someone explores the demo.
+ * Real activity retains its strict expiry; semantic task evidence is untouched. */
+export function refreshDemoPresence(snapshot: Snapshot, at = Date.now()): Snapshot {
+  const checkedAt = new Date(at).toISOString();
+  return {
+    ...snapshot,
+    repositories: snapshot.repositories.map((repository) => ({
+      ...repository,
+      branches: repository.branches.map((branch) => ({
+        ...branch,
+        tasks: branch.tasks?.map((task) =>
+          !task.archived &&
+          task.association === 'verified' &&
+          (task.status === 'active' || task.waiting)
+            ? { ...task, checkedAt }
+            : task,
+        ),
+      })),
+    })),
+  };
+}

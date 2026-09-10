@@ -3063,6 +3063,21 @@ code {
 .search-results > button > svg {
   color: var(--muted);
 }
+.search-results-more {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 20px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 9px;
+}
+.search-results-more button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
 .search-dialog-footer {
   padding: 12px 20px;
   border-top: 1px solid var(--line-strong);

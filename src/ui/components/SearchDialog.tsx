@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowUpLeft, GitBranch, Search, X } from 'lucide-react';
+import { ArrowUpLeft, ChevronDown, GitBranch, Search, X } from 'lucide-react';
 import { branchSearchResults } from '../../domain/branchSearch';
 import type { Branch, Repository } from '../../domain/types';
 import { BranchTargetSummary } from './BranchTargetSummary';
 import { WorkSignalIcon } from './WorkSignalIcon';
+import { nextSearchResultLimit, SEARCH_RESULT_BATCH } from '../navigation';
+import { useModalFocus } from '../hooks/useModalFocus';
 
 export function SearchDialog({
   repositories,
@@ -16,16 +18,24 @@ export function SearchDialog({
 }) {
   const [query, setQuery] = useState('');
   const [index, setIndex] = useState(0);
+  const [limit, setLimit] = useState(SEARCH_RESULT_BATCH);
   const [now, setNow] = useState(() => Date.now());
   const input = useRef<HTMLInputElement>(null);
-  const dialog = useRef<HTMLDivElement>(null);
   const choosing = useRef(false);
+  const modal = useModalFocus<HTMLDivElement>(input, () => !choosing.current);
   const matches = useMemo(
     () => branchSearchResults(repositories, query, now),
     [repositories, query, now],
   );
-  const results = matches.slice(0, 50);
-  const activeCount = matches.filter(({ activity }) => activity).length;
+  const results = matches.slice(0, limit);
+  const liveCount = matches.filter(({ activity }) => activity?.kind === 'live').length;
+  const waitingCount = matches.filter(({ activity }) => activity?.kind === 'waiting').length;
+  const activitySummary = [
+    liveCount ? `${liveCount} live` : '',
+    waitingCount ? `${waitingCount} waiting` : '',
+  ]
+    .filter(Boolean)
+    .join(' · ');
   const choose = (repository: Repository, branch: Branch) => {
     choosing.current = true;
     close();
@@ -34,33 +44,19 @@ export function SearchDialog({
     requestAnimationFrame(() => focus(repository, branch));
   };
   useEffect(() => {
-    const previous = document.activeElement;
-    const element = dialog.current;
-    input.current?.focus();
-    return () => {
-      // A selected result may already have focused its map. Restore
-      // the search origin only when closing would otherwise leave focus behind.
-      if (
-        !choosing.current &&
-        previous instanceof HTMLElement &&
-        previous.isConnected &&
-        (document.activeElement === document.body || element?.contains(document.activeElement))
-      )
-        previous.focus({ preventScroll: true });
-    };
-  }, []);
-  useEffect(() => {
     setIndex(0);
+    setLimit(SEARCH_RESULT_BATCH);
   }, [query]);
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 15_000);
     return () => window.clearInterval(timer);
   }, []);
   useEffect(() => {
-    dialog.current
+    modal.container.current
       ?.querySelector(`[data-result-index="${index}"]`)
       ?.scrollIntoView({ block: 'nearest' });
-  }, [index]);
+  }, [index, modal.container]);
+  const showMore = () => setLimit((value) => nextSearchResultLimit(value, matches.length));
   return (
     <div
       className="modal-backdrop"
@@ -73,7 +69,7 @@ export function SearchDialog({
         role="dialog"
         aria-modal="true"
         aria-label="Search all branches"
-        ref={dialog}
+        ref={modal.container}
         onKeyDown={(event) => {
           if (event.key === 'Escape') {
             event.preventDefault();
@@ -82,19 +78,21 @@ export function SearchDialog({
           }
           if (event.key === 'ArrowDown') {
             event.preventDefault();
-            setIndex((i) => Math.min(i + 1, results.length - 1));
+            if (!results.length) return;
+            if (index === results.length - 1 && results.length < matches.length) {
+              showMore();
+              setIndex(index + 1);
+            } else setIndex((i) => Math.min(i + 1, results.length - 1));
           }
           if (event.key === 'ArrowUp') {
             event.preventDefault();
+            if (!results.length) return;
             setIndex((i) => Math.max(0, i - 1));
           }
           if (event.key === 'Enter' && results[index]) {
             choose(results[index].repository, results[index].branch);
           }
-          if (event.key === 'Tab') {
-            event.preventDefault();
-            input.current?.focus();
-          }
+          modal.trapTab(event);
         }}
       >
         <div className="search-dialog-input">
@@ -119,9 +117,9 @@ export function SearchDialog({
         </div>
         <div className="search-label" role="status" aria-live="polite">
           {query
-            ? `${matches.length} matches across all projects${activeCount ? ` · ${activeCount} working now` : ''}`
-            : activeCount
-              ? `${activeCount} working now · then recent branches`
+            ? `${matches.length} matches across all projects${activitySummary ? ` · ${activitySummary}` : ''}`
+            : activitySummary
+              ? `${activitySummary} · then recent branches`
               : 'RECENT BRANCHES'}
         </div>
         <div
@@ -138,6 +136,7 @@ export function SearchDialog({
               className={`${index === i ? 'highlighted' : ''}${activity ? ` ${activity.kind}` : ''}`}
               aria-label={`${branch.title} in ${repository.name}${activity ? `. ${activity.label}` : ''}. Open on map.`}
               role="option"
+              tabIndex={-1}
               aria-selected={index === i}
               onClick={() => choose(repository, branch)}
             >
@@ -164,6 +163,17 @@ export function SearchDialog({
             <p className="search-no-results">No matching branches. Try a shorter name.</p>
           )}
         </div>
+        {results.length < matches.length && (
+          <div className="search-results-more">
+            <span role="status" aria-live="polite">
+              Showing {results.length} of {matches.length}
+            </span>
+            <button className="text-button" onClick={showMore}>
+              Show next {nextSearchResultLimit(limit, matches.length) - results.length}
+              <ChevronDown size={13} aria-hidden="true" />
+            </button>
+          </div>
+        )}
         <div className="search-dialog-footer">
           <span>
             <kbd>↑</kbd>

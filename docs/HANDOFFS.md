@@ -11,6 +11,8 @@ The Needs attention screen can send one branch or a multi-selection to an instal
 
 A 500-branch selection in one repository remains one task. A selection across five repositories becomes five tasks because each agent process has one working directory. The bulk bar and confirmation dialog always count the complete selection, including branches that are not on the visible page.
 
+Preview preparation indexes branch IDs and review findings once per repository. Selection validation and prompt assembly then use those indexes instead of rescanning every branch for every selected row. The 500-branch regression fixture exercises the complete prompt and revision path under the normal five-second test boundary.
+
 ## Evidence and stale-state protection
 
 The renderer sends only repository and branch identifiers. The Electron main process resolves those identifiers against the current snapshot, regenerates deterministic findings, and builds the prompt itself. The preview revision hashes every task, branch, and prompt. Sending fails if the evidence has changed since preview.

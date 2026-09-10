@@ -101,6 +101,7 @@ export function Sidebar(p: Props) {
         {visible.map((repo) => (
           <button
             key={repo.id}
+            aria-label={`Open ${repo.name}, ${repo.branches.length} branch copies`}
             className={
               p.selectedId === repo.id &&
               !['people', 'attention', 'activity', 'settings'].includes(p.view)

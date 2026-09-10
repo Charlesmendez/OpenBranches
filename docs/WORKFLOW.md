@@ -26,6 +26,8 @@ Each project toolbar makes live coverage visible without adding another dashboar
 
 Verified live work uses the animated blue pulse. A current checkout with a fresh commit or uncommitted files uses a strong static halo and explicit Git wording, so it remains easy to find without implying that a person or agent is still running.
 
+The word **live** is reserved for fresh runtime evidence. Project totals use the lifecycle label **Recent & open**, while global search reports live and waiting counts separately. A recent commit, open PR, dirty checkout, or saved task cannot inflate the live count.
+
 The Inspector lists every local checkout of the selected branch instead of collapsing them into one Mac location. A fresh verified runtime is attached to its exact worktree and that checkout sorts first with the coding tool and live or waiting state. Clean, dirty, unchecked, locked, prunable, missing, primary, linked, and detached copies remain distinct. The map and inventory show the available-worktree count and call out missing copies separately; each available copy has its own reveal action. Exact worktree paths stay on the Mac and are omitted from team snapshots.
 
 Codex, Claude Code, and Cursor can supply fresh activity through separate opt-in local hooks. Codex asks the user to review and trust a newly installed hook before it runs. Other saved tool/model metadata is not live presence. PR authors and commit authors are labeled by source and do not establish who is working now. Recent task updates and uncommitted work are distinct activity labels. Human presence and unpublished teammate activity still require an opted-in companion with its own observed evidence.

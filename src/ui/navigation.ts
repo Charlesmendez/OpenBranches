@@ -5,6 +5,7 @@ import { prioritizeWork, workSpotlights } from '../domain/workSpotlight';
 export const INVENTORY_ROW_HEIGHT = 76;
 export const INVENTORY_HEADER_HEIGHT = 44;
 export const MAP_PAGE_SIZE = 6;
+export const SEARCH_RESULT_BATCH = 50;
 export type ClusterId = 'review' | 'local' | 'tracked';
 export interface MapPosition {
   expanded: ClusterId | null;
@@ -114,6 +115,9 @@ export function inventoryCursor(
                 ? index - page
                 : undefined;
   return next === undefined ? undefined : Math.max(0, Math.min(count - 1, next));
+}
+export function nextSearchResultLimit(current: number, total: number): number {
+  return Math.min(Math.max(0, total), Math.max(SEARCH_RESULT_BATCH, current + SEARCH_RESULT_BATCH));
 }
 export function typeaheadIndex(branches: Branch[], text: string, current: number): number {
   const needle = text.toLocaleLowerCase();
