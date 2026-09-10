@@ -98,6 +98,13 @@ let active;
 let settle;
 let configuredTools = [];
 let initialAudit;
+let instructionSources = {
+  reported: false,
+  total: 0,
+  expected: false,
+  unexpected: 0,
+  malformed: false,
+};
 const execution = {
   scenario,
   modelRequests: 0,
@@ -114,6 +121,7 @@ function finishExecution(reason) {
     modelCalls: 'local stub only',
     version,
     configuredTools,
+    instructionSources,
     ...initialAudit,
     ...(reason ? { reason } : {}),
     execution: { ...execution },
@@ -187,10 +195,12 @@ const server = createServer((request, response) => {
         }
         finishExecution('Unexpected additional model request.');
       } else {
+        const audit = auditModelRequest(payload, { base, developer, input });
         settle({
           modelCalls: 'local stub only',
           version,
           configuredTools,
+          instructionSources,
           framing: (payload.input ?? [])
             .filter((item) => item.type === 'message')
             .map((item) => {
@@ -218,7 +228,12 @@ const server = createServer((request, response) => {
                 containsPrompt: content.includes(input),
               };
             }),
-          ...auditModelRequest(payload, { base, developer, input }),
+          ...audit,
+          readyForModelExecution:
+            audit.readyForModelExecution &&
+            instructionSources.reported &&
+            !instructionSources.malformed &&
+            instructionSources.unexpected === 0,
         });
       }
     } catch {
@@ -463,6 +478,19 @@ try {
     selectedCapabilityRoots: [],
     runtimeWorkspaceRoots: [],
   });
+  const reportedSources = thread.instructionSources;
+  const sourcePaths = Array.isArray(reportedSources)
+    ? reportedSources.filter((value) => typeof value === 'string')
+    : [];
+  instructionSources = {
+    reported: Array.isArray(reportedSources),
+    total: sourcePaths.length,
+    expected: sourcePaths.includes(instructions),
+    unexpected: sourcePaths.filter((value) => value !== instructions).length,
+    malformed:
+      reportedSources !== undefined &&
+      (!Array.isArray(reportedSources) || sourcePaths.length !== reportedSources.length),
+  };
   if (
     thread.thread?.ephemeral !== true ||
     thread.sandbox?.type !== 'readOnly' ||

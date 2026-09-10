@@ -56,6 +56,30 @@ describe('advisor request diagnostics', () => {
       readyForModelExecution: false,
     });
   });
+  it('allows one exact empty protocol tool envelope and rejects lookalikes or duplicates', () => {
+    const emptyEnvelope = {
+      type: 'additional_tools',
+      id: 'tools_fixture',
+      role: 'developer',
+      tools: [],
+    };
+    const payload = request();
+    payload.input.push(emptyEnvelope);
+    expect(auditModelRequest(payload, expected)).toMatchObject({
+      emptyToolEnvelopes: 1,
+      injectedTools: 0,
+      extraContext: false,
+      readyForModelExecution: true,
+    });
+    payload.input.push({ ...emptyEnvelope, id: 'tools_fixture_2' });
+    expect(auditModelRequest(payload, expected).readyForModelExecution).toBe(false);
+    const withHiddenField = request();
+    withHiddenField.input.push({ ...emptyEnvelope, metadata: 'hidden' });
+    expect(auditModelRequest(withHiddenField, expected).readyForModelExecution).toBe(false);
+    const withWrongRole = request();
+    withWrongRole.input.push({ ...emptyEnvelope, role: 'user' });
+    expect(auditModelRequest(withWrongRole, expected).readyForModelExecution).toBe(false);
+  });
   it('does not leak extra instructions, descriptions, credentials or source paths in its report', () => {
     const payload = request();
     payload.input.push(

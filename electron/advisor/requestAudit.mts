@@ -40,6 +40,16 @@ const publicLabels = new Set([
 ]);
 const label = (value: unknown) =>
   typeof value === 'string' && publicLabels.has(value) ? value : 'unrecognized';
+const validId = (value: unknown) =>
+  value === undefined || (typeof value === 'string' && /^[a-z0-9_-]{1,200}$/i.test(value));
+const emptyToolEnvelope = (item: unknown): item is RecordValue =>
+  record(item) &&
+  item.type === 'additional_tools' &&
+  item.role === 'developer' &&
+  validId(item.id) &&
+  Array.isArray(item.tools) &&
+  item.tools.length === 0 &&
+  Object.keys(item).every((key) => ['type', 'id', 'role', 'tools'].includes(key));
 const textOf = (item: RecordValue): string | undefined => {
   if (typeof item.content === 'string') return item.content;
   if (!Array.isArray(item.content)) return;
@@ -76,6 +86,7 @@ export function auditModelRequest(
   const payload = record(value) ? value : {};
   const items = Array.isArray(payload.input) ? payload.input : [];
   const additions = items.filter((item) => record(item) && item.type === 'additional_tools');
+  const emptyToolEnvelopes = additions.filter(emptyToolEnvelope).length;
   const ordinaryTools = Array.isArray(payload.tools) ? payload.tools.length : 0;
   const injectedTools = additions.reduce(
     (sum, item) => sum + (Array.isArray(item.tools) ? item.tools.length : 0),
@@ -83,12 +94,12 @@ export function auditModelRequest(
   );
   const seen = new Set<string>();
   const extraItems = items.filter((item) => {
+    if (emptyToolEnvelope(item)) return false;
     if (
       !record(item) ||
       item.type !== 'message' ||
       !Object.keys(item).every((key) => ['type', 'role', 'content', 'id'].includes(key)) ||
-      (item.id !== undefined &&
-        (typeof item.id !== 'string' || !/^[a-z0-9_-]{1,200}$/i.test(item.id)))
+      !validId(item.id)
     )
       return true;
     const text = textOf(item);
@@ -104,6 +115,7 @@ export function auditModelRequest(
   });
   const extraContext =
     extraItems.length > 0 ||
+    emptyToolEnvelopes > 1 ||
     (payload.instructions != null && payload.instructions !== expected.base);
   const hasInput = items.some(
     (item) => record(item) && item.role === 'user' && textOf(item) === expected.input,
@@ -114,6 +126,7 @@ export function auditModelRequest(
   return {
     ordinaryTools,
     injectedTools,
+    emptyToolEnvelopes,
     toolLabels: [
       ...toolLabels(payload.tools),
       ...additions.flatMap((item) => toolLabels(item.tools)),
