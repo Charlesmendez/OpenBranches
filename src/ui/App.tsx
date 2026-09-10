@@ -15,7 +15,7 @@ import {
   Sparkles,
   X,
 } from 'lucide-react';
-import type { Branch, Lifecycle, View } from '../domain/types';
+import type { Branch, Lifecycle, Repository, View } from '../domain/types';
 import { featureBranches, groupCounts, lifecycleLabels, lifecycleOf } from '../domain/branches';
 import { useWorkspace } from './hooks/useWorkspace';
 import { useProviders } from './hooks/useProviders';
@@ -164,19 +164,23 @@ export function App() {
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setSelectedId(branch.id);
   };
-  const focusMapBranch = (branch: Branch) => {
-    if (!repository) return;
+  const focusRepositoryBranch = (targetRepository: Repository, branch: Branch) => {
     const nextGroup = lifecycleOf(branch);
-    const nextBranches = branches.filter((candidate) => lifecycleOf(candidate) === nextGroup);
-    const mapPosition = mapPositionFor(nextBranches, branch.id, repository.path);
+    const targetBranches = featureBranches(targetRepository);
+    const nextBranches = targetBranches.filter((candidate) => lifecycleOf(candidate) === nextGroup);
+    const mapPosition = mapPositionFor(nextBranches, branch.id, targetRepository.path);
     if (mapPosition)
-      memory.remember(repository.id, {
-        maps: { ...memory.read(repository.id).maps, [nextGroup]: mapPosition },
+      memory.remember(targetRepository.id, {
+        maps: { ...memory.read(targetRepository.id).maps, [nextGroup]: mapPosition },
       });
     setNavigationRequest((request) => request + 1);
+    setProjectId(targetRepository.id);
     setView('map');
     setGroup(nextGroup);
     selectBranch(branch);
+  };
+  const focusMapBranch = (branch: Branch) => {
+    if (repository) focusRepositoryBranch(repository, branch);
   };
   const navigateBranch = (repoId: string, branchId?: string) => {
     memory.remember(repoId, { inventory: undefined });
@@ -557,6 +561,7 @@ export function App() {
               }}
               onActivity={() => setView('activity')}
               onSelect={navigateBranch}
+              onFocus={focusRepositoryBranch}
               onAdd={() => void addRepository()}
             />
           ) : view === 'inventory' ? (

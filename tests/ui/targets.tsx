@@ -90,11 +90,38 @@ function repositoryFor(scenario: Scenario): Repository {
   return repository;
 }
 
+function clonedRepository(repository: Repository, id: string, name: string): Repository {
+  return {
+    ...structuredClone(repository),
+    id,
+    name,
+    path: `/demo/${name}`,
+    commonDir: `/demo/${name}/.git`,
+    branches: repository.branches.map((branch, index) => ({
+      ...structuredClone(branch),
+      id: `${id}:${index}`,
+      repositoryId: id,
+    })),
+  };
+}
+
 function Fixture() {
   const [scenario, setScenario] = useState<Scenario>('standard');
   const [view, setView] = useState<View>('map');
   const repository = useMemo(() => repositoryFor(scenario), [scenario]);
-  const snapshot = useMemo(() => createDemoSnapshot(), []);
+  const snapshot = useMemo(() => {
+    const value = createDemoSnapshot();
+    return {
+      ...value,
+      repositories: [
+        ...value.repositories,
+        clonedRepository(value.repositories[1], 'forge', 'forge-web'),
+        clonedRepository(value.repositories[2], 'harbor', 'harbor-worker'),
+        clonedRepository(value.repositories[1], 'lumen', 'lumen-mobile'),
+        clonedRepository(value.repositories[2], 'orbit', 'orbit-jobs'),
+      ],
+    };
+  }, []);
   const [selected, setSelected] = useState<string | null>(null);
   return (
     <main className="target-fixture">
@@ -135,6 +162,7 @@ function Fixture() {
           onProject={() => {}}
           onActivity={() => {}}
           onSelect={() => {}}
+          onFocus={() => setView('map')}
           onAdd={() => {}}
         />
       ) : view === 'map' ? (

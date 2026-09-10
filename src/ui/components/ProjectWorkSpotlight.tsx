@@ -1,9 +1,8 @@
-import { ArrowUpRight, CircleDot } from 'lucide-react';
+import { CircleDot } from 'lucide-react';
 import type { Branch, Repository } from '../../domain/types';
 import { workSpotlights } from '../../domain/workSpotlight';
 import { useClock } from '../hooks/useClock';
-import { BranchTargetSummary } from './BranchTargetSummary';
-import { WorkSignalIcon } from './WorkSignalIcon';
+import { WorkSpotlightCard } from './WorkSpotlightCard';
 
 export function ProjectWorkSpotlight({
   repository,
@@ -43,27 +42,15 @@ export function ProjectWorkSpotlight({
         <small>Select a branch to focus it on the map.</small>
       </div>
       <div className="project-work-items">
-        {shown.map(({ branch, signal }) => {
-          return (
-            <button
-              key={branch.id}
-              className={`project-work-item ${signal.kind}`}
-              title={signal.detail}
-              onClick={() => onFocus(branch)}
-            >
-              <span className="project-work-icon">
-                <WorkSignalIcon signal={signal} />
-              </span>
-              <span className="project-work-copy">
-                <strong>{branch.title}</strong>
-                <code>{branch.name}</code>
-                <small>{signal.label}</small>
-                <BranchTargetSummary branch={branch} targets={repository.targets} />
-              </span>
-              <ArrowUpRight size={14} />
-            </button>
-          );
-        })}
+        {shown.map(({ branch, signal }) => (
+          <WorkSpotlightCard
+            key={branch.id}
+            repository={repository}
+            branch={branch}
+            signal={signal}
+            onOpen={() => onFocus(branch)}
+          />
+        ))}
       </div>
       {spotlights.length > shown.length && (
         <span className="project-work-more">+{spotlights.length - shown.length} more</span>

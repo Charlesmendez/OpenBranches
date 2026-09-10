@@ -12,6 +12,7 @@ import { recommendationsFor } from '../src/domain/branches';
 import { groupReviews } from '../src/domain/reviews';
 import { triageFindings, triageHighlights } from '../src/domain/triage';
 import {
+  activeWorkspaceSpotlights,
   prioritizeWork,
   workPreviews,
   workSignal,
@@ -258,6 +259,54 @@ describe('source-backed branch activity', () => {
   });
 });
 describe('current work spotlight', () => {
+  it('collects only verified live or waiting work across projects in urgency order', () => {
+    const running = branch();
+    running.id = 'running';
+    running.repositoryId = 'live-repo';
+    running.tasks = [task()];
+    const liveRepository = { ...repository(running), id: 'live-repo', name: 'Live project' };
+
+    const waiting = branch();
+    waiting.id = 'waiting';
+    waiting.repositoryId = 'waiting-repo';
+    waiting.tasks = [task({ tool: 'claude-code', status: 'idle', waiting: true })];
+    const waitingRepository = {
+      ...repository(waiting),
+      id: 'waiting-repo',
+      name: 'Waiting project',
+    };
+
+    const changed = branch();
+    changed.id = 'changed';
+    changed.repositoryId = 'changed-repo';
+    changed.worktrees = [
+      {
+        path: '/fixture/changed',
+        head: sha,
+        detached: false,
+        available: true,
+        dirty: true,
+        changedFiles: 2,
+      },
+    ];
+    const changedRepository = {
+      ...repository(changed),
+      id: 'changed-repo',
+      path: '/fixture/changed',
+    };
+
+    const result = activeWorkspaceSpotlights(
+      [changedRepository, waitingRepository, liveRepository],
+      now,
+    );
+    expect(
+      result.map(({ repository, branch: item, signal }) => [repository.id, item.id, signal.kind]),
+    ).toEqual([
+      ['live-repo', 'running', 'live'],
+      ['waiting-repo', 'waiting', 'waiting'],
+    ]);
+  });
+
   it('keeps current work first and fills the remaining project preview with open review work', () => {
     const running = branch();
     running.id = 'running';

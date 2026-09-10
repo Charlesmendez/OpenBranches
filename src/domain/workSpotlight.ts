@@ -1,6 +1,7 @@
 import { knownTool, toolNames } from './agents';
 import { liveTasks, waitingTasks } from './branchActivity';
-import type { Branch, CodingTool, TaskLink } from './types';
+import { featureBranches } from './branches';
+import type { Branch, CodingTool, Repository, TaskLink } from './types';
 
 const RECENT_TASK_TTL = 5 * 60_000;
 const RECENT_COMMIT_TTL = 15 * 60_000;
@@ -18,6 +19,9 @@ export interface WorkSignal {
 export interface BranchSpotlight {
   branch: Branch;
   signal: WorkSignal;
+}
+export interface RepositoryWorkSpotlight extends BranchSpotlight {
+  repository: Repository;
 }
 export interface WorkPreview {
   branch: Branch;
@@ -132,6 +136,28 @@ export function workSpotlights(
         b.signal.priority - a.signal.priority ||
         (Date.parse(b.branch.updatedAt) || 0) - (Date.parse(a.branch.updatedAt) || 0) ||
         a.branch.name.localeCompare(b.branch.name),
+    );
+}
+
+/** Return only runtime-backed work across repositories. This deliberately
+ * excludes dirty trees, recent commits, and current checkouts so the workspace
+ * rail never implies that a person or agent is still working without evidence. */
+export function activeWorkspaceSpotlights(
+  repositories: Repository[],
+  now = Date.now(),
+): RepositoryWorkSpotlight[] {
+  return repositories
+    .flatMap((repository) =>
+      workSpotlights(featureBranches(repository), repository.path, now)
+        .filter(({ signal }) => signal.kind === 'live' || signal.kind === 'waiting')
+        .map(({ branch, signal }) => ({ repository, branch, signal })),
+    )
+    .sort(
+      (left, right) =>
+        right.signal.priority - left.signal.priority ||
+        (Date.parse(right.branch.updatedAt) || 0) - (Date.parse(left.branch.updatedAt) || 0) ||
+        left.repository.name.localeCompare(right.repository.name) ||
+        left.branch.name.localeCompare(right.branch.name),
     );
 }
 

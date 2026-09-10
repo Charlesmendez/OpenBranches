@@ -10,12 +10,13 @@ import {
   Laptop,
   Plus,
 } from 'lucide-react';
-import type { ActivityEvent, Repository } from '../../domain/types';
+import type { ActivityEvent, Branch, Repository } from '../../domain/types';
 import { featureBranches, groupCounts, relativeTime } from '../../domain/branches';
 import { primaryIntegrationTargets } from '../../domain/integrationTargets';
 import { workPreviews } from '../../domain/workSpotlight';
 import { useClock } from '../hooks/useClock';
 import { WorkSignalIcon } from './WorkSignalIcon';
+import { WorkspaceWorkSpotlight } from './WorkspaceWorkSpotlight';
 
 export function ActivityList({
   events,
@@ -72,6 +73,7 @@ export function Overview({
   onProject,
   onActivity,
   onSelect,
+  onFocus,
   onAdd,
 }: {
   repositories: Repository[];
@@ -79,11 +81,13 @@ export function Overview({
   onProject: (id: string) => void;
   onActivity: () => void;
   onSelect: (repositoryId: string, branchId?: string) => void;
+  onFocus: (repository: Repository, branch: Branch) => void;
   onAdd: () => void;
 }) {
   const now = useClock();
   return (
     <div className="overview-content">
+      <WorkspaceWorkSpotlight repositories={repositories} now={now} onFocus={onFocus} />
       <div className="section-kicker">
         <span>YOUR PROJECTS</span>
         <span>
