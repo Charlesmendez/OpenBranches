@@ -1,0 +1,31 @@
+.workspace-fixture {
+  display: grid;
+  grid-template-columns: var(--sidebar) minmax(0, 1fr);
+  min-height: 100vh;
+  background: var(--bg);
+}
+.workspace-fixture-sidebar {
+  min-height: 100vh;
+}
+.workspace-fixture-note {
+  padding: 10px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+.workspace-fixture > main {
+  padding: 70px 60px;
+}
+.workspace-fixture > main > span {
+  color: var(--faint);
+  font-size: 9px;
+  letter-spacing: 1.5px;
+}
+.workspace-fixture > main h1 {
+  margin-top: 15px;
+  font-size: 31px;
+}
+.workspace-fixture > main p {
+  margin-top: 12px;
+  color: var(--muted);
+}

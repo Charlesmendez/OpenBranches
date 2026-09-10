@@ -239,14 +239,26 @@ code {
   stroke-width: 1.6;
   fill: var(--surface);
 }
+.workspace-switcher {
+  position: relative;
+  z-index: 20;
+  margin-bottom: 20px;
+}
 .space-switch {
   display: flex;
   align-items: center;
   gap: 10px;
+  width: 100%;
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 10px;
-  margin-bottom: 20px;
+  background: var(--surface);
+  text-align: left;
+}
+.space-switch:hover,
+.space-switch[aria-expanded='true'] {
+  border-color: var(--line-strong);
+  background: var(--raised);
 }
 .workspace-avatar {
   display: grid;
@@ -259,22 +271,135 @@ code {
   font-size: 13px;
   font-weight: 600;
 }
-.space-switch div {
+.space-switch-copy {
   flex: 1;
+  min-width: 0;
 }
-.space-switch strong {
+.space-switch strong,
+.workspace-option strong {
   display: block;
   font-size: 11px;
   font-weight: 550;
 }
-.space-switch small {
+.space-switch small,
+.workspace-option small {
   display: block;
   color: var(--faint);
   font-size: 10px;
   margin-top: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .space-switch > svg {
   color: var(--faint);
+  transition: transform 0.15s ease;
+}
+.space-switch[aria-expanded='true'] > svg {
+  transform: rotate(180deg);
+}
+.workspace-menu {
+  position: absolute;
+  z-index: 50;
+  top: calc(100% + 7px);
+  left: 0;
+  width: 292px;
+  padding: 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: #17191f;
+  box-shadow: 0 18px 55px #000a;
+}
+.workspace-menu-label {
+  display: block;
+  padding: 7px 8px 6px;
+  color: var(--faint);
+  font-size: 8px;
+  letter-spacing: 1.35px;
+}
+.workspace-menu-label.team-label {
+  margin-top: 6px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.workspace-option {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) 16px;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 8px;
+  border-radius: 7px;
+  text-align: left;
+}
+.workspace-option:hover,
+.workspace-option:focus-visible,
+.workspace-option.selected {
+  background: var(--raised);
+}
+.workspace-option.selected > svg {
+  color: var(--accent);
+}
+.workspace-option-copy {
+  min-width: 0;
+}
+.workspace-team-avatar {
+  display: grid;
+  place-items: center;
+  width: 27px;
+  height: 27px;
+  border: 1px solid #8da9ff35;
+  border-radius: 7px;
+  background: #8da9ff0e;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 650;
+}
+.workspace-option.team.pairing .workspace-team-avatar {
+  border-color: #b1a2f540;
+  background: #b1a2f50d;
+  color: var(--violet);
+}
+.workspace-option.team.unavailable .workspace-team-avatar,
+.workspace-option.team.removing .workspace-team-avatar {
+  border-color: #e6bd7835;
+  background: #e6bd780b;
+  color: var(--amber);
+}
+.workspace-option.team > svg {
+  color: var(--faint);
+}
+.workspace-menu-message {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 8px;
+  color: var(--muted);
+  font-size: 10px;
+}
+.workspace-menu-message.issue {
+  color: var(--amber);
+}
+.workspace-menu-footer {
+  margin: 7px -8px -8px;
+  padding: 7px 8px;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: 0 0 10px 10px;
+}
+.workspace-menu-footer button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 8px;
+  border-radius: 6px;
+  color: var(--text-soft);
+  font-size: 10px;
+}
+.workspace-menu-footer button:hover,
+.workspace-menu-footer button:focus-visible {
+  background: var(--raised);
 }
 .primary-nav,
 .project-nav {
@@ -3246,6 +3371,10 @@ code {
     padding-bottom: 14px;
   }
   .space-switch {
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+  .workspace-switcher {
     margin-bottom: 12px;
   }
   .primary-nav button {

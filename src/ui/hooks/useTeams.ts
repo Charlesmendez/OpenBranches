@@ -1,6 +1,6 @@
 import type { TeamDesktopApi } from '../../team/device';
 import { useBridgeState } from './useBridgeState';
-export function useTeams(api?: TeamDesktopApi) {
+export function useTeams(api?: Pick<TeamDesktopApi, 'getTeamConnections' | 'onTeamConnections'>) {
   return useBridgeState(
     api?.getTeamConnections,
     api?.onTeamConnections,

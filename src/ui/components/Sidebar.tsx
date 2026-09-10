@@ -1,7 +1,6 @@
 import {
   Activity,
   ArrowUpRight,
-  ChevronDown,
   CircleDot,
   FolderGit2,
   Layers,
@@ -16,6 +15,7 @@ import { useEffect, useState } from 'react';
 import { projectMatches } from '../../domain/projects';
 import { ProjectSearch } from './ProjectSearch';
 import { Brand } from './Primitives';
+import { WorkspaceSwitcher, type WorkspaceTeamApi } from './WorkspaceSwitcher';
 
 interface Props {
   repositories: Repository[];
@@ -28,6 +28,8 @@ interface Props {
   onView: (view: View) => void;
   onAdd: () => void;
   onMode: () => void;
+  teamApi?: WorkspaceTeamApi;
+  onError: (message: string) => void;
 }
 export function Sidebar(p: Props) {
   const [query, setQuery] = useState('');
@@ -38,14 +40,13 @@ export function Sidebar(p: Props) {
       <div className="sidebar-brand">
         <Brand />
       </div>
-      <div className="space-switch">
-        <span className="workspace-avatar">O</span>
-        <div>
-          <strong>Your workspace</strong>
-          <small>{p.demo ? 'Interactive demo' : 'Personal workspace'}</small>
-        </div>
-        <ChevronDown size={13} />
-      </div>
+      <WorkspaceSwitcher
+        demo={p.demo}
+        api={p.teamApi}
+        onMode={p.onMode}
+        onSettings={() => p.onView('settings')}
+        onError={p.onError}
+      />
       <nav className="primary-nav" aria-label="Workspace">
         <button
           className={!p.selectedId && p.view === 'map' ? 'selected' : ''}

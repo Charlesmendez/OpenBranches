@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useId, useState } from 'react';
 import {
   Check,
   ChevronDown,
@@ -19,6 +19,7 @@ import {
 } from '../../domain/sourceHealth';
 import { relativeTime } from '../../domain/branches';
 import { useClock } from '../hooks/useClock';
+import { useDismissiblePopover } from '../hooks/useDismissiblePopover';
 
 const sourceIcons = {
   local: Database,
@@ -48,30 +49,10 @@ export function SourceStatusMenu({
   onSettings: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const root = useRef<HTMLDivElement>(null);
-  const trigger = useRef<HTMLButtonElement>(null);
+  const { root, trigger } = useDismissiblePopover(open, setOpen);
   const detailsId = useId();
   const now = useClock();
   const health = workspaceSourceHealth(repositories, providers, gitState, scanning, now);
-
-  useEffect(() => {
-    if (!open) return;
-    const closeOutside = (event: PointerEvent) => {
-      if (!root.current?.contains(event.target as Node)) setOpen(false);
-    };
-    const closeWithEscape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      event.preventDefault();
-      setOpen(false);
-      trigger.current?.focus();
-    };
-    document.addEventListener('pointerdown', closeOutside);
-    document.addEventListener('keydown', closeWithEscape);
-    return () => {
-      document.removeEventListener('pointerdown', closeOutside);
-      document.removeEventListener('keydown', closeWithEscape);
-    };
-  }, [open]);
 
   const SummaryIcon = stateIcons[health.state];
   return (

@@ -325,6 +325,8 @@ export function App() {
         onView={changeView}
         onAdd={() => void addRepository()}
         onMode={switchMode}
+        teamApi={mode === 'live' ? window.openbranches?.teams : undefined}
+        onError={setError}
       />
       <main className={`main ${firstSetup ? 'initial-setup' : ''}`}>
         <div className="page-header">
