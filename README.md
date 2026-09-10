@@ -33,7 +33,7 @@ The intended release experience is **download the DMG, drag OpenBranches into Ap
 
 Multi-agent attribution and team workspaces are part of the planned first release. Team mode combines GitHub activity with local work that each member explicitly chooses to share through the Mac app and an optional open-source shared service. Codex runtime, Claude Code history/runtime, and Cursor runtime attribution are implemented locally. The optional [team service preview](docs/TEAM_SERVICE.md) includes grouped branch reports, permission-aware search, a small company priority queue, people/project permissions, device pairing and revocation, plus owner-reviewed GitHub repository selection and bounded background refresh. Fresh local-only and possibly forgotten findings open the exact shared branch. Connected team dashboards appear beside Personal in the desktop workspace switcher. Try the isolated fictional team with `npm run team:preview` after installing team dependencies and starting Docker. The [Mac companion preview](docs/TEAM_COMPANION.md) adds pairing, selected metadata approval, background updates, upload status, Stop sharing, and disconnection; run `npm run team:preview:mac` in a second terminal for its isolated native fixture. Native publication, automatic commit updates, process restarts, and offline withdrawal were verified with fictional data. Real multi-device verification remains unfinished; see [team scope and privacy](docs/TEAM_WORKSPACES.md).
 
-Current installers are **unsigned developer previews**, not normal public releases. Signed and notarized downloads for Apple Silicon and Intel Macs are a release gate. We do not recommend changing macOS security settings to install a preview.
+Current installers are **unsigned developer previews**, not normal public releases. The reproducible [Mac release workflow](docs/RELEASING.md) now builds, signs, notarizes, and verifies separate Apple silicon and Intel DMGs, then attaches them to a draft release for clean-machine review. Public downloads still require the release credentials and final installation checks. We do not recommend changing macOS security settings to install a preview.
 
 ## Develop locally
 
@@ -65,13 +65,13 @@ Build a production renderer and desktop bundle:
 npm run build
 ```
 
-Create an **unsigned, local-only** app and installer:
+Create an **unsigned, local-only** app and installer for the current Mac:
 
 ```sh
 npm run make
 ```
 
-Artifacts are written under `out/`. This command explicitly disables signing and notarization and does not upload a release. A distinct `make:release` command enables Apple signing/notarization; it requires release credentials and explicit release authorization.
+Artifacts are written under `out/`. Preview DMGs include the version, architecture, and `-unsigned` in the file name. `npm run make:arm64` and `npm run make:x64` build a specific architecture. These commands disable signing and notarization and never upload a release. The distinct `make:release` command enables Apple signing/notarization; it requires release credentials and explicit release authorization. See [the complete release process](docs/RELEASING.md).
 
 Set `GITHUB_APP_CLIENT_ID` when building to enable GitHub App device sign-in. The client ID is public; no GitHub client secret is bundled. See [connection setup](docs/CONNECTIONS.md).
 

@@ -1,10 +1,10 @@
 # Mac installation and first-run setup
 
-OpenBranches is still a development preview. The intended public release is a signed, notarized DMG for Apple Silicon and Intel Macs. Those public downloads and their clean-machine installation checks remain release work; the existing unsigned artifacts are for development.
+OpenBranches is still a development preview. The public release format is a signed, notarized DMG for Apple silicon and Intel Macs. The automated pipeline and architecture-specific artifacts are implemented; release credentials, live notarization, and clean-machine installation checks remain release work. Existing unsigned artifacts are for development.
 
 ## Intended public installation
 
-1. Download the release for your Mac.
+1. Download the release for your Mac: `arm64` for Apple silicon or `x64` for Intel.
 2. Drag OpenBranches into Applications and open it.
 3. Choose a local project folder. No account is required for local Git inspection.
 4. Optionally connect GitHub or existing Codex task history in Settings.
@@ -29,5 +29,6 @@ An unsupported or broken Git installation shows repair guidance instead of prete
 - A real Git fixture confirms that scanning with a limited PATH and another repository’s inherited Git settings still inspects the selected folder and preserves its index.
 - The desktop build has detected Git and scanned the selected repository on the development Mac. The missing-tool, retry, demo, recovery, and old-version screens have been exercised through the browser fixture.
 - A clean Mac/VM test of Apple’s actual installer is still required. No development test downloads or installs Apple’s tools on the developer’s machine. Signed installation, Intel runtime validation, and supported macOS-version coverage remain release gates.
+- The [Mac release workflow](RELEASING.md) builds on native Apple silicon and Intel GitHub runners, checks artifact architecture and mounted bundle symlinks, verifies code signing and stapled notarization tickets, verifies each DMG, generates SHA-256 checksums, and keeps the GitHub release as a draft until a maintainer publishes it. An unsigned Apple silicon DMG has been mounted and launched successfully from its read-only volume; signed and Intel runs remain release gates.
 
 For UI verification, run `npm run dev:web` and open `/tests/ui/setup.html`. Its clearly labeled controls simulate the environment. All desktop operations are mocked, and the fixture is excluded from the production entry points.

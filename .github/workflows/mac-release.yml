@@ -1,0 +1,137 @@
+name: Mac release
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+concurrency:
+  group: mac-release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  prepare-draft:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Check version and prepare a reviewable release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match package version $version." >&2
+            exit 1
+          fi
+          if gh release view "$GITHUB_REF_NAME" --json isDraft --jq .isDraft > /tmp/openbranches-release-state 2>/dev/null; then
+            if [ "$(cat /tmp/openbranches-release-state)" != "true" ]; then
+              echo "The release already exists and is not a draft." >&2
+              exit 1
+            fi
+          else
+            gh release create "$GITHUB_REF_NAME" --draft --verify-tag --generate-notes --title "OpenBranches $GITHUB_REF_NAME"
+          fi
+
+  build:
+    needs: prepare-draft
+    if: always() && (needs.prepare-draft.result == 'success' || needs.prepare-draft.result == 'skipped')
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Apple silicon
+            runner: macos-15
+            arch: arm64
+          - label: Intel
+            runner: macos-15-intel
+            arch: x64
+    env:
+      GITHUB_APP_CLIENT_ID: ${{ vars.GITHUB_APP_CLIENT_ID }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Check release configuration
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: |
+          missing=()
+          for name in GITHUB_APP_CLIENT_ID APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID MACOS_CERTIFICATE MACOS_CERTIFICATE_PASSWORD; do
+            if [ -z "${!name}" ]; then missing+=("$name"); fi
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            printf 'Missing release configuration: %s\n' "${missing[*]}" >&2
+            exit 1
+          fi
+          if [ "$(node -p 'process.arch')" != "${{ matrix.arch }}" ]; then
+            echo "Runner architecture does not match ${{ matrix.arch }}." >&2
+            exit 1
+          fi
+      - run: npm ci --no-audit --no-fund
+      - run: npm test && npm run format:check
+      - name: Import Developer ID certificate
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: |
+          certificate="$RUNNER_TEMP/openbranches-release.p12"
+          keychain="$RUNNER_TEMP/openbranches-signing.keychain-db"
+          keychain_password="$(openssl rand -hex 24)"
+          printf '%s' "$MACOS_CERTIFICATE" | openssl base64 -d -A -out "$certificate"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          security import "$certificate" -P "$MACOS_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$keychain"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$keychain_password" "$keychain"
+          security list-keychains -d user -s "$keychain"
+          echo "OPENBRANCHES_RELEASE_KEYCHAIN=$keychain" >> "$GITHUB_ENV"
+          echo "OPENBRANCHES_RELEASE_CERTIFICATE=$certificate" >> "$GITHUB_ENV"
+      - name: Build, sign, and notarize
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: npm run make:release -- --arch=${{ matrix.arch }}
+      - name: Verify application, notarization, DMG, and checksum
+        run: npm run verify:macos -- --release --arch=${{ matrix.arch }}
+      - name: Keep verified installers with the workflow
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: OpenBranches-${{ matrix.arch }}
+          path: |
+            out/make/OpenBranches-*-mac-${{ matrix.arch }}.dmg
+            out/make/OpenBranches-*-mac-${{ matrix.arch }}.dmg.sha256
+          if-no-files-found: error
+          retention-days: 14
+      - name: Attach installers to the draft release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$GITHUB_REF_NAME" out/make/OpenBranches-*-mac-${{ matrix.arch }}.dmg out/make/OpenBranches-*-mac-${{ matrix.arch }}.dmg.sha256 --clobber
+      - name: Remove temporary signing material
+        if: always()
+        run: |
+          if [ -n "${OPENBRANCHES_RELEASE_KEYCHAIN:-}" ]; then
+            security delete-keychain "$OPENBRANCHES_RELEASE_KEYCHAIN" || true
+          fi
+          if [ -n "${OPENBRANCHES_RELEASE_CERTIFICATE:-}" ]; then
+            rm -f "$OPENBRANCHES_RELEASE_CERTIFICATE"
+          fi

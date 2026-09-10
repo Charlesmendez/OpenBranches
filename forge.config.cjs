@@ -3,9 +3,13 @@ const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 const signRelease = process.env.OPENBRANCHES_SIGN_RELEASE === '1';
 if (
   signRelease &&
-  !['APPLE_ID', 'APPLE_APP_SPECIFIC_PASSWORD', 'APPLE_TEAM_ID'].every((key) => process.env[key])
+  !['APPLE_ID', 'APPLE_APP_SPECIFIC_PASSWORD', 'APPLE_TEAM_ID', 'GITHUB_APP_CLIENT_ID'].every(
+    (key) => process.env[key],
+  )
 ) {
-  throw new Error('Release signing requires an Apple ID, app-specific password, and team ID.');
+  throw new Error(
+    'Release packaging requires Apple notarization credentials and the public GitHub App client ID.',
+  );
 }
 module.exports = {
   packagerConfig: {
