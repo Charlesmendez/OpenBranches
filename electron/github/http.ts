@@ -12,8 +12,8 @@ export class GitHubHttp {
   ) {
     this.transport = new GitHubTransport(request);
   }
-  async get(path: string): Promise<{ body: unknown; hasNext: boolean }> {
-    return this.transport.json(path, this.token);
+  async get(path: string, options: { etag?: string } = {}) {
+    return this.transport.json(path, this.token, options);
   }
   resetBackoff() {
     this.transport.resetBackoff();

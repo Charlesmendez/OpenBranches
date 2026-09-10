@@ -10,7 +10,13 @@ import {
 import { enrichRepository } from './enrich';
 import { readOpenPulls, reconcileOpenPulls, retainPartialPulls } from '../../src/github/pulls';
 import { limitSignalCache } from '../../src/github/signals';
-import { GitHubError } from '../../src/github/transport';
+import { GitHubError, type GitHubReader } from '../../src/github/transport';
+
+const PULL_REFRESH_MS = 120_000;
+const PUBLIC_PULL_REFRESH_MS = 5 * 60_000;
+const FULL_REFRESH_MS = 10 * 60_000;
+
+class RefreshBudgetExhausted extends Error {}
 
 export class GitHubService {
   private sources: Record<string, RemoteSnapshot>;
@@ -18,12 +24,15 @@ export class GitHubService {
   private closed = false;
   private generation = 0;
   private job?: { generation: number; promise: Promise<void> };
+  private fullRequested = false;
   private refreshOffset = 0;
-  private timer: ReturnType<typeof setInterval>;
+  private lastPullRefreshAt = 0;
+  private pullTimer: ReturnType<typeof setInterval>;
+  private fullTimer: ReturnType<typeof setInterval>;
 
   constructor(
     private store: Pick<AppStore, 'read' | 'write'>,
-    private auth: Pick<GitHubAuth, 'http'>,
+    private auth: Pick<GitHubAuth, 'http'> & Partial<Pick<GitHubAuth, 'status'>>,
     private current: () => Snapshot,
     private publish: () => void,
     private read: typeof readRemote = readRemote,
@@ -39,9 +48,10 @@ export class GitHubService {
     }
     this.enabled = store.read<boolean>('github.enabled', false) === true;
     this.forgetUnselected();
-    this.timer = setInterval(() => {
-      void this.refresh();
-    }, 120_000);
+    // Open PR state is small and time-sensitive. Branch, closed-PR, signal and
+    // history reads are substantially more expensive, so rotate them slowly.
+    this.pullTimer = setInterval(() => void this.refreshPullRequests(), PULL_REFRESH_MS);
+    this.fullTimer = setInterval(() => void this.refresh(), FULL_REFRESH_MS);
   }
   isEnabled() {
     return this.enabled;
@@ -73,6 +83,7 @@ export class GitHubService {
   }
   setEnabled(enabled: boolean) {
     ++this.generation;
+    this.fullRequested = false;
     this.enabled = enabled;
     this.store.write('github.enabled', enabled);
     if (!enabled) {
@@ -98,14 +109,28 @@ export class GitHubService {
     });
   }
   refresh(): Promise<void> {
+    return this.startRefresh(true);
+  }
+  refreshPullRequests(): Promise<void> {
+    return this.startRefresh(false);
+  }
+  private startRefresh(full: boolean): Promise<void> {
     if (!this.enabled || this.closed) return Promise.resolve();
+    if (full) this.fullRequested = true;
     if (this.job?.generation === this.generation) return this.job.promise;
     const job = { generation: this.generation, promise: Promise.resolve() };
     this.job = job;
-    job.promise = this.refreshAll(job.generation).finally(() => {
+    job.promise = this.runQueuedRefreshes(job.generation).finally(() => {
       if (this.job === job) this.job = undefined;
     });
     return job.promise;
+  }
+  private async runQueuedRefreshes(generation: number) {
+    do {
+      const full = this.fullRequested;
+      this.fullRequested = false;
+      await this.refreshAll(generation, full);
+    } while (this.fullRequested && !this.closed && this.enabled && generation === this.generation);
   }
   private sourceKey(repository: Repository, remote: Repository['remotes'][number]) {
     const slug = githubRepository(remote.url);
@@ -120,53 +145,106 @@ export class GitHubService {
     this.store.write('github.sources', this.sources);
     this.publish();
   }
-  private async refreshAll(generation: number) {
+  private async refreshAll(generation: number, full: boolean) {
+    const hasAuthStatus = typeof this.auth.status === 'function';
+    const connected = this.auth.status?.().connected === true;
+    const now = Date.now();
+    if (!full && !connected && now - this.lastPullRefreshAt < PUBLIC_PULL_REFRESH_MS) return;
+    this.lastPullRefreshAt = now;
+    const requestBudget = {
+      remaining: !hasAuthStatus
+        ? Number.MAX_SAFE_INTEGER
+        : connected
+          ? full
+            ? 100
+            : 50
+          : full
+            ? 8
+            : 1,
+    };
+    const http: GitHubReader = {
+      get: async (path, options) => {
+        if (requestBudget.remaining <= 0) throw new RefreshBudgetExhausted();
+        requestBudget.remaining -= 1;
+        return this.auth.http.get(path, options);
+      },
+    };
     const sources = this.current().repositories.flatMap((repository) =>
-      repository.remotes.map((remote) => ({ repository, remote })),
+      repository.remotes.flatMap((remote) =>
+        githubRepository(remote.url) ? [{ repository, remote }] : [],
+      ),
     );
     const verifiedPulls = new Set<string>();
+    const freshOpenPulls = new Map<string, Awaited<ReturnType<typeof readOpenPulls>>>();
     let pullStatesChanged = false;
-    const openSources = sources
+    const pullSources = sources
       .flatMap(({ repository, remote }) => {
         const slug = githubRepository(remote.url);
         const key = this.sourceKey(repository, remote);
         const source = key ? this.sources[key] : undefined;
-        return slug && key && source?.pulls.some((pull) => pull.state === 'open')
-          ? [{ repository, remote, slug, key, source }]
-          : [];
+        if (!slug || !key) return [];
+        if (!hasAuthStatus && !source?.pulls.some((pull) => pull.state === 'open')) return [];
+        return [
+          {
+            repository,
+            remote,
+            slug,
+            key,
+            source:
+              source ??
+              ({
+                repository: slug,
+                remoteName: remote.name,
+                branches: [],
+                pulls: [],
+                checkedAt: '',
+                branchesComplete: false,
+                pullHistoryComplete: false,
+              } satisfies RemoteSnapshot),
+          },
+        ];
       })
       .sort(
         (left, right) =>
-          Number(right.source.pulls.some((pull) => pull.state === 'open' && pull.retained)) -
-            Number(left.source.pulls.some((pull) => pull.state === 'open' && pull.retained)) ||
+          Number(right.source.pulls.some((pull) => pull.state === 'open')) -
+            Number(left.source.pulls.some((pull) => pull.state === 'open')) ||
           (left.source.pullsCheckedAt || left.source.checkedAt).localeCompare(
             right.source.pullsCheckedAt || right.source.checkedAt,
           ),
       );
-    for (const { slug, key } of openSources) {
+    const pullLimit = hasAuthStatus && !connected ? 1 : pullSources.length;
+    const prioritizedPullSources = pullSources.slice(0, pullLimit);
+    for (const { slug, key, source } of prioritizedPullSources) {
       if (this.closed || !this.enabled || generation !== this.generation) return;
       if (!this.selectedKeys().has(key)) continue;
       try {
         const fresh = await readOpenPulls(
-          this.auth.http,
+          http,
           slug,
           () =>
             !this.closed &&
             this.enabled &&
             generation === this.generation &&
             this.selectedKeys().has(key),
+          source,
         );
         if (this.closed || generation !== this.generation) return;
         if (!this.selectedKeys().has(key)) continue;
-        this.sources[key] = reconcileOpenPulls(this.sources[key], fresh);
+        this.sources[key] = reconcileOpenPulls(source, fresh);
+        freshOpenPulls.set(key, fresh);
         verifiedPulls.add(key);
         pullStatesChanged = true;
       } catch (error) {
         if (this.closed || generation !== this.generation) return;
         if (!this.selectedKeys().has(key)) continue;
+        if (error instanceof RefreshBudgetExhausted) break;
         const message =
           error instanceof Error ? error.message : 'GitHub could not refresh pull requests.';
-        this.sources[key] = { ...this.sources[key], pullsError: message };
+        this.sources[key] = {
+          ...source,
+          checkedAt: source.checkedAt || new Date(now).toISOString(),
+          pullsError: message,
+        };
         pullStatesChanged = true;
         if (error instanceof GitHubError && error.status === 429) break;
       }
@@ -174,24 +252,35 @@ export class GitHubService {
     // Publish this focused result before slower branch and history reads. A
     // closed PR should disappear from the live panel as soon as GitHub proves it.
     if (pullStatesChanged) this.save(generation);
+    if (!full) return;
 
-    const offset = this.refreshOffset++ % Math.max(1, sources.length);
-    const budget = { remaining: 12, milliseconds: 30_000 };
-    const pullLookupBudget = { remaining: 6, milliseconds: 15_000 };
-    const signalsBudget = { remaining: 6, milliseconds: 20_000 };
-    for (const { repository, remote } of [...sources.slice(offset), ...sources.slice(0, offset)]) {
+    const sourceLimit = !hasAuthStatus ? sources.length : connected ? 8 : 1;
+    const offset = this.refreshOffset % Math.max(1, sources.length);
+    const rotated = [...sources.slice(offset), ...sources.slice(0, offset)].slice(0, sourceLimit);
+    this.refreshOffset = (offset + rotated.length) % Math.max(1, sources.length);
+    const budget = { remaining: connected || !hasAuthStatus ? 12 : 1, milliseconds: 30_000 };
+    const pullLookupBudget = {
+      remaining: connected || !hasAuthStatus ? 6 : 1,
+      milliseconds: 15_000,
+    };
+    const signalsBudget = {
+      remaining: connected || !hasAuthStatus ? 6 : 1,
+      milliseconds: 20_000,
+    };
+    for (const { repository, remote } of rotated) {
       if (this.closed || !this.enabled || generation !== this.generation) return;
       const slug = githubRepository(remote.url);
       if (!slug) continue;
       const key = `${repository.id}:${remote.name}:${slug}`;
       try {
         if (!this.selectedKeys().has(key)) continue;
-        const fresh = await this.read(this.auth.http, slug, remote.name, {
+        const fresh = await this.read(http, slug, remote.name, {
           previous: this.sources[key]?.history,
           previousPulls: this.sources[key]?.pulls,
           previousPullLookups: this.sources[key]?.pullLookups,
           pullLookupBudget,
           signalsBudget,
+          openPullSnapshot: freshOpenPulls.get(key),
           local: repository,
           budget,
           isCurrent: () =>
@@ -207,6 +296,7 @@ export class GitHubService {
       } catch (error) {
         if (this.closed || generation !== this.generation) return;
         if (!this.selectedKeys().has(key)) continue;
+        if (error instanceof RefreshBudgetExhausted) break;
         const previous = this.sources[key] ?? {
           repository: slug,
           remoteName: remote.name,
@@ -232,6 +322,7 @@ export class GitHubService {
   }
   close() {
     this.closed = true;
-    clearInterval(this.timer);
+    clearInterval(this.pullTimer);
+    clearInterval(this.fullTimer);
   }
 }

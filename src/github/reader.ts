@@ -1,6 +1,12 @@
 import { z } from 'zod';
 import type { GitHubReader } from './transport';
-import { cachedPullSchema, limitCachedPulls, mergeCachedPulls, readPulls } from './pulls';
+import {
+  cachedPullSchema,
+  limitCachedPulls,
+  mergeCachedPulls,
+  readPulls,
+  type OpenPullSnapshot,
+} from './pulls';
 import { historySchema, readHistory, type HistoryOptions } from './history';
 import { readPullSignals, type SignalsBudget } from './signals';
 import type { CachedPull } from './pulls';
@@ -17,6 +23,7 @@ export interface RemoteOptions extends HistoryOptions {
   previousPullLookups?: PullLookup[];
   pullLookupBudget?: PullLookupBudget;
   signalsBudget?: SignalsBudget;
+  openPullSnapshot?: OpenPullSnapshot;
 }
 
 export { githubRepository } from './identity';
@@ -33,6 +40,7 @@ export const remoteSnapshotSchema = z.object({
   pulls: z.array(cachedPullSchema).max(5300),
   pullLookups: z.array(pullLookupSchema).max(10_000).optional(),
   openPullsComplete: z.boolean().optional(),
+  openPullEtag: z.string().max(512).optional(),
   pullsCheckedAt: cachedText.optional(),
   pullsError: cachedText.optional(),
   checkedAt: cachedText,
@@ -75,7 +83,12 @@ export async function readRemote(
       break;
     }
   }
-  const pullIndex = await readPulls(http, repository, () => options.isCurrent?.() !== false);
+  const pullIndex = await readPulls(
+    http,
+    repository,
+    () => options.isCurrent?.() !== false,
+    options.openPullSnapshot,
+  );
   let pulls = pullIndex.pulls;
   let pullLookups: PullLookup[] | undefined;
   if (options.pullLookupBudget) {
@@ -111,6 +124,7 @@ export async function readRemote(
     ...(pullLookups ? { pullLookups } : {}),
     branchesComplete,
     checkedAt,
+    pullsCheckedAt: options.openPullSnapshot?.checkedAt ?? checkedAt,
     history,
   };
 }

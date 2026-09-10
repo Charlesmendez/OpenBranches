@@ -89,6 +89,27 @@ describe('bounded GitHub transport', () => {
     await expect(transport.json('/user', 'connected-token')).resolves.toMatchObject({ body: {} });
     expect(request).toHaveBeenCalledTimes(2);
   });
+  it('uses authenticated ETags and accepts an unchanged response without reading a body', async () => {
+    const request = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response('[]', { headers: { etag: '"pulls-v1"' } }))
+      .mockResolvedValueOnce(new Response(null, { status: 304 }));
+    const transport = new GitHubTransport(request);
+
+    const first = await transport.json('/repos/example/project/pulls', 'connected-token');
+    const unchanged = await transport.json('/repos/example/project/pulls', 'connected-token', {
+      etag: first.etag,
+    });
+
+    expect(first).toMatchObject({ body: [], etag: '"pulls-v1"' });
+    expect(unchanged).toEqual({
+      body: undefined,
+      etag: '"pulls-v1"',
+      hasNext: false,
+      notModified: true,
+    });
+    expect(new Headers(request.mock.calls[1][1]?.headers).get('if-none-match')).toBe('"pulls-v1"');
+  });
   it('stops pre-aborted requests and discards a response arriving after cancellation', async () => {
     const abort = new AbortController();
     const request = vi.fn<typeof fetch>().mockImplementation(async () => {

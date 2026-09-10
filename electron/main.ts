@@ -70,7 +70,7 @@ function refreshGitHubInForeground() {
   const now = Date.now();
   if (now - lastForegroundGitHubRefresh < 30_000) return;
   lastForegroundGitHubRefresh = now;
-  void github?.refresh();
+  void github?.refreshPullRequests();
 }
 function showWindow() {
   window?.show();

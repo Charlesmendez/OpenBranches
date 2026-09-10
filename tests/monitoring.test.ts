@@ -9,7 +9,7 @@ import { AppStore } from '../electron/services/store';
 import { RepositoryService } from '../electron/services/repositories';
 import { GitHubService } from '../electron/github/service';
 import { GitHubHttp } from '../electron/github/http';
-import type { RemoteSnapshot } from '../src/github/reader';
+import { readRemote, remoteSnapshotSchema, type RemoteSnapshot } from '../src/github/reader';
 import { CodexService } from '../electron/codex/service';
 import { ReviewService } from '../electron/services/reviews';
 import { stopMonitoring } from '../electron/services/monitoring';
@@ -333,6 +333,94 @@ describe('stopping project monitoring', () => {
     expect(saved.error).toBe('Full refresh failed.');
     expect(service.enrich(snapshot).repositories[0].github?.openPullsComplete).toBe(true);
     expect(publish).toHaveBeenCalledTimes(2);
+  });
+  it('limits public background polling to one PR source and skips expensive full scans', async () => {
+    vi.useFakeTimers();
+    const { store } = await storeFixture();
+    const snapshot = createDemoSnapshot();
+    snapshot.repositories = [0, 1, 2].map((index) => ({
+      ...structuredClone(snapshot.repositories[0]),
+      id: `project-${index}`,
+      name: `Project ${index}`,
+      remotes: [{ name: 'origin', url: `https://github.com/example/project-${index}` }],
+    }));
+    store.write('github.enabled', true);
+    const request = vi.fn<typeof fetch>().mockImplementation(async () => new Response('[]'));
+    const read = vi.fn<typeof readRemote>();
+    const service = new GitHubService(
+      store,
+      {
+        http: new GitHubHttp(async () => undefined, request),
+        status: () => ({ connected: false, configured: true }),
+      },
+      () => snapshot,
+      () => {},
+      read,
+    );
+    cleanup.push(() => service.close());
+
+    await vi.advanceTimersByTimeAsync(8 * 60_000);
+
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(read).not.toHaveBeenCalled();
+    expect(request.mock.calls.map(([input]) => new URL(String(input)).pathname).sort()).toEqual([
+      '/repos/example/project-0/pulls',
+      '/repos/example/project-1/pulls',
+    ]);
+  });
+  it('caps a public full refresh even when GitHub advertises unbounded pages', async () => {
+    const { store } = await storeFixture();
+    const snapshot = createDemoSnapshot();
+    snapshot.repositories = [snapshot.repositories[0]];
+    store.write('github.enabled', true);
+    const request = vi.fn<typeof fetch>().mockImplementation(
+      async () =>
+        new Response('[]', {
+          headers: {
+            link: '<https://api.github.com/repos/example/project/pulls?page=2>; rel="next"',
+          },
+        }),
+    );
+    const service = new GitHubService(
+      store,
+      {
+        http: new GitHubHttp(async () => undefined, request),
+        status: () => ({ connected: false, configured: true }),
+      },
+      () => snapshot,
+      () => {},
+    );
+    cleanup.push(() => service.close());
+
+    await service.refresh();
+
+    expect(request).toHaveBeenCalledTimes(8);
+  });
+  it('keeps a valid partial source when a first public PR check fails', async () => {
+    vi.useFakeTimers();
+    const { store } = await storeFixture();
+    const snapshot = createDemoSnapshot();
+    snapshot.repositories = [snapshot.repositories[0]];
+    store.write('github.enabled', true);
+    const service = new GitHubService(
+      store,
+      {
+        http: new GitHubHttp(
+          async () => undefined,
+          vi.fn<typeof fetch>().mockResolvedValue(new Response('{}', { status: 500 })),
+        ),
+        status: () => ({ connected: false, configured: true }),
+      },
+      () => snapshot,
+      () => {},
+    );
+    cleanup.push(() => service.close());
+
+    await vi.advanceTimersByTimeAsync(2 * 60_000);
+
+    const cached = Object.values(store.read<Record<string, unknown>>('github.sources', {}));
+    expect(cached).toHaveLength(1);
+    expect(remoteSnapshotSchema.safeParse(cached[0]).success).toBe(true);
   });
   it('does not resurrect a repository after a pending local scan and never touches its files', async () => {
     vi.useFakeTimers();

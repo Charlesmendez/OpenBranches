@@ -2,7 +2,10 @@ import { readJson } from '../shared/readJson';
 
 export type Fetch = typeof fetch;
 export interface GitHubReader {
-  get(path: string): Promise<{ body: unknown; hasNext: boolean }>;
+  get(
+    path: string,
+    options?: { etag?: string },
+  ): Promise<{ body: unknown; hasNext: boolean; etag?: string; notModified?: boolean }>;
 }
 export class GitHubError extends Error {
   constructor(
@@ -32,8 +35,9 @@ export class GitHubTransport {
       signal?: AbortSignal;
       body?: unknown;
       maxBytes?: number;
+      etag?: string;
     } = {},
-  ): Promise<{ body: unknown; hasNext: boolean }> {
+  ): Promise<{ body: unknown; hasNext: boolean; etag?: string; notModified?: boolean }> {
     const url = new URL(path, 'https://api.github.com');
     if (
       !path.startsWith('/') ||
@@ -53,6 +57,14 @@ export class GitHubTransport {
     // Check the path and backoff before a desktop credential provider can
     // perform its own token refresh request.
     const token = typeof credential === 'function' ? await credential() : credential;
+    const etag =
+      token &&
+      options.body === undefined &&
+      options.etag &&
+      options.etag.length <= 512 &&
+      /^[\x20-\x7e]+$/.test(options.etag)
+        ? options.etag
+        : undefined;
     let response: Response;
     try {
       signal.throwIfAborted();
@@ -63,6 +75,7 @@ export class GitHubTransport {
           'X-GitHub-Api-Version': '2026-03-10',
           'User-Agent': 'OpenBranches',
           ...(token && { Authorization: `Bearer ${token}` }),
+          ...(etag && { 'If-None-Match': etag }),
           ...(options.body !== undefined && { 'Content-Type': 'application/json' }),
         },
         ...(options.body !== undefined && { body: JSON.stringify(options.body) }),
@@ -72,6 +85,10 @@ export class GitHubTransport {
       });
     } catch {
       throw new GitHubError('GitHub could not complete this request. Refresh to retry.', 0);
+    }
+    if (response.status === 304 && etag) {
+      await response.body?.cancel().catch(() => {});
+      return { body: undefined, hasNext: false, etag, notModified: true };
     }
     if (!response.ok) {
       await response.body?.cancel().catch(() => {});
@@ -109,7 +126,15 @@ export class GitHubTransport {
         unreadable: 'GitHub sent an unreadable response.',
       });
       signal.throwIfAborted();
-      return { body, hasNext: /rel="next"/.test(response.headers.get('link') ?? '') };
+      const responseEtag = response.headers.get('etag');
+      return {
+        body,
+        hasNext: /rel="next"/.test(response.headers.get('link') ?? ''),
+        ...(token &&
+          responseEtag &&
+          responseEtag.length <= 512 &&
+          /^[\x20-\x7e]+$/.test(responseEtag) && { etag: responseEtag }),
+      };
     } catch {
       throw new GitHubError('GitHub returned unavailable, oversized, or unexpected data.', 0);
     }

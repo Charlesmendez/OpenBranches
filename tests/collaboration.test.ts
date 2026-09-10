@@ -318,6 +318,37 @@ describe('GitHub collaboration metadata', () => {
     expect(reconciled.error).toBe('GitHub is rate limited.');
   });
 
+  it('reuses sanitized open PR evidence when an authenticated conditional read is unchanged', async () => {
+    const request = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(response([sourcePull()]))
+      .mockResolvedValueOnce(new Response(null, { status: 304 }));
+    const client = new GitHubHttp(
+      async () => 'connected-token',
+      async (input, init) => {
+        const result = await request(input, init);
+        if (request.mock.calls.length === 1)
+          return new Response(await result.text(), {
+            status: result.status,
+            headers: { ...Object.fromEntries(result.headers), etag: '"open-v1"' },
+          });
+        return result;
+      },
+    );
+    const first = await readOpenPulls(client, 'example/project');
+    const previous = source({
+      pulls: first.pulls,
+      openPullEtag: first.etag,
+      openPullsComplete: true,
+    });
+    const unchanged = await readOpenPulls(client, 'example/project', () => true, previous);
+
+    expect(unchanged.pulls).toEqual(first.pulls);
+    expect(unchanged.etag).toBe('"open-v1"');
+    expect(new Headers(request.mock.calls[1][1]?.headers).get('if-none-match')).toBe('"open-v1"');
+    expect(reconcileOpenPulls(previous, unchanged).pulls).toHaveLength(1);
+  });
+
   it('retains authors, review requests and deleted-head PRs without bodies, private actor fields or arbitrary links', () => {
     const pull = parsePulls(
       [sourcePull({ head: { ref: 'feat/sharing', sha: hash, repo: null } })],

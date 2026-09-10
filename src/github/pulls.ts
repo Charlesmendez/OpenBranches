@@ -50,6 +50,7 @@ export interface OpenPullSnapshot {
   pulls: CachedPull[];
   complete: boolean;
   checkedAt: string;
+  etag?: string;
 }
 
 /** Merge bounded listings and exact-SHA results without letting an older
@@ -124,6 +125,7 @@ async function readPullState(
   pages: number,
   deadline: number,
   isCurrent: () => boolean,
+  conditional?: { etag: string; pulls: CachedPull[] },
 ) {
   const pulls = new Map<number, CachedPull>();
   const prefix = `/repos/${repository.split('/').map(encodeURIComponent).join('/')}`;
@@ -133,15 +135,24 @@ async function readPullState(
     if (Date.now() >= deadline) break;
     const response = await http.get(
       `${prefix}/pulls?state=${state}&sort=updated&direction=desc&per_page=100&page=${page}`,
+      page === 1 && conditional ? { etag: conditional.etag } : undefined,
     );
     if (!isCurrent()) throw new Error('GitHub refresh was cancelled.');
+    if (response.notModified) {
+      if (page !== 1 || !conditional) throw new Error('GitHub returned an invalid cache response.');
+      return { pulls: conditional.pulls, complete: true, etag: conditional.etag };
+    }
     for (const pr of parsePulls(response.body, repository)) {
       const previous = pulls.get(pr.number);
       if (!previous || pr.updatedAt >= previous.updatedAt) pulls.set(pr.number, pr);
     }
     if (!response.hasNext) {
       complete = true;
-      break;
+      return {
+        pulls: [...pulls.values()],
+        complete,
+        ...(page === 1 && response.etag ? { etag: response.etag } : {}),
+      };
     }
   }
   return { pulls: [...pulls.values()], complete };
@@ -153,19 +164,42 @@ export async function readOpenPulls(
   http: GitHubReader,
   repository: string,
   isCurrent = () => true,
+  previous?: Pick<RemoteSnapshot, 'pulls' | 'openPullEtag' | 'openPullsComplete'>,
 ): Promise<OpenPullSnapshot> {
   const checkedAt = new Date().toISOString();
-  const result = await readPullState(http, repository, 'open', 50, Date.now() + 30_000, isCurrent);
+  const conditional =
+    previous?.openPullsComplete && previous.openPullEtag
+      ? {
+          etag: previous.openPullEtag,
+          pulls: previous.pulls.filter((pull) => pull.state === 'open'),
+        }
+      : undefined;
+  const result = await readPullState(
+    http,
+    repository,
+    'open',
+    50,
+    Date.now() + 30_000,
+    isCurrent,
+    conditional,
+  );
   return { ...result, checkedAt };
 }
 
-export async function readPulls(http: GitHubReader, repository: string, isCurrent = () => true) {
+export async function readPulls(
+  http: GitHubReader,
+  repository: string,
+  isCurrent = () => true,
+  openSnapshot?: OpenPullSnapshot,
+) {
   const deadline = Date.now() + 30_000;
-  const open = await readPullState(http, repository, 'open', 50, deadline, isCurrent);
+  const open =
+    openSnapshot ?? (await readPullState(http, repository, 'open', 50, deadline, isCurrent));
   const closed = await readPullState(http, repository, 'closed', 3, deadline, isCurrent);
   return {
     pulls: mergeCachedPulls(open.pulls, closed.pulls),
     openPullsComplete: open.complete,
+    ...(open.etag ? { openPullEtag: open.etag } : {}),
     pullHistoryComplete: open.complete && closed.complete,
   };
 }
@@ -198,8 +232,10 @@ export function reconcileOpenPulls(
         .map((pull) => ({ ...pull, retained: true }));
   return {
     ...previous,
+    checkedAt: previous.checkedAt || fresh.checkedAt,
     pulls: limitCachedPulls(mergeCachedPulls(history, retained, observed), observed),
     openPullsComplete: fresh.complete,
+    openPullEtag: fresh.etag,
     pullsCheckedAt: fresh.checkedAt,
     pullsError: undefined,
   };
