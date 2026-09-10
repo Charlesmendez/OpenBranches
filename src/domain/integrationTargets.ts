@@ -39,9 +39,9 @@ export function primaryIntegrationTargets(targets: readonly Target[], limit = 2)
 export function targetHistoryLabel(target: Target): string {
   const source =
     target.source === 'local'
-      ? 'Local history'
+      ? 'History on this Mac'
       : target.source === 'github'
-        ? 'GitHub history'
-        : 'Cached history';
+        ? 'History checked on GitHub'
+        : 'Cached remote history on this Mac';
   return target.role === 'default' ? `Default branch · ${source}` : source;
 }

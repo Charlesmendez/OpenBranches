@@ -44,8 +44,8 @@ export function Inventory({
     filter,
   } = navigation;
   const targets = repository.targets;
-  const columns = `minmax(220px, 1.65fr) 115px ${targets.map(() => '140px').join(' ')} 90px`;
-  const minWidth = 220 + 115 + targets.length * 140 + 90 + (targets.length + 2) * 12 + 30;
+  const columns = `minmax(220px, 1.65fr) 175px ${targets.map(() => '140px').join(' ')} 90px`;
+  const minWidth = 220 + 175 + targets.length * 140 + 90 + (targets.length + 2) * 12 + 30;
   return (
     <div className="inventory">
       <div className="inventory-search">
@@ -89,7 +89,7 @@ export function Inventory({
           >
             <option value="all">All locations</option>
             <option value="local">On this Mac</option>
-            <option value="remote">With remote reference</option>
+            <option value="remote">With Git remote evidence</option>
           </select>
           <select
             aria-label="Filter lifecycle"
@@ -197,7 +197,7 @@ export function Inventory({
                         </span>
                       </span>
                       <span>
-                        <Locations branch={branch} compact />
+                        <Locations branch={branch} repository={repository} compact />
                       </span>
                       {targets.map((target) => (
                         <span key={target.name}>
@@ -206,7 +206,7 @@ export function Inventory({
                       ))}
                       <span className="table-time">{relativeTime(branch.updatedAt)}</span>
                       <span id={`${rowId}-details`} className="sr-only">
-                        {branch.name}. {locationOf(branch)}.
+                        {branch.name}. {locationOf(branch, repository)}.
                         {targets.length
                           ? ` ${targets
                               .map(

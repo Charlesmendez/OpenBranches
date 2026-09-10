@@ -117,6 +117,27 @@ describe('map evidence', () => {
     };
     expect(mapEvidence(repository(b), b, now)[1].connection).toBeUndefined();
   });
+  it('separates an integrated committed tip from uncommitted work', () => {
+    const b = branch();
+    b.integration.main = 'integrated';
+    b.worktrees = [
+      {
+        path: '/fixture/project',
+        head: sha,
+        branch: 'refs/heads/feat/work',
+        detached: false,
+        available: true,
+        dirty: true,
+        changedFiles: 2,
+      },
+    ];
+    const evidence = mapEvidence(repository(b), b, now);
+    expect(evidence.map((item) => item.label)).toEqual([
+      'Committed tip in develop',
+      'Committed tip in main',
+    ]);
+    expect(evidence[0].detail).toContain('Uncommitted files are not part of this comparison.');
+  });
   it('requires the exact published tip and a fresh PR destination; a diverged local copy stays separate', () => {
     const b = branch();
     b.remote = {

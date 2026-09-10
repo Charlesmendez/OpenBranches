@@ -1588,6 +1588,18 @@ code {
   font-size: 8px;
   line-height: 1;
 }
+.locations .location-remote {
+  min-width: 0;
+}
+.locations .location-remote > span,
+.locations .location-remote > code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.locations .location-remote > code {
+  color: var(--muted);
+  font: inherit;
+}
 .locations .location-missing {
   color: var(--amber);
 }

@@ -4,10 +4,12 @@ import {
   featureBranches,
   groupCounts,
   lifecycleOf,
+  locationOf,
   recommendationsFor,
   relativeTime,
   DAY,
 } from '../src/domain/branches';
+import { remoteDestinationLabel, remoteEvidenceLabel, remoteIdentity } from '../src/domain/remotes';
 
 describe('branch evidence', () => {
   it('accounts for every feature branch exactly once across activity groups', () => {
@@ -70,5 +72,41 @@ describe('branch evidence', () => {
     expect(recommendationsFor(repo).some((item) => item.category === 'forgotten')).toBe(false);
     branch.tasks = [];
     expect(recommendationsFor(repo).some((item) => item.category === 'forgotten')).toBe(true);
+  });
+  it('names the exact Git remote without implying that Codex runs there', () => {
+    const repo = createDemoSnapshot().repositories[0];
+    const branch = repo.branches[0];
+    branch.local = branch.local ?? {
+      name: branch.name,
+      fullName: `refs/heads/${branch.name}`,
+      sha: 'a'.repeat(40),
+      updatedAt: new Date().toISOString(),
+      subject: branch.title,
+    };
+    branch.remote = {
+      ...(branch.remote ?? branch.local),
+      remote: 'origin',
+      source: 'github',
+      presence: 'present',
+    };
+    repo.remotes = [{ name: 'origin', url: 'git@github.com:Charlesmendez/OpenBranches.git' }];
+    const remote = remoteIdentity(repo, branch)!;
+    expect(remote).toMatchObject({
+      name: 'origin',
+      host: 'github.com',
+      destination: 'github.com/Charlesmendez/OpenBranches',
+      state: 'published',
+    });
+    expect(remoteEvidenceLabel(remote, true)).toBe('Published to origin · github.com');
+    expect(remoteDestinationLabel(remote)).toBe('origin · github.com/Charlesmendez/OpenBranches');
+    expect(locationOf(branch, repo)).toBe('On this Mac and Published to origin · github.com');
+    branch.remote.source = undefined;
+    branch.remote.presence = undefined;
+    expect(remoteEvidenceLabel(remoteIdentity(repo, branch)!)).toBe('Tracking origin');
+    branch.remote.source = 'github';
+    branch.remote.presence = 'missing';
+    expect(remoteEvidenceLabel(remoteIdentity(repo, branch)!)).toBe(
+      'origin copy no longer on GitHub',
+    );
   });
 });

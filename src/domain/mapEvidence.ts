@@ -100,12 +100,18 @@ export function mapEvidence(
         now,
       );
     const status = state === 'integrated' ? 'In' : state === 'pending' ? 'Not in' : 'Unknown in';
+    const uncommitted =
+      view === 'local' && branch.worktrees.some((tree) => tree.available && tree.dirty === true);
+    const label =
+      state === 'integrated' && uncommitted
+        ? `Committed tip in ${target.name}`
+        : `${status} ${target.name}`;
     return {
       target,
       state,
       stale,
-      label: `${status} ${target.name}${stale ? ' · cached' : ''}`,
-      detail: `${tip?.sha.slice(0, 7) ?? 'Unknown tip'} ${state === 'integrated' ? 'is an ancestor of' : state === 'pending' ? 'is not an ancestor of' : 'could not be compared with'} ${source} ${target.name} (${target.sha.slice(0, 7)}).${state === 'pending' ? ' Squashed, rebased, or cherry-picked changes may still be included.' : ''}${stale ? ' This is saved evidence; refresh before acting.' : ''}`,
+      label: `${label}${stale ? ' · cached' : ''}`,
+      detail: `${tip?.sha.slice(0, 7) ?? 'Unknown tip'} ${state === 'integrated' ? 'is an ancestor of' : state === 'pending' ? 'is not an ancestor of' : 'could not be compared with'} ${source} ${target.name} (${target.sha.slice(0, 7)}).${uncommitted ? ' Uncommitted files are not part of this comparison.' : ''}${state === 'pending' ? ' Squashed, rebased, or cherry-picked changes may still be included.' : ''}${stale ? ' This is saved evidence; refresh before acting.' : ''}`,
       connection: state === 'integrated' ? 'history' : pullMatches ? 'pull-request' : undefined,
       ...(pullMatches ? { pullLabel: `PR #${pull.number} → ${target.name}` } : {}),
     };

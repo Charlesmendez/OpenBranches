@@ -59,7 +59,7 @@ export function Inspector({
           <GitBranch size={20} />
         </span>
         <h2>{branch.title}</h2>
-        <BranchStatus branch={branch} />
+        <BranchStatus branch={branch} repository={repository} />
       </div>
       <div className="ref-copy">
         <code>{branch.name}</code>

@@ -1,4 +1,5 @@
 import type { Branch, IntegrationState, Lifecycle, Recommendation, Repository } from './types';
+import { remoteEvidenceLabel, remoteIdentity } from './remotes';
 import { recommendationRevision } from './reviews';
 import { idleWork, liveTasks, waitingTasks } from './branchActivity';
 
@@ -24,10 +25,12 @@ export function lifecycleOf(branch: Branch, now = Date.now()): Lifecycle {
   if (!states.length || states.some((s) => s === 'unknown')) return 'unverified';
   return 'quiet';
 }
-export function locationOf(branch: Branch): string {
-  if (branch.local && branch.remote) return 'Mac + remote';
-  if (branch.remote) return 'Remote';
-  return 'This Mac';
+export function locationOf(branch: Branch, repository: Pick<Repository, 'remotes'>): string {
+  const remote = remoteIdentity(repository, branch);
+  const local = branch.local || branch.detached ? 'On this Mac' : '';
+  if (!remote) return local || 'Location unavailable';
+  const published = remoteEvidenceLabel(remote, true);
+  return local ? `${local} and ${published}` : published;
 }
 export function titleFromBranch(name: string): string {
   const title = name.replace(/^(codex|feat|feature|fix|chore|agent)\//, '').replace(/[-_]+/g, ' ');

@@ -1,16 +1,17 @@
 import {
   Check,
   GitBranch,
-  Cloud,
   Laptop,
   CircleHelp,
   Minus,
   TriangleAlert,
+  Upload,
   type LucideIcon,
 } from 'lucide-react';
-import type { Branch, IntegrationState } from '../../domain/types';
+import type { Branch, IntegrationState, Repository } from '../../domain/types';
 import type { ReactNode } from 'react';
 import brand from '../../../assets/brand.svg';
+import { remoteEvidenceLabel, remoteIdentity } from '../../domain/remotes';
 
 export function Brand({ compact = false }: { compact?: boolean }) {
   return (
@@ -49,8 +50,17 @@ export function IconButton({
     </button>
   );
 }
-export function Locations({ branch, compact = false }: { branch: Branch; compact?: boolean }) {
+export function Locations({
+  branch,
+  repository,
+  compact = false,
+}: {
+  branch: Branch;
+  repository: Pick<Repository, 'remotes'>;
+  compact?: boolean;
+}) {
   const local = !!branch.local || branch.detached;
+  const remote = remoteIdentity(repository, branch);
   const availableCopies = branch.worktrees.filter((tree) => tree.available).length;
   const missingCopies = branch.worktrees.length - availableCopies;
   const localLabel = [
@@ -63,19 +73,14 @@ export function Locations({ branch, compact = false }: { branch: Branch; compact
   ]
     .filter(Boolean)
     .join('; ');
-  const remoteLabel =
-    branch.remote?.presence === 'missing'
-      ? 'Cached reference; branch no longer listed on GitHub'
-      : branch.remote?.source === 'github'
-        ? 'Observed on GitHub'
-        : 'Cached remote reference';
+  const remoteLabel = remote ? remoteEvidenceLabel(remote, true) : '';
   return (
     <span
       className="locations"
       title={
-        branch.remote
-          ? `${local ? `${localLabel} + ` : ''}${remoteLabel}`
-          : `${localLabel}; remote association not found in this scan`
+        remote
+          ? `${local ? `${localLabel}; ` : ''}${remoteLabel}${remote.destination ? ` (${remote.destination})` : ''}`
+          : `${localLabel}; Git remote association not found in this scan`
       }
     >
       {local && (
@@ -85,8 +90,9 @@ export function Locations({ branch, compact = false }: { branch: Branch; compact
             (availableCopies > 1
               ? `${availableCopies} worktrees`
               : availableCopies === 1
-                ? 'Mac'
-                : 'Mac ref')}
+                ? 'This Mac'
+                : 'Ref on this Mac')}
+          {compact && (availableCopies ? 'Mac' : 'Mac ref')}
           {compact && availableCopies > 1 && <small>{availableCopies}</small>}
         </span>
       )}
@@ -97,11 +103,12 @@ export function Locations({ branch, compact = false }: { branch: Branch; compact
           {compact && <small>{missingCopies}</small>}
         </span>
       )}
-      {local && branch.remote && <span className="location-plus">+</span>}
-      {branch.remote && (
-        <span>
-          <Cloud size={14} />
-          {!compact && 'Remote'}
+      {local && remote && <span className="location-plus">·</span>}
+      {remote && (
+        <span className="location-remote">
+          <Upload size={14} />
+          <span>{compact ? remote.name : remoteEvidenceLabel(remote)}</span>
+          {remote.host && <code>{remote.host}</code>}
         </span>
       )}
     </span>
@@ -127,7 +134,13 @@ export function IntegrationBadge({
     </span>
   );
 }
-export function BranchStatus({ branch }: { branch: Branch }) {
+export function BranchStatus({
+  branch,
+  repository,
+}: {
+  branch: Branch;
+  repository: Pick<Repository, 'remotes'>;
+}) {
   if (branch.pullRequest?.state === 'open')
     return (
       <span className="pill violet">
@@ -154,8 +167,13 @@ export function BranchStatus({ branch }: { branch: Branch }) {
       </span>
     );
   if (!branch.remote) return <span className="pill amber">Local branch</span>;
-  if (branch.local) return <span className="pill neutral">Mac + remote</span>;
-  return <span className="pill neutral">Remote reference</span>;
+  const remote = remoteIdentity(repository, branch)!;
+  return (
+    <span className="pill neutral" title={remote.destination ?? remote.url}>
+      {branch.local && 'On this Mac · '}
+      {remoteEvidenceLabel(remote, true)}
+    </span>
+  );
 }
 export function EmptyState({
   icon: Icon = GitBranch,

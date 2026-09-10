@@ -52,6 +52,7 @@ type MapData = {
   signal?: WorkSignal;
   liveCount?: number;
   now?: number;
+  repository?: Repository;
 } & Record<string, unknown>;
 type MapNode = Node<MapData, 'mapNode'>;
 const MapNodeView = memo(function MapNodeView({ data, selected }: NodeProps<MapNode>) {
@@ -114,7 +115,7 @@ const MapNodeView = memo(function MapNodeView({ data, selected }: NodeProps<MapN
           <AgentBadges branch={data.branch!} compact />
         </div>
         <div className="node-card-bottom">
-          <Locations branch={data.branch!} />
+          <Locations branch={data.branch!} repository={data.repository!} />
           {data.branch!.pullRequest && (
             <span className="pill neutral">PR #{data.branch!.pullRequest.number}</span>
           )}
@@ -255,14 +256,14 @@ export function BranchMap({
       },
       {
         id: 'tracked',
-        label: 'Remote branches',
+        label: 'Git remote copies',
         tone: 'blue',
         branches: prioritizeWork(
           branches.filter((b) => clusterFor(b) === 'tracked'),
           repository.path,
           now,
         ),
-        hint: 'Published or cached references',
+        hint: 'Published or locally cached refs',
       },
     ].filter((c) => c.branches.length);
   }, [branches, repository.path, now]);
@@ -330,6 +331,7 @@ export function BranchMap({
             evidence: evidenceByBranch.get(branch.id),
             signal,
             now,
+            repository,
             activate: () => onSelect(branch),
           },
         });
@@ -480,13 +482,13 @@ export function BranchMap({
             aria-pressed={source === 'local'}
             onClick={() => changeScope({ expanded, page: currentPage, source: 'local' })}
           >
-            Local Git
+            History on this Mac
           </button>
           <button
             aria-pressed={source === 'github'}
             onClick={() => changeScope({ expanded, page: currentPage, source: 'github' })}
           >
-            GitHub
+            History on GitHub
           </button>
         </div>
         <span className="map-count">

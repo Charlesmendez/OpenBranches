@@ -2,6 +2,7 @@ import { ArrowUpRight, Cloud, GitBranch, Laptop, TriangleAlert } from 'lucide-re
 import { useState } from 'react';
 import type { Branch, Repository, Worktree } from '../../domain/types';
 import { relativeTime, shortPath } from '../../domain/branches';
+import { remoteDestinationLabel, remoteEvidenceLabel, remoteIdentity } from '../../domain/remotes';
 import { liveTasks, waitingTasks } from '../../domain/branchActivity';
 import { knownTool, toolNames } from '../../domain/agents';
 import { useClock } from '../hooks/useClock';
@@ -108,6 +109,7 @@ export function WorktreeLocations({
       onError(error instanceof Error ? error.message : String(error));
     }
   };
+  const remote = remoteIdentity(repository, branch);
   const remoteNote =
     branch.remote?.presence === 'missing'
       ? 'Not listed on GitHub at the last successful check. This cached reference may have been deleted.'
@@ -123,7 +125,7 @@ export function WorktreeLocations({
         ? 'Local ref'
         : '',
     missingCount ? `${missingCount} missing` : '',
-    branch.remote ? 'remote copy' : '',
+    remote ? remoteEvidenceLabel(remote) : '',
   ]
     .filter(Boolean)
     .join(' + ');
@@ -193,16 +195,15 @@ export function WorktreeLocations({
           </button>
         </div>
       )}
-      {branch.remote && (
+      {branch.remote && remote && (
         <div className="location-detail remote-copy">
           <Cloud size={18} />
           <div>
-            <strong>{branch.remote.source === 'github' ? 'GitHub' : 'Remote reference'}</strong>
-            <code>
-              {branch.remote.remote
-                ? `${branch.remote.remote}/${branch.remote.name}`
-                : branch.remote.name}
-            </code>
+            <strong>{remoteEvidenceLabel(remote)}</strong>
+            <code title={remote.url}>{remoteDestinationLabel(remote)}</code>
+            <small>
+              Branch ref: {remote.name}/{branch.remote.name}
+            </small>
             <small>{demo ? 'Sample remote state' : remoteNote}</small>
             {branch.local && branch.local.sha !== branch.remote.sha && (
               <small>
