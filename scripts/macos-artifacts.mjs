@@ -33,6 +33,12 @@ export function macArguments(args, hostArchitecture = process.arch) {
   return { architecture, release };
 }
 
+export function lipoArchitecture(architecture) {
+  if (!architectures.has(architecture))
+    throw new Error(`Unsupported Mac architecture: ${architecture}`);
+  return architecture === 'x64' ? 'x86_64' : architecture;
+}
+
 export async function releaseMetadata(root) {
   const value = JSON.parse(await readFile(join(root, 'package.json'), 'utf8'));
   if (!productPattern.test(value.productName ?? ''))
