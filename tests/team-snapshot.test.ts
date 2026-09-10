@@ -22,6 +22,9 @@ describe('opt-in local metadata preparation', () => {
       title: 'PRIVATE TASK TITLE',
       summary: 'PRIVATE TASK SUMMARY',
       evidence: ['PRIVATE EVIDENCE PATH'],
+      status: 'active',
+      activitySource: 'codex-runtime',
+      waiting: true,
     };
     const value = prepareSharedSnapshot(repository, consent, key),
       serialized = JSON.stringify(value);
@@ -31,6 +34,11 @@ describe('opt-in local metadata preparation', () => {
     expect(serialized).not.toContain('PRIVATE');
     expect(serialized).not.toContain(repository.commonDir);
     expect(value.branches[0].tasks[0].key).not.toBe(branch.tasks![0].id);
+    expect(value.branches[0].tasks[0]).toMatchObject({
+      status: 'active',
+      activitySource: 'codex-runtime',
+      waiting: true,
+    });
     expect(snapshotWithinConsent(value, consent)).toBe(true);
   });
   it('has independent choices for task titles and summaries, enforced again by the server schema', () => {
@@ -60,6 +68,26 @@ describe('opt-in local metadata preparation', () => {
       sharedSnapshotSchema.safeParse({
         ...summary,
         branches: [{ ...summary.branches[0], prompt: 'never accepted' }],
+      }).success,
+    ).toBe(false);
+    expect(
+      sharedSnapshotSchema.safeParse({
+        ...summary,
+        branches: [
+          {
+            ...summary.branches[0],
+            tasks: [
+              {
+                ...summary.branches[0].tasks[0],
+                tool: 'cursor',
+                association: 'verified',
+                status: 'active',
+                activitySource: 'codex-runtime',
+                checkedAt: new Date().toISOString(),
+              },
+            ],
+          },
+        ],
       }).success,
     ).toBe(false);
   });

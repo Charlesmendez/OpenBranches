@@ -10,20 +10,44 @@ export type ShareConsent = z.infer<typeof consentSchema>;
 const sha = z.string().regex(/^(?:[a-f\d]{40}|[a-f\d]{64})$/);
 const label = z.string().min(1).max(512);
 const count = z.number().int().nonnegative().max(1_000_000);
-const task = z.strictObject({
-  key: z.string().regex(/^[a-f\d]{64}$/),
-  tool: z.enum(['codex', 'claude-code', 'cursor', 'other', 'unknown']),
-  model: z
-    .strictObject({
-      id: label,
-      provider: z.enum(['openai', 'anthropic', 'xai', 'other']).optional(),
-    })
-    .optional(),
-  association: z.enum(['verified', 'possible']),
-  title: z.string().max(512).optional(),
-  summary: z.string().max(1024).optional(),
-  checkedAt: z.iso.datetime().optional(),
-});
+const task = z
+  .strictObject({
+    key: z.string().regex(/^[a-f\d]{64}$/),
+    tool: z.enum(['codex', 'claude-code', 'cursor', 'other', 'unknown']),
+    model: z
+      .strictObject({
+        id: label,
+        provider: z.enum(['openai', 'anthropic', 'xai', 'other']).optional(),
+      })
+      .optional(),
+    association: z.enum(['verified', 'possible']),
+    status: z.enum(['active', 'idle', 'unknown']).optional(),
+    activitySource: z.literal('codex-runtime').optional(),
+    waiting: z.boolean().optional(),
+    title: z.string().max(512).optional(),
+    summary: z.string().max(1024).optional(),
+    checkedAt: z.iso.datetime().optional(),
+  })
+  .superRefine((value, context) => {
+    if (
+      value.activitySource &&
+      (value.tool !== 'codex' ||
+        value.association !== 'verified' ||
+        value.status === undefined ||
+        value.checkedAt === undefined)
+    )
+      context.addIssue({
+        code: 'custom',
+        path: ['activitySource'],
+        message: 'Runtime activity must be a checked, verified Codex association.',
+      });
+    if (value.waiting !== undefined && !value.activitySource)
+      context.addIssue({
+        code: 'custom',
+        path: ['waiting'],
+        message: 'Waiting state requires runtime activity evidence.',
+      });
+  });
 export const sharedBranchSchema = z.strictObject({
   key: z.string().regex(/^[a-f\d]{64}$/),
   name: label,

@@ -9,21 +9,14 @@ import {
   Clock,
   Check,
   Minus,
+  Radio,
 } from 'lucide-react';
-import type { SharedWork, SharedSnapshot } from '../../src/team/protocol';
 import { sharedWorkStale } from '../../src/team/protocol';
+import { sharedBranchRows, type SharedBranchRow } from '../../src/team/activity';
 import type { TeamPage } from '../../src/team/responses';
 import { ToolIcon, ReportedModel } from '../../src/ui/components/AgentBadges';
 import { toolNames } from '../../src/domain/agents';
 import { Avatar, dateLabel, Empty, Notice } from './primitives';
-type Branch = SharedSnapshot['branches'][number];
-interface Row {
-  work: SharedWork;
-  branch: Branch;
-  person: string;
-  project: string;
-  key: string;
-}
 export function SharedBoard({
   data,
   group,
@@ -52,25 +45,9 @@ export function SharedBoard({
     if (matchMedia('(max-width: 900px)').matches)
       detail.current?.scrollIntoView({ block: 'start' });
   }, [selection]);
-  const rows = useMemo(
-    () =>
-      data.work.flatMap((work) =>
-        work.snapshot.branches.map((branch) => ({
-          work,
-          branch,
-          person:
-            data.people.find((person) => person.id === work.memberId)?.login ??
-            'Member outside this page',
-          project:
-            data.projects.find((project) => project.id === work.projectId)?.name ??
-            'Project outside this page',
-          key: work.deviceId + ':' + work.projectId + ':' + branch.key,
-        })),
-      ),
-    [data],
-  );
+  const rows = useMemo(() => sharedBranchRows(data, now), [data, now]);
   const groups = useMemo(() => {
-    const groups = new Map<string, { name: string; rows: Row[] }>();
+    const groups = new Map<string, { name: string; rows: SharedBranchRow[] }>();
     for (const row of rows) {
       const key = group === 'person' ? row.work.memberId : row.work.projectId;
       const current = groups.get(key) ?? {
@@ -80,9 +57,12 @@ export function SharedBoard({
       current.rows.push(row);
       groups.set(key, current);
     }
-    return [...groups].sort((a, b) => a[1].name.localeCompare(b[1].name));
+    return [...groups].sort(
+      (a, b) => groupRank(a[1].rows) - groupRank(b[1].rows) || a[1].name.localeCompare(b[1].name),
+    );
   }, [rows, group]);
-  const selected = rows.find((row) => row.key === selection);
+  const selected = rows.find((row) => row.key === selection),
+    selectedActivity = selected?.activity;
   return (
     <div className={'shared-layout' + (selected ? ' has-detail' : '')}>
       <div className="shared-groups">
@@ -93,10 +73,10 @@ export function SharedBoard({
               : 'Connect a Mac and choose projects to share. Their branch reports will appear here, grouped by person or project.'}
           </Empty>
         )}
-        {groups.map(([key, value]) => (
+        {groups.map(([key, value], index) => (
           <BranchGroup
             key={group + key + String(focused)}
-            initiallyOpen={focused}
+            initiallyOpen={focused || (index === 0 && value.rows.some((row) => row.activity))}
             name={value.name}
             rows={value.rows}
             group={group}
@@ -124,6 +104,15 @@ export function SharedBoard({
           <p className="detail-origin">
             {selected.project} · reported by @{selected.person}
           </p>
+          {selectedActivity && (
+            <div className={`detail-activity ${selectedActivity.kind}`}>
+              <Radio size={15} />
+              <span>
+                <strong>{selectedActivity.label}</strong>
+                <small>Fresh, verified runtime evidence from this Mac</small>
+              </span>
+            </div>
+          )}
           <div className="detail-status">
             <Laptop size={15} />
             {selected.work.deviceName}
@@ -219,8 +208,9 @@ export function SharedBoard({
             )}
           </section>
           <p className="microcopy">
-            This is metadata reported by an opted-in device. It does not establish who authored
-            every change or whether a person is working right now.
+            This is metadata reported by an opted-in device. A working or waiting label requires a
+            fresh, verified runtime observation; other records do not establish live activity or
+            authorship.
           </p>
         </aside>
       )}
@@ -238,7 +228,7 @@ function BranchGroup({
 }: {
   initiallyOpen: boolean;
   name: string;
-  rows: Row[];
+  rows: SharedBranchRow[];
   group: 'person' | 'project';
   now: number;
   selected?: string;
@@ -246,6 +236,16 @@ function BranchGroup({
 }) {
   const [open, setOpen] = useState(initiallyOpen),
     [limit, setLimit] = useState(8);
+  useEffect(() => {
+    if (initiallyOpen) setOpen(true);
+  }, [initiallyOpen]);
+  const orderedRows = useMemo(
+      () => [...rows].sort((a, b) => a.rank - b.rank || a.branch.name.localeCompare(b.branch.name)),
+      [rows],
+    ),
+    activities = rows.flatMap((row) => (row.activity ? [row.activity] : [])),
+    working = activities.filter((activity) => activity.kind === 'live').length,
+    waiting = activities.filter((activity) => activity.kind === 'waiting').length;
   const outdated = new Set(
     rows
       .filter((row) => sharedWorkStale(row.work, now))
@@ -295,6 +295,12 @@ function BranchGroup({
               </span>
             ))}
         </span>
+        {working > 0 && (
+          <em className="live-group">
+            <Radio size={11} /> {working} working
+          </em>
+        )}
+        {waiting > 0 && <em className="waiting-group">{waiting} waiting</em>}
         {outdated > 0 && (
           <em>
             {outdated} outdated {outdated === 1 ? 'snapshot' : 'snapshots'}
@@ -304,56 +310,69 @@ function BranchGroup({
       </button>
       {open && (
         <div className="branch-group-body">
-          {rows.slice(0, limit).map((row) => (
-            <button
-              key={row.key}
-              className={'shared-branch-row' + (selected === row.key ? ' selected' : '')}
-              onClick={() => onSelect(row.key)}
-            >
-              <span className="branch-node">
-                <GitBranch size={15} />
-              </span>
-              <span className="branch-label">
-                <strong>{row.branch.name}</strong>
-                <small>
-                  {group === 'person' ? row.project : '@' + row.person} · {row.work.deviceName}
-                </small>
-              </span>
-              <span className="branch-tools">
-                {[...new Set(row.branch.tasks.map((task) => task.tool))].slice(0, 3).map((tool) => (
-                  <span key={tool} title={toolNames[tool]} aria-label={toolNames[tool]}>
-                    <ToolIcon tool={tool} />
-                  </span>
-                ))}
-              </span>
-              <span
+          {orderedRows.slice(0, limit).map((row) => {
+            const activity = row.activity;
+            return (
+              <button
+                key={row.key}
                 className={
-                  'row-state ' +
-                  (sharedWorkStale(row.work, now)
-                    ? 'stale'
-                    : row.branch.worktrees.dirty
-                      ? 'dirty'
-                      : '')
+                  'shared-branch-row' +
+                  (selected === row.key ? ' selected' : '') +
+                  (activity ? ` activity-${activity.kind}` : '')
                 }
+                onClick={() => onSelect(row.key)}
               >
-                {sharedWorkStale(row.work, now)
-                  ? 'Outdated'
-                  : row.branch.worktrees.dirty === null
-                    ? 'Status unknown'
-                    : row.branch.worktrees.dirty
-                      ? 'Uncommitted work'
-                      : 'Snapshot saved'}
-              </span>
-              <ChevronRight size={14} />
-            </button>
-          ))}
-          {rows.length > limit && (
+                <span className={'branch-node' + (activity ? ` ${activity.kind}` : '')}>
+                  <GitBranch size={15} />
+                </span>
+                <span className="branch-label">
+                  <strong>{row.branch.name}</strong>
+                  <small>
+                    {group === 'person' ? row.project : '@' + row.person} · {row.work.deviceName}
+                  </small>
+                </span>
+                <span className="branch-tools">
+                  {[...new Set(row.branch.tasks.map((task) => task.tool))]
+                    .slice(0, 3)
+                    .map((tool) => (
+                      <span key={tool} title={toolNames[tool]} aria-label={toolNames[tool]}>
+                        <ToolIcon tool={tool} />
+                      </span>
+                    ))}
+                </span>
+                <span
+                  className={
+                    'row-state ' +
+                    (activity?.kind ??
+                      (row.stale ? 'stale' : row.branch.worktrees.dirty ? 'dirty' : ''))
+                  }
+                >
+                  {activity
+                    ? activity.label
+                    : row.stale
+                      ? 'Outdated'
+                      : row.branch.worktrees.dirty === null
+                        ? 'Status unknown'
+                        : row.branch.worktrees.dirty
+                          ? 'Uncommitted work'
+                          : 'Snapshot saved'}
+                </span>
+                <ChevronRight size={14} />
+              </button>
+            );
+          })}
+          {orderedRows.length > limit && (
             <button className="more-branches" onClick={() => setLimit((value) => value + 20)}>
-              Show {Math.min(20, rows.length - limit)} more branches <ChevronDown size={14} />
+              Show {Math.min(20, orderedRows.length - limit)} more branches{' '}
+              <ChevronDown size={14} />
             </button>
           )}
         </div>
       )}
     </section>
   );
+}
+
+function groupRank(rows: SharedBranchRow[]) {
+  return Math.min(...rows.map((row) => row.rank));
 }

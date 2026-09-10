@@ -18,7 +18,7 @@ The device-only companion endpoint returns the verified account/device, accessib
 
 The member searches monitored projects and explicitly chooses a team-issued destination. Display names never join projects automatically. Task titles and summaries have independent choices, both initially off. Changing choices or destinations clears the preview. Removing the local project or losing sharing permission also invalidates the displayed review.
 
-The shared snapshot preparation module supplies preview and publication with the same field whitelist. The preview shows branch counts, observation time, omitted entries, scan errors, and complete JSON. Per-connection HMAC keys replace raw branch/task IDs. Paths, remote URLs, prompts, source, diffs, commit subjects, and arbitrary evidence are excluded. Branch names and commit IDs can still disclose work and are visible for review.
+The shared snapshot preparation module supplies preview and publication with the same field whitelist. The preview shows branch counts, observation time, omitted entries, scan errors, and complete JSON. Per-connection HMAC keys replace raw branch/task IDs. Paths, remote URLs, prompts, source, diffs, commit subjects, and arbitrary evidence are excluded. Branch names and commit IDs can still disclose work and are visible for review. When the local Codex connection supplies it, the snapshot also carries bounded task status, waiting state, checked time, and `codex-runtime` provenance; the server rejects inconsistent tool/provenance combinations.
 
 The main process retains a short-lived, single-use review of the exact connection, repository, destination, choices, and observed sharing epoch. It does not persist the preview snapshot. Approval accepts only that review ID, rechecks access, expiry, monitoring and epoch, and saves the binding before any enabling request. Later snapshots use the currently monitored repository within those field choices. The UI explicitly explains that approval permits continuing updates.
 
@@ -52,6 +52,7 @@ Actual Electron/Chrome checks with isolated fictional data verified:
 
 - Code approval under the expected team/member/device, followed by a 229-branch preview and publication. The browser gained those reports automatically.
 - Branch details under the reporting Mac, separate tools/models, task text absent by default, and titles present with summaries off when selected.
+- Fresh verified Codex runtime evidence appears as working or waiting, expires after 90 seconds, and never derives from dirty files or commit recency.
 - Stop sharing changed the Mac to Stopped and removed both the searched branch and its open browser details.
 - A simulated commit updated the browser without manually refreshing publication.
 - A real Electron-process restart preserved the project, credential, choices, opaque branch identity, and upload status. Another simulated commit was published after restart.

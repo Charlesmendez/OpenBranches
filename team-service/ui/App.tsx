@@ -27,6 +27,7 @@ import { Access } from './Access';
 import { Devices } from './Devices';
 import { GitHubProjects } from './GitHubProjects';
 import { PublishedWork } from './PublishedWork';
+import { LiveActivitySummary } from './LiveActivitySummary';
 export function TeamApp() {
   const [session, setSession] = useState<TeamSession | null>(),
     [error, setError] = useState(''),
@@ -413,6 +414,19 @@ function Workspace({
         )}
         {data && tab === 'work' && (
           <>
+            <LiveActivitySummary
+              data={data}
+              now={now}
+              onFocus={(row) => {
+                setGroup('person');
+                setPerson(row.work.memberId);
+                setProject(row.work.projectId);
+                setQuery(row.branch.name);
+                requestAnimationFrame(() =>
+                  document.getElementById('shared-work-board')?.scrollIntoView({ block: 'start' }),
+                );
+              }}
+            />
             <div className="team-metrics">
               {[
                 {
@@ -528,12 +542,14 @@ function Workspace({
                 Search and totals describe the reported metadata available here.
               </Notice>
             )}
-            <SharedBoard
-              data={data}
-              group={group}
-              now={now}
-              focused={!!(query || person || project)}
-            />
+            <div id="shared-work-board">
+              <SharedBoard
+                data={data}
+                group={group}
+                now={now}
+                focused={!!(query || person || project)}
+              />
+            </div>
             {data.nextCursor && (
               <div className="load-reports">
                 {state.atLimit ? (

@@ -72,6 +72,9 @@ export function prepareSharedSnapshot(
         key: opaqueKey('task:' + taskKey(task)),
         tool: knownTool(task.tool),
         association: task.association,
+        status: task.status,
+        ...(task.activitySource ? { activitySource: task.activitySource } : {}),
+        ...(task.waiting ? { waiting: true } : {}),
         ...(task.model
           ? {
               model: {
