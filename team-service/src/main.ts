@@ -5,18 +5,21 @@ import { TeamOAuth } from './oauth';
 import { TeamEvents } from './events';
 import { createTeamServer } from './http';
 import { loadTeamAssets } from './static';
+import { loadGitHubSetup } from './github/load';
 
 async function main() {
   const config = teamConfig(process.env);
   const db = new TeamDatabase(config.databaseUrl);
   const store = new TeamStore(db, config.ownerGitHubId);
   const events = new TeamEvents(db);
+  const github = await loadGitHubSetup(config, db);
   const server = createTeamServer(
     config,
     store,
-    new TeamOAuth(db, config, store.identities),
+    new TeamOAuth(db, config, store.identities, fetch, github),
     events,
     await loadTeamAssets(),
+    github,
   );
   let closing: Promise<void> | undefined;
   const close = () =>

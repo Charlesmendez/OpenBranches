@@ -5,6 +5,7 @@ export interface TeamConfig {
   databaseUrl: string;
   githubClientId: string;
   githubClientSecret: string;
+  githubPrivateKeyFile?: string;
   ownerGitHubId: string;
   host: string;
   port: number;
@@ -29,6 +30,9 @@ export function teamConfig(env: NodeJS.ProcessEnv): TeamConfig {
     databaseUrl,
     githubClientId: z.string().min(1).parse(env.GITHUB_APP_CLIENT_ID),
     githubClientSecret: z.string().min(1).parse(env.GITHUB_APP_CLIENT_SECRET),
+    ...(env.GITHUB_APP_PRIVATE_KEY_FILE
+      ? { githubPrivateKeyFile: z.string().min(1).max(4096).parse(env.GITHUB_APP_PRIVATE_KEY_FILE) }
+      : {}),
     ownerGitHubId: z
       .string()
       .regex(/^[1-9]\d{0,19}$/)

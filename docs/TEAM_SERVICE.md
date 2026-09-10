@@ -1,8 +1,8 @@
 # Team service: developer preview
 
-The optional service now implements GitHub browser identity verification, workspace membership, scoped device pairing, project permissions, selected metadata snapshots, revocation, and live invalidation events. It uses PostgreSQL and a separate Node.js process. Personal desktop use does not install or connect to it.
+The optional service now implements GitHub browser identity verification, workspace membership, scoped device pairing, project permissions, selected metadata snapshots, revocation, and live invalidation events. Workspace owners can verify authority over a GitHub user or organization installation, search its repository catalog, review exact choices, save stable selections, and remove them. It uses PostgreSQL and a separate Node.js process. Personal desktop use does not install or connect to it.
 
-The service includes a **browser workspace preview**: grouped shared branch reports, permission-aware search and totals, a focused branch inspector, people/project administration, pairing approval, and device revocation. The [Mac companion](TEAM_COMPANION.md) now pairs, previews and approves selected metadata, publishes background updates, and withdraws sharing. A tested [GitHub installation reader](TEAM_GITHUB.md) now supplies the provider foundation; it is not wired into the running service. GitHub App installation ingestion, organization membership synchronization, company PR alerts, and real two-member/device verification remain incomplete. Running this service does not automatically share any desktop projects. This is not a usable team release yet.
+The service includes a **browser workspace preview**: grouped shared branch reports, permission-aware search and totals, a focused branch inspector, people/project administration, pairing approval, device revocation, and the owner GitHub-selection flow. The [Mac companion](TEAM_COMPANION.md) pairs, previews and approves selected metadata, publishes background updates, shows upload status, and withdraws sharing. Background GitHub branch/PR synchronization, organization membership synchronization, company alerts, and real two-member/device verification remain incomplete. Running this service does not automatically share any desktop projects. This is not a usable team release yet.
 
 ## Try the fictional team
 
@@ -43,13 +43,21 @@ The team test command starts a uniquely named PostgreSQL 18 container, publishes
 
 ## Run the service
 
-The API requires a registered GitHub App. Configure the callback to exactly `<OPENBRANCHES_TEAM_ORIGIN>/auth/callback`. Identity sign-in follows GitHub's [web flow with state and PKCE](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-user-access-token-for-a-github-app). This milestone reads the signed-in user's identity and publicly resolves member logins; it does not use repository installation permissions yet. Keep the client secret on the service host. It is never bundled into the Mac app.
+The API requires a registered GitHub App. Configure the callback to exactly `<OPENBRANCHES_TEAM_ORIGIN>/auth/callback`. Identity sign-in follows GitHub's [web flow with state and PKCE](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-user-access-token-for-a-github-app). Keep the client secret and optional repository-reading private key on the service host. They are never bundled into the Mac app.
 
-Copy `team-service/.env.example` to `team-service/.env` and fill the empty settings. The owner setting is a stable numeric GitHub user ID, not a login. Use a random hex database password so it is safe inside the connection URL. Then, from the repository root:
+Copy `team-service/.env.example` to `team-service/.env` and fill the settings. The owner setting is a stable numeric GitHub user ID, not a login. Use a random hex database password so it is safe inside the connection URL. The optional GitHub repository flow also requires an existing GitHub App private-key file outside the repository. Then, from the repository root:
 
 ```sh
 docker compose --env-file team-service/.env -f team-service/compose.yaml up --build -d
 ```
+
+To enable the owner GitHub repository-selection flow, include the secret-file overlay:
+
+```sh
+docker compose --env-file team-service/.env -f team-service/compose.yaml -f team-service/compose.github.yaml up --build -d
+```
+
+Without that overlay, team sign-in and opted-in local sharing remain available, while the GitHub Projects tab explains that its host setup is incomplete.
 
 The example listens on `127.0.0.1:4389`, keeps PostgreSQL private on the container network, and stores its data in a named volume. Check `/health`, then open `/` for the browser workspace. Continue with GitHub to sign in; the callback returns to the workspace. The server serves only the three fixed build assets, with a same-origin content security policy and no inline scripts.
 

@@ -7,6 +7,7 @@ import {
   projectAccessSchema,
 } from './responses';
 import { readTeamResponse, TeamApiError } from './readResponse';
+import { githubCatalog, githubSetupState, githubNumericId } from './github';
 export { TeamApiError } from './readResponse';
 const changed = z.object({ revision: z.string() });
 export interface TeamFilter {
@@ -147,5 +148,61 @@ export class TeamClient {
   }
   eventsPath(workspace: string) {
     return this.root(workspace) + '/events';
+  }
+  githubState(workspace: string, signal?: AbortSignal) {
+    return this.json(this.root(workspace) + '/github', githubSetupState, { signal }).then((value) =>
+      this.githubScope(workspace, value),
+    );
+  }
+  githubAuthorize(workspace: string) {
+    return this.json(
+      this.root(workspace) + '/github/authorize',
+      z.object({
+        url: z
+          .string()
+          .url()
+          .refine((value) => {
+            const url = new URL(value);
+            return (
+              url.origin === 'https://github.com' &&
+              url.pathname === '/login/oauth/authorize' &&
+              !url.username &&
+              !url.password &&
+              !url.hash
+            );
+          }),
+      }),
+      { method: 'POST' },
+    );
+  }
+  githubCatalog(workspace: string, proofId: string, installationId: string) {
+    return this.json(this.root(workspace) + '/github/catalog', githubCatalog, {
+      method: 'POST',
+      value: {
+        proofId: teamId.parse(proofId),
+        installationId: githubNumericId.parse(installationId),
+      },
+    }).then((value) => {
+      this.githubScope(workspace, value);
+      if (value.proofId !== proofId || value.installation.installationId !== installationId)
+        throw new Error('The GitHub catalog does not match this access review.');
+      return value;
+    });
+  }
+  githubSelect(workspace: string, reviewId: string, repositoryIds: string[]) {
+    return this.json(this.root(workspace) + '/github/select', changed, {
+      method: 'POST',
+      value: { reviewId: teamId.parse(reviewId), repositoryIds },
+    });
+  }
+  githubRemove(workspace: string, project: string) {
+    return this.json(this.root(workspace) + '/github/projects/' + teamId.parse(project), changed, {
+      method: 'DELETE',
+    });
+  }
+  private githubScope<T extends { workspaceId: string }>(workspace: string, value: T): T {
+    if (value.workspaceId !== workspace)
+      throw new Error('The GitHub response does not match the selected workspace.');
+    return value;
   }
 }

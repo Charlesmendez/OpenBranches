@@ -11,6 +11,9 @@ import { loadTeamAssets } from '../src/static';
 import type { TeamConfig } from '../src/config';
 import type { Credential } from '../src/access';
 import type { SharedSnapshot } from '../../src/team/protocol';
+import { fictionalGitHub, pem, repository, response as fixtureResponse } from './githubFixture';
+import { TeamGitHubApp } from '../src/github/app';
+import { TeamGitHubSetup } from '../src/github/setup';
 const databaseUrl = process.env.OPENBRANCHES_TEAM_PREVIEW_DATABASE_URL;
 if (!databaseUrl || process.env.OPENBRANCHES_TEAM_FICTIONAL_PREVIEW !== '1')
   throw new Error('Use the isolated preview command.');
@@ -165,7 +168,7 @@ const pairing = await store.pairings.start({ deviceName: 'Fictional review Mac' 
 const config: TeamConfig = {
   origin: new URL('http://127.0.0.1:1'),
   databaseUrl,
-  githubClientId: 'fictional-preview',
+  githubClientId: 'fixture-client',
   githubClientSecret: 'fictional-preview',
   ownerGitHubId: String(ownerId),
   host: '127.0.0.1',
@@ -178,15 +181,54 @@ html.body = Buffer.from(
     .toString()
     .replace('<head>', '<head><meta name="openbranches-fictional-preview" content="1">'),
 );
-const oauth = new TeamOAuth(db, config, store.identities, async (url) => {
-  const login = String(url).split('/').at(-1) ?? 'fictional-member';
-  return Response.json({
-    id: 910000000 + Number.parseInt(hash(login).slice(0, 6), 16),
-    login,
-    type: 'User',
-  });
+const fixtureProvider = fictionalGitHub((path) => {
+  if (path.includes('/memberships/'))
+    return fixtureResponse({
+      role: 'admin',
+      state: 'active',
+      organization: { id: 41 },
+      user: { id: ownerId },
+    });
+  if (path.startsWith('/installation/repositories?'))
+    return fixtureResponse({
+      total_count: 36,
+      repositories: Array.from({ length: 36 }, (_, index) => {
+        const name =
+          ['atlas-web', 'payments-api', 'design-system', 'developer-tools'][index] ??
+          'service-' + String(index + 1).padStart(2, '0');
+        return {
+          ...repository,
+          id: 51 + index,
+          name,
+          full_name: 'FictionalOrg/' + name,
+          private: index % 3 !== 0,
+          archived: index === 30,
+        };
+      }),
+    });
+  return undefined;
 });
-const api = createTeamServer(config, store, oauth, events, assets);
+const github = new TeamGitHubSetup(
+  db,
+  new TeamGitHubApp('fixture-client', pem, fixtureProvider.request),
+);
+const oauth = new TeamOAuth(
+  db,
+  config,
+  store.identities,
+  async (url, options) => {
+    if (!String(url).startsWith('https://api.github.com/users/'))
+      return fixtureProvider.request(url, options);
+    const login = String(url).split('/').at(-1) ?? 'fictional-member';
+    return Response.json({
+      id: 910000000 + Number.parseInt(hash(login).slice(0, 6), 16),
+      login,
+      type: 'User',
+    });
+  },
+  github,
+);
+const api = createTeamServer(config, store, oauth, events, assets, github);
 const server = createServer((request, response) => {
   if (request.headers.host !== config.origin.host) {
     response.writeHead(421);
@@ -195,13 +237,30 @@ const server = createServer((request, response) => {
   }
   const path = new URL(request.url ?? '/', config.origin).pathname;
   if (['/auth/github', '/__preview/owner', '/__preview/member'].includes(path)) {
-    const session = sessions[path.endsWith('/member') ? 1 : 0];
-    response.setHeader(
-      'Set-Cookie',
-      'ob_session=' + session.token + '; HttpOnly; SameSite=Lax; Path=/',
-    );
-    response.writeHead(302, { Location: '/' });
-    response.end();
+    const index = path.endsWith('/member') ? 1 : 0,
+      session = sessions[index];
+    void (async () => {
+      if (index === 0)
+        await github.verify(
+          owners[0],
+          workspace.id,
+          { id: ownerId, login: names[0], type: 'User' },
+          'fictional-user-token',
+        );
+      response.setHeader(
+        'Set-Cookie',
+        'ob_session=' + session.token + '; HttpOnly; SameSite=Lax; Path=/',
+      );
+      const githubView =
+        new URL(request.url ?? '/', config.origin).searchParams.get('view') === 'github';
+      response.writeHead(302, {
+        Location: '/?workspace=' + workspace.id + (githubView ? '&view=github' : ''),
+      });
+      response.end();
+    })().catch(() => {
+      response.writeHead(503);
+      response.end('Fictional sign-in could not complete.');
+    });
     return;
   }
   if (['/', '/team.js', '/team.css'].includes(path)) {

@@ -24,10 +24,13 @@ import { SharedBoard } from './SharedBoard';
 import { PairDevice } from './PairDevice';
 import { Access } from './Access';
 import { Devices } from './Devices';
+import { GitHubProjects } from './GitHubProjects';
 export function TeamApp() {
   const [session, setSession] = useState<TeamSession | null>(),
     [error, setError] = useState(''),
-    [selected, setSelected] = useState(''),
+    [selected, setSelected] = useState(
+      () => new URLSearchParams(window.location.search).get('workspace') ?? '',
+    ),
     [reload, setReload] = useState(0),
     [create, setCreate] = useState(false),
     [name, setName] = useState(''),
@@ -262,7 +265,12 @@ function Workspace({
   workspace: TeamSession['workspaces'][number];
   login: string;
 }) {
-  const [tab, setTab] = useState<'work' | 'access' | 'devices'>('work'),
+  const [tab, setTab] = useState<'work' | 'access' | 'devices' | 'github'>(() =>
+      workspace.role === 'owner' &&
+      new URLSearchParams(window.location.search).get('view') === 'github'
+        ? 'github'
+        : 'work',
+    ),
     [person, setPerson] = useState(''),
     [project, setProject] = useState(''),
     [query, setQuery] = useState(''),
@@ -283,6 +291,9 @@ function Workspace({
     { id: 'work' as const, label: 'Shared work', icon: Activity },
     { id: 'access' as const, label: 'People & access', icon: Users },
     { id: 'devices' as const, label: 'Devices', icon: Laptop },
+    ...(workspace.role === 'owner'
+      ? [{ id: 'github' as const, label: 'GitHub projects', icon: GitBranch }]
+      : []),
   ];
   return (
     <main className="team-main">
@@ -321,7 +332,9 @@ function Workspace({
                 ? 'See where the work stands.'
                 : tab === 'access'
                   ? 'The right people. The right access.'
-                  : 'A view from every connected Mac.'}
+                  : tab === 'github'
+                    ? 'Your repositories, connected by choice.'
+                    : 'A view from every connected Mac.'}
             </h1>
             <p>
               {tab === 'work'
@@ -368,6 +381,15 @@ function Workspace({
             <span className="loading-line" />
             <p>Loading shared work…</p>
           </div>
+        )}
+        {data && tab === 'github' && workspace.role === 'owner' && (
+          <GitHubProjects
+            key={workspace.id}
+            client={client}
+            workspace={workspace.id}
+            revision={data.workspace.revision}
+            onChange={state.refresh}
+          />
         )}
         {data && tab === 'work' && (
           <>

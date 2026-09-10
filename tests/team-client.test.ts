@@ -16,6 +16,56 @@ const page = () => ({
   totals: { people: 0, projects: 0, reports: 0, snapshots: 0, stale: 0, omitted: 0 },
 });
 describe('team browser client boundary', () => {
+  it('rejects GitHub setup responses for another workspace and unsafe authorization destinations', async () => {
+    const wrong = new TeamClient(
+      vi
+        .fn()
+        .mockResolvedValue(
+          Response.json({ workspaceId: randomUUID(), configured: true, selections: [] }),
+        ),
+    );
+    await expect(wrong.githubState(workspace)).rejects.toThrow('does not match');
+    for (const url of [
+      'https://elsewhere.invalid/login/oauth/authorize',
+      'https://github.com/settings',
+      'https://user@github.com/login/oauth/authorize',
+    ]) {
+      const client = new TeamClient(vi.fn().mockResolvedValue(Response.json({ url })));
+      await expect(client.githubAuthorize(workspace)).rejects.toThrow('unsupported response');
+    }
+  });
+  it('binds a GitHub catalog to its exact workspace, authority review and installation', async () => {
+    const proofId = randomUUID(),
+      value = {
+        id: randomUUID(),
+        workspaceId: workspace,
+        proofId,
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+        installation: {
+          installationId: '31',
+          accountId: '41',
+          accountType: 'Organization',
+          accountLogin: 'FictionalOrg',
+        },
+        projects: [],
+        complete: true,
+        total: 0,
+      };
+    const good = new TeamClient(vi.fn().mockResolvedValue(Response.json(value)));
+    expect((await good.githubCatalog(workspace, proofId, '31')).id).toBe(value.id);
+    await expect(
+      new TeamClient(
+        vi.fn().mockResolvedValue(Response.json({ ...value, proofId: randomUUID() })),
+      ).githubCatalog(workspace, proofId, '31'),
+    ).rejects.toThrow('does not match');
+    await expect(
+      new TeamClient(vi.fn().mockResolvedValue(Response.json(value))).githubCatalog(
+        workspace,
+        proofId,
+        '32',
+      ),
+    ).rejects.toThrow('does not match');
+  });
   it('binds the browser fetch receiver and scopes encoded filters to the team API', async () => {
     const request = vi.fn<typeof fetch>(function (this: unknown, url, options) {
       expect(this).toBe(globalThis);

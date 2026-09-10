@@ -9,6 +9,8 @@ import { TeamError, unauthorized } from './errors';
 import { secretHash, validSecret } from './secrets';
 import { pairingApprovalSchema, teamId } from '../../src/team/protocol';
 import type { TeamAssets } from './static';
+import { TeamGitHubSetup } from './github/setup';
+import { githubNumericId } from '../../src/team/github';
 
 function json(response: ServerResponse, status: number, value: unknown) {
   if (response.destroyed || response.writableEnded) return;
@@ -86,6 +88,7 @@ export function createTeamServer(
   oauth: TeamOAuth,
   events: TeamEvents,
   assets?: TeamAssets,
+  github = new TeamGitHubSetup(store.db),
 ) {
   const limits = new RequestLimits();
   const streams = new Set<ServerResponse>();
@@ -159,12 +162,17 @@ export function createTeamServer(
         url.searchParams.get('state') ?? '',
         cookie(request, cookieName(config, 'browser')),
         url.searchParams.get('code') ?? '',
+        cookie(request, cookieName(config, 'session')),
       );
       response.setHeader('Set-Cookie', [
         setCookie(config, 'session', signed.token, 28800),
         setCookie(config, 'browser', '', 0),
       ]);
-      response.writeHead(302, { Location: '/' });
+      response.writeHead(302, {
+        Location: signed.githubWorkspace
+          ? '/?workspace=' + signed.githubWorkspace + '&view=github'
+          : '/',
+      });
       response.end();
       return;
     }
@@ -175,6 +183,45 @@ export function createTeamServer(
     }
     const auth = credential(request, config);
     if (!['GET', 'HEAD'].includes(method) && auth.kind === 'session') sameOrigin(request, config);
+    const githubRoute =
+      /^\/api\/workspaces\/([^/]+)\/github(?:\/(authorize|catalog|select|projects)(?:\/([^/]+))?)?$/.exec(
+        path,
+      );
+    if (githubRoute) {
+      const workspace = teamId.parse(githubRoute[1]),
+        action = githubRoute[2],
+        id = githubRoute[3];
+      if (!action && method === 'GET') {
+        json(response, 200, await github.state(auth, workspace));
+        return;
+      }
+      if (action === 'authorize' && !id && method === 'POST') {
+        const started = await oauth.begin({ credential: auth, workspace });
+        response.setHeader('Set-Cookie', setCookie(config, 'browser', started.browser, 600));
+        json(response, 200, { url: started.url });
+        return;
+      }
+      if (action === 'catalog' && !id && method === 'POST') {
+        const input = z
+          .strictObject({ proofId: teamId, installationId: githubNumericId })
+          .parse(await body(request));
+        json(
+          response,
+          200,
+          await github.catalog(auth, workspace, input.proofId, input.installationId),
+        );
+        return;
+      }
+      if (action === 'select' && !id && method === 'POST') {
+        json(response, 200, await github.select(auth, workspace, await body(request)));
+        return;
+      }
+      if (action === 'projects' && id && method === 'DELETE') {
+        json(response, 200, await github.remove(auth, workspace, teamId.parse(id)));
+        return;
+      }
+      throw new TeamError(404, 'not_found', 'This GitHub endpoint is unavailable.');
+    }
     if (path === '/api/session' && method === 'GET') {
       json(response, 200, await store.identities.workspaces(auth));
       return;

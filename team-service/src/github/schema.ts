@@ -1,9 +1,7 @@
 import { z } from 'zod';
+import { githubNumericId, type GitHubInstallation } from '../../../src/team/github';
 
-export const githubId = z
-  .string()
-  .regex(/^[1-9]\d{0,15}$/)
-  .refine((v) => Number.isSafeInteger(Number(v)));
+export const githubId = githubNumericId;
 const numericId = z.number().int().positive().safe();
 const login = z.string().regex(/^[a-z\d](?:[a-z\d-]{0,38})$/i);
 const name = z
@@ -16,6 +14,11 @@ export const installationBinding = z.strictObject({
   accountType: z.enum(['User', 'Organization']),
 });
 export type InstallationBinding = z.infer<typeof installationBinding>;
+export const installationIdentity = (value: GitHubInstallation): InstallationBinding => ({
+  installationId: value.installationId,
+  accountId: value.accountId,
+  accountType: value.accountType,
+});
 export const permissionsSchema = z.record(z.string().max(100), z.enum(['read', 'write', 'admin']));
 export const installationSchema = z.object({
   id: numericId,

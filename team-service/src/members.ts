@@ -97,6 +97,11 @@ export class TeamMembers {
       );
       if (!result.rowCount) throw denied();
       await withdrawShares(client, workspaceId, { projectId });
+      await client.query('DELETE FROM ob_github_sources WHERE workspace_id=$1 AND project_id=$2', [
+        workspaceId,
+        projectId,
+      ]);
+      await client.query('DELETE FROM ob_github_reviews WHERE workspace_id=$1', [workspaceId]);
       await client.query('DELETE FROM ob_project_access WHERE workspace_id=$1 AND project_id=$2', [
         workspaceId,
         projectId,

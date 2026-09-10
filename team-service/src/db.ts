@@ -36,10 +36,14 @@ export class TeamDatabase {
     }
   }
   async migrate() {
-    const sql = await readFile(new URL('../migrations/001-team.sql', import.meta.url), 'utf8');
+    const sql = await Promise.all(
+      ['001-team.sql', '002-github.sql'].map((name) =>
+        readFile(new URL('../migrations/' + name, import.meta.url), 'utf8'),
+      ),
+    );
     await this.transaction(async (client) => {
       await client.query('SELECT pg_advisory_xact_lock(826041920)');
-      await client.query(sql);
+      for (const migration of sql) await client.query(migration);
     });
   }
   close() {

@@ -1,128 +1,92 @@
-import { generateKeyPairSync, verify } from 'node:crypto';
+import { verify } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 import { TeamGitHubApp } from '../src/github/app';
-import type { InstallationBinding } from '../src/github/schema';
-
-// Keys are generated only in memory. No real GitHub app or credentials used.
-const keys = generateKeyPairSync('rsa', { modulusLength: 2048 });
-const pem = keys.privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
-const binding: InstallationBinding = {
-  installationId: '31',
-  accountId: '41',
-  accountType: 'Organization',
-};
-const permissions = {
-  metadata: 'read',
-  contents: 'read',
-  pull_requests: 'read',
-  checks: 'read',
-  statuses: 'read',
-};
-const owner = { id: 41, login: 'FictionalOrg', type: 'Organization' };
-const repository = {
-  id: 51,
-  name: 'work',
-  full_name: 'FictionalOrg/work',
-  owner,
-  private: true,
-  archived: false,
-  default_branch: 'develop',
-};
-const installation = {
-  id: 31,
-  account: owner,
-  suspended_at: null,
+import {
+  fictionalGitHub,
+  keys,
+  pem,
+  binding,
   permissions,
-  client_id: 'fixture-client',
-};
-const mainSha = 'a'.repeat(40),
-  branchSha = 'b'.repeat(40);
-const response = (body: unknown, headers?: HeadersInit) =>
-  new Response(JSON.stringify(body), { headers });
-type Intercept = (
-  path: string,
-  options: RequestInit | undefined,
-  count: number,
-) => Response | undefined | Promise<Response | undefined>;
+  owner,
+  repository,
+  installation,
+  mainSha,
+  branchSha,
+  response,
+  type Intercept,
+} from '../dev/githubFixture';
 function fixture(intercept?: Intercept) {
-  const counts = new Map<string, number>();
-  const request = vi.fn<typeof fetch>().mockImplementation(async (url, options) => {
-    const address = new URL(String(url)),
-      path = address.pathname + address.search;
-    const count = (counts.get(path) ?? 0) + 1;
-    counts.set(path, count);
-    const custom = await intercept?.(path, options, count);
-    if (custom) return custom;
-    if (path === '/app/installations/31') return response(installation);
-    if (path === '/app/installations/31/access_tokens')
-      return response({
-        token: 'fictional-installation-token',
-        expires_at: new Date(Date.now() + 3600_000).toISOString(),
-        permissions: JSON.parse(String(options?.body)).permissions,
-      });
-    if (path.startsWith('/installation/repositories?'))
-      return response({ total_count: 1, repositories: [repository] });
-    if (path === '/repos/FictionalOrg/work') return response(repository);
-    if (path.includes('/branches?'))
-      return response([
-        { name: 'develop', commit: { sha: mainSha } },
-        { name: 'feature/shared', commit: { sha: branchSha } },
-      ]);
-    if (path.includes('/pulls?'))
-      return response(
-        path.includes('state=open')
-          ? [
-              {
-                number: 1,
-                title: 'Fictional PR',
-                state: 'open',
-                draft: false,
-                merged_at: null,
-                updated_at: new Date().toISOString(),
-                user: { id: 61, login: 'fictional-person', type: 'User' },
-                base: { ref: 'develop' },
-                head: {
-                  ref: 'feature/shared',
-                  sha: branchSha,
-                  repo: { full_name: repository.full_name },
-                },
-                body: 'PRIVATE_BODY',
-              },
-            ]
-          : [],
-      );
-    if (path.includes('/check-runs?'))
-      return response({
-        total_count: 1,
-        check_runs: [
-          {
-            id: 71,
-            name: 'Build',
-            head_sha: branchSha,
-            status: 'completed',
-            conclusion: 'failure',
-            output: { text: 'PRIVATE_LOG' },
-          },
-        ],
-      });
-    if (path.includes('/status?'))
-      return response({ sha: branchSha, total_count: 0, statuses: [] });
-    if (path.includes('/reviews?')) return response([]);
-    if (path.includes('/compare/'))
-      return response({
-        status: 'ahead',
-        ahead_by: 1,
-        behind_by: 0,
-        base_commit: { sha: mainSha },
-        merge_base_commit: { sha: mainSha },
-        files: [{ patch: 'PRIVATE_PATCH' }],
-      });
-    throw new Error('Unexpected fictional route: ' + path);
-  });
-  return { app: new TeamGitHubApp('fixture-client', pem, request), request, counts };
+  const source = fictionalGitHub(intercept),
+    request = vi.fn(source.request);
+  return { app: new TeamGitHubApp('fixture-client', pem, request), request, counts: source.counts };
 }
 
 describe('GitHub App installation reader', () => {
+  it('distinguishes accessible installations from account ownership and verifies organization identities', async () => {
+    const user = { githubId: '61', login: 'fictional-person' };
+    expect(await fixture().app.authorizedInstallations('fictional-user-token', user)).toMatchObject(
+      {
+        complete: true,
+        installations: [
+          {
+            installationId: '31',
+            accountId: '41',
+            accountType: 'Organization',
+            accountLogin: 'FictionalOrg',
+          },
+        ],
+      },
+    );
+    for (const change of [
+      { role: 'member' },
+      { state: 'pending' },
+      { user: { id: 62 } },
+      { organization: { id: 42 } },
+    ]) {
+      const f = fixture((path) =>
+        path.includes('/memberships/')
+          ? response({
+              role: 'admin',
+              state: 'active',
+              user: { id: 61 },
+              organization: { id: 41 },
+              ...change,
+            })
+          : undefined,
+      );
+      expect(
+        (await f.app.authorizedInstallations('fictional-user-token', user)).installations,
+      ).toEqual([]);
+    }
+    const personal = fixture((path) =>
+      path === '/app/installations/31'
+        ? response({
+            ...installation,
+            account: { id: 61, login: 'fictional-person', type: 'User' },
+          })
+        : undefined,
+    );
+    expect(
+      await personal.app.authority({ ...binding, accountType: 'User', accountId: '61' }, user),
+    ).toMatchObject({ accountId: '61' });
+    expect(
+      await personal.app.authority(
+        { ...binding, accountType: 'User', accountId: '61' },
+        { ...user, githubId: '62' },
+      ),
+    ).toBeUndefined();
+  });
+  it('keeps unverified installations out of the result and marks provider failures incomplete', async () => {
+    const f = fixture((path) =>
+      path.includes('/memberships/') ? new Response('{}', { status: 403 }) : undefined,
+    );
+    expect(
+      await f.app.authorizedInstallations('fictional-user-token', {
+        githubId: '61',
+        login: 'fictional-person',
+      }),
+    ).toEqual({ installations: [], complete: false });
+  });
   it('signs verifiable short-lived JWTs, narrows one repository and reuses normalized PR/check/ancestry evidence', async () => {
     const f = fixture();
     const result = await f.app.read(binding, '51');

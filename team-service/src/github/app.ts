@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { GitHubTransport, GitHubError } from '../../../src/github/transport';
 import { readRemote, type RemoteSnapshot } from '../../../src/github/reader';
 import { retainPartialPulls } from '../../../src/github/pulls';
+import type { GitHubInstallation } from '../../../src/team/github';
 import {
   githubId,
   installationBinding,
@@ -125,8 +126,14 @@ export class TeamGitHubApp {
       throw new Error('The GitHub App needs the configured read permissions for this source.');
     return value;
   }
-  private async token(binding: InstallationBinding, operation: Operation, repositoryId?: string) {
-    const permissions = repositoryId ? readPermissions : ({ metadata: 'read' } as const);
+  private async token(
+    binding: InstallationBinding,
+    operation: Operation,
+    repositoryId?: string,
+    permissions: Readonly<Record<string, 'read'>> = repositoryId
+      ? readPermissions
+      : { metadata: 'read' },
+  ) {
     await this.installation(binding, operation, permissions);
     const response = await operation.get(
       '/app/installations/' + binding.installationId + '/access_tokens',
@@ -151,6 +158,101 @@ export class TeamGitHubApp {
     )
       throw new Error('GitHub did not confirm the requested read-only permissions and expiration.');
     return value.token;
+  }
+  /** Recheck actual account ownership; merely being able to access an app
+   * installation does not authorize publishing it into a team workspace. */
+  async authority(
+    input: InstallationBinding,
+    user: { githubId: string; login: string },
+    options: ReadOptions = {},
+  ): Promise<GitHubInstallation | undefined> {
+    const binding = installationBinding.parse(input),
+      operation = this.operation(options);
+    return this.checkOwner(binding, user, operation);
+  }
+  private async checkOwner(
+    binding: InstallationBinding,
+    user: { githubId: string; login: string },
+    operation: Operation,
+  ): Promise<GitHubInstallation | undefined> {
+    const installation = await this.installation(binding, operation);
+    let owner = binding.accountType === 'User' && binding.accountId === user.githubId;
+    if (binding.accountType === 'Organization') {
+      const login = z
+        .string()
+        .regex(/^[a-z\d][a-z\d-]{0,38}$/i)
+        .parse(user.login);
+      const token = await this.token(binding, operation, undefined, {
+        metadata: 'read',
+        members: 'read',
+      });
+      const result = await operation.get(
+        '/orgs/' +
+          encodeURIComponent(installation.account.login) +
+          '/memberships/' +
+          encodeURIComponent(login),
+        token,
+      );
+      const membership = z
+        .object({
+          state: z.enum(['active', 'pending']),
+          role: z.enum(['admin', 'member']),
+          organization: z.object({ id: z.number().int().positive().safe() }),
+          user: z.object({ id: z.number().int().positive().safe() }),
+        })
+        .safeParse(result.body);
+      if (!membership.success) throw new Error('GitHub could not verify organization ownership.');
+      owner =
+        membership.data.state === 'active' &&
+        membership.data.role === 'admin' &&
+        String(membership.data.organization.id) === binding.accountId &&
+        String(membership.data.user.id) === user.githubId;
+    }
+    operation.current();
+    return owner ? { ...binding, accountLogin: installation.account.login } : undefined;
+  }
+  async authorizedInstallations(
+    userToken: string,
+    user: { githubId: string; login: string },
+    options: ReadOptions = {},
+  ) {
+    const operation = this.operation(options);
+    const result = await operation.get('/user/installations?per_page=50&page=1', userToken);
+    const page = z
+      .object({
+        total_count: z.number().int().nonnegative(),
+        installations: z.array(installationSchema).max(50),
+      })
+      .safeParse(result.body);
+    if (!page.success) throw new Error('GitHub returned an unsupported installation list.');
+    const installations: GitHubInstallation[] = [];
+    let complete = !result.hasNext && page.data.installations.length >= page.data.total_count;
+    for (const value of page.data.installations) {
+      operation.current();
+      if (
+        value.suspended_at ||
+        (value.account.type === 'User' && String(value.account.id) !== user.githubId)
+      )
+        continue;
+      try {
+        const allowed = await this.checkOwner(
+          {
+            installationId: String(value.id),
+            accountId: String(value.account.id),
+            accountType: value.account.type,
+          },
+          user,
+          operation,
+        );
+        if (allowed && !installations.some((v) => v.installationId === allowed.installationId))
+          installations.push(allowed);
+      } catch {
+        operation.current();
+        complete = false;
+      }
+    }
+    operation.current();
+    return { installations, complete };
   }
   async catalog(input: InstallationBinding, options: ReadOptions = {}) {
     const binding = installationBinding.parse(input),

@@ -1,0 +1,10 @@
+# Optional overlay: mounts the host's existing private key as a server secret.
+services:
+  team:
+    environment:
+      GITHUB_APP_PRIVATE_KEY_FILE: /run/secrets/github_app_key
+    secrets:
+      - github_app_key
+secrets:
+  github_app_key:
+    file: ${GITHUB_APP_PRIVATE_KEY_HOST_FILE:?Set an absolute path to the GitHub App private key outside this repository}
