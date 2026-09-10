@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import {
   absoluteBundleSymlinks,
+  lipoArchitecture,
   macArguments,
   macArtifactPaths,
   releaseMetadata,
@@ -35,9 +36,13 @@ await Promise.all([
 ]);
 verifyBundleIdentifier(artifact.application);
 
-execFileSync('/usr/bin/lipo', [artifact.executable, '-verify_arch', options.architecture], {
-  stdio: 'inherit',
-});
+execFileSync(
+  '/usr/bin/lipo',
+  [artifact.executable, '-verify_arch', lipoArchitecture(options.architecture)],
+  {
+    stdio: 'inherit',
+  },
+);
 execFileSync('/usr/bin/hdiutil', ['verify', artifact.diskImage], { stdio: 'inherit' });
 if (options.release) {
   execFileSync(

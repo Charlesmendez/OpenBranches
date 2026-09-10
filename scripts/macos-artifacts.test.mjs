@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
   absoluteBundleSymlinks,
+  lipoArchitecture,
   macArguments,
   macArtifactPaths,
   releaseMetadata,
@@ -28,6 +29,12 @@ describe('Mac release artifacts', () => {
     });
     assert.throws(() => macArguments(['--arch=riscv64']), /Unsupported Mac architecture/);
     assert.throws(() => macArguments(['--publish']), /Unknown Mac packaging option/);
+  });
+
+  it('uses architecture names understood by the macOS lipo tool', () => {
+    assert.equal(lipoArchitecture('arm64'), 'arm64');
+    assert.equal(lipoArchitecture('x64'), 'x86_64');
+    assert.throws(() => lipoArchitecture('riscv64'), /Unsupported Mac architecture/);
   });
 
   it('gives signed and preview installers distinct, readable names', () => {
