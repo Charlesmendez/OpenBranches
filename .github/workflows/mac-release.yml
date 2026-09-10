@@ -58,7 +58,7 @@ jobs:
             runner: macos-15-intel
             arch: x64
     env:
-      GITHUB_APP_CLIENT_ID: ${{ vars.GITHUB_APP_CLIENT_ID }}
+      GITHUB_APP_CLIENT_ID: ${{ vars.OPENBRANCHES_GITHUB_APP_CLIENT_ID }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
@@ -86,6 +86,7 @@ jobs:
             exit 1
           fi
       - run: npm ci --no-audit --no-fund
+      - run: npm run electron:install
       - run: npm test && npm run format:check
       - name: Import Developer ID certificate
         env:

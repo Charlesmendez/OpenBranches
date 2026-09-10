@@ -18,7 +18,7 @@ The bundle identifier is `com.openbranches.desktop`. Packaging and artifact veri
 
 Complete the Apple Developer enrollment and create the Developer ID Application certificate described above. No App Store listing is involved.
 
-Create the public GitHub App used for device authorization and set its client ID as the repository variable `GITHUB_APP_CLIENT_ID`. The desktop bundle never contains a GitHub client secret.
+Create the public GitHub App used for device authorization and set its client ID as the repository variable `OPENBRANCHES_GITHUB_APP_CLIENT_ID`. The release workflow maps that value to the build-time `GITHUB_APP_CLIENT_ID` environment variable. The desktop bundle never contains a GitHub client secret.
 
 Add these GitHub Actions secrets:
 

@@ -21,6 +21,7 @@
     "notices:generate": "node scripts/notices.mjs --write",
     "notices:check": "node scripts/notices.mjs --check",
     "test:watch": "vitest",
+    "electron:install": "node node_modules/electron/install.js",
     "probe:advisor": "node scripts/probe-advisor.mjs",
     "package": "npm run build && OPENBRANCHES_SIGN_RELEASE=0 electron-forge package",
     "make": "node scripts/make-macos.mjs",
@@ -68,6 +69,10 @@
   },
   "engines": {
     "node": ">=24.14.0 <25"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "fsevents@2.3.3": true
   },
   "overrides": {
     "tar": "^7.5.22",

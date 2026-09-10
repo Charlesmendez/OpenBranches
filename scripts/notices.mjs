@@ -87,9 +87,7 @@ export async function thirdPartyNotices(root = moduleRoot) {
     name: 'Electron',
     version: lock.packages['node_modules/electron'].version,
     license: 'MIT',
-    text: (
-      await readFile(join(root, 'node_modules', 'electron', 'dist', 'LICENSE'), 'utf8')
-    ).trim(),
+    text: (await readFile(join(root, 'node_modules', 'electron', 'LICENSE'), 'utf8')).trim(),
   });
   dependencies.push({
     key: 'provider-icons',
