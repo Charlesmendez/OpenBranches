@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
+import type { FSWatcher, watch as watchType } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createDemoSnapshot } from '../src/data/demo';
-import type { Repository } from '../src/domain/types';
+import type { Repository, Worktree } from '../src/domain/types';
 import { AppStore } from '../electron/services/store';
 import { RepositoryService } from '../electron/services/repositories';
 import { GitHubService } from '../electron/github/service';
@@ -35,6 +36,46 @@ function deferred<T>() {
   });
   return { promise, resolve, reject };
 }
+class FakeWatcher {
+  private error?: () => void;
+  closed = false;
+  constructor(
+    readonly path: string,
+    readonly change: (event: string, filename: string | null) => void,
+  ) {}
+  on(event: string, listener: () => void) {
+    if (event === 'error') this.error = listener;
+    return this;
+  }
+  close() {
+    this.closed = true;
+  }
+  fail() {
+    this.error?.();
+  }
+}
+function watcherFixture() {
+  const watchers: FakeWatcher[] = [];
+  const factory = ((
+    path: string,
+    _options: { recursive: boolean },
+    listener: (event: string, filename: string | null) => void,
+  ) => {
+    const watcher = new FakeWatcher(path, listener);
+    watchers.push(watcher);
+    return watcher as unknown as FSWatcher;
+  }) as typeof watchType;
+  return { factory, watchers };
+}
+const checkout = (path: string, branch: string, head: string, available = true): Worktree => ({
+  path,
+  branch,
+  head,
+  available,
+  detached: false,
+  dirty: available ? false : null,
+  changedFiles: available ? 0 : null,
+});
 const remote = (sha: string): RemoteSnapshot => ({
   repository: 'example/atlas-api',
   remoteName: 'origin',
@@ -291,5 +332,87 @@ describe('stopping project monitoring', () => {
     expect(() => service.remove(snapshot.repositories[0].id)).toThrow('storage failure');
     expect(service.current().repositories).toHaveLength(1);
     expect(store.snapshot().repositories).toHaveLength(1);
+  });
+});
+
+describe('live repository monitoring', () => {
+  it('watches Git and every available checkout, coalesces bursts, and ignores generated folders', async () => {
+    vi.useFakeTimers();
+    const { store } = await storeFixture();
+    const snapshot = createDemoSnapshot();
+    const repo = structuredClone(snapshot.repositories[0]);
+    repo.commonDir = '/fixture/shared.git';
+    repo.path = '/fixture/primary';
+    repo.worktrees = [
+      checkout(repo.path, repo.branches[0].local!.fullName, 'a'.repeat(40)),
+      checkout('/fixture/linked', repo.branches[1].local!.fullName, 'b'.repeat(40)),
+      checkout('/fixture/missing', repo.branches[2].local!.fullName, 'c'.repeat(40), false),
+    ];
+    store.write('snapshot', { ...snapshot, repositories: [repo] });
+    const fresh = structuredClone(repo);
+    fresh.branches[0].local!.sha = 'd'.repeat(40);
+    const scan = vi.fn(async () => fresh);
+    const publish = vi.fn();
+    const watcher = watcherFixture();
+    const service = new RepositoryService(
+      store,
+      publish,
+      { executable: async () => '/fixture/git' },
+      { scan, close: () => {} },
+      watcher.factory,
+    );
+    cleanup.push(() => service.close());
+
+    expect(watcher.watchers.map(({ path }) => path)).toEqual([
+      '/fixture/linked',
+      '/fixture/primary',
+      '/fixture/shared.git',
+    ]);
+    watcher.watchers[0].change('change', 'node_modules/library/index.js');
+    await vi.advanceTimersByTimeAsync(600);
+    expect(scan).not.toHaveBeenCalled();
+
+    watcher.watchers[0].change('change', 'src/first.ts');
+    watcher.watchers[1].change('change', 'src/second.ts');
+    await vi.advanceTimersByTimeAsync(499);
+    expect(scan).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(scan).toHaveBeenCalledOnce();
+    expect(service.current().repositories[0].branches[0].local?.sha).toBe('d'.repeat(40));
+    expect(publish).toHaveBeenCalledOnce();
+  });
+
+  it('rebuilds every watcher after one fails and closes them all on shutdown', async () => {
+    vi.useFakeTimers();
+    const { store } = await storeFixture();
+    const snapshot = createDemoSnapshot();
+    const repo = structuredClone(snapshot.repositories[0]);
+    repo.commonDir = '/fixture/shared.git';
+    repo.path = '/fixture/primary';
+    repo.worktrees = [checkout(repo.path, repo.branches[0].local!.fullName, 'a'.repeat(40))];
+    store.write('snapshot', { ...snapshot, repositories: [repo] });
+    const watcher = watcherFixture();
+    const scan = vi.fn(async () => structuredClone(repo));
+    const service = new RepositoryService(
+      store,
+      () => {},
+      { executable: async () => '/fixture/git' },
+      { scan, close: () => {} },
+      watcher.factory,
+    );
+
+    expect(watcher.watchers).toHaveLength(2);
+    watcher.watchers[0].fail();
+    expect(watcher.watchers[0].closed).toBe(true);
+    await service.refresh();
+    expect(watcher.watchers).toHaveLength(4);
+    expect(watcher.watchers.slice(0, 2).every(({ closed }) => closed)).toBe(true);
+
+    watcher.watchers[2].change('change', 'src/after-close.ts');
+    service.close();
+    await vi.advanceTimersByTimeAsync(600);
+    expect(watcher.watchers.every(({ closed }) => closed)).toBe(true);
+    expect(scan).toHaveBeenCalledOnce();
   });
 });

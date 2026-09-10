@@ -21,6 +21,7 @@ export class RepositoryService {
     private publish: (snapshot: Snapshot) => void,
     git: Pick<GitInstallation, 'executable'>,
     worker: Pick<GitWorkerClient, 'scan' | 'close'> = new GitWorkerClient(git),
+    private watchDirectory: typeof watch = watch,
   ) {
     this.worker = worker;
     this.snapshot = { ...store.snapshot(), scanning: false };
@@ -154,7 +155,7 @@ export class RepositoryService {
       /(^|\/)(node_modules|dist|out|build|target|\.next|\.cache|coverage|\.venv)(\/|$)/;
     for (const path of paths) {
       try {
-        const watcher = watch(path, { recursive: true }, (_event, filename) => {
+        const watcher = this.watchDirectory(path, { recursive: true }, (_event, filename) => {
           if (filename && ignored.test(String(filename))) return;
           const timer = this.debounces.get(repository.id);
           if (timer) clearTimeout(timer);
