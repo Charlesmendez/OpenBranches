@@ -3,6 +3,8 @@ import { CircleDot } from 'lucide-react';
 import type { Branch, Repository } from '../../domain/types';
 import { activeWorkspaceSpotlights } from '../../domain/workSpotlight';
 import { WorkSpotlightCard } from './WorkSpotlightCard';
+import { CompactPager } from './CompactPager';
+import { usePageWindow } from '../hooks/usePageWindow';
 
 const COLLAPSED_LIMIT = 3;
 const PAGE_SIZE = 6;
@@ -17,27 +19,26 @@ export function WorkspaceWorkSpotlight({
   onFocus: (repository: Repository, branch: Branch) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const [requestedPage, setRequestedPage] = useState(0);
   const spotlights = activeWorkspaceSpotlights(repositories, now);
   const live = spotlights.filter(({ signal }) => signal.kind === 'live').length;
   const waiting = spotlights.length - live;
 
   const canExpand = spotlights.length > COLLAPSED_LIMIT;
   const showingPages = expanded && canExpand;
-  const pageCount = Math.max(1, Math.ceil(spotlights.length / PAGE_SIZE));
-  const page = Math.min(requestedPage, pageCount - 1);
-  const pageStart = page * PAGE_SIZE;
-  const shown = showingPages
-    ? spotlights.slice(pageStart, pageStart + PAGE_SIZE)
-    : spotlights.slice(0, COLLAPSED_LIMIT);
+  const spotlightKey = spotlights
+    .map(({ repository, branch, signal }) =>
+      [repository.id, branch.id, signal.kind, signal.label].join(':'),
+    )
+    .join('|');
+  const current = usePageWindow(spotlights, PAGE_SIZE, spotlightKey);
+  const shown = showingPages ? current.items : spotlights.slice(0, COLLAPSED_LIMIT);
   const summary = [live ? `${live} live` : '', waiting ? `${waiting} waiting for input` : '']
     .filter(Boolean)
     .join(' · ');
 
   useEffect(() => {
-    setRequestedPage((value) => Math.min(value, pageCount - 1));
     if (!canExpand) setExpanded(false);
-  }, [canExpand, pageCount]);
+  }, [canExpand]);
 
   if (!spotlights.length) return null;
 
@@ -61,7 +62,7 @@ export function WorkspaceWorkSpotlight({
             aria-expanded={showingPages}
             onClick={() => {
               setExpanded((value) => !value);
-              setRequestedPage(0);
+              current.setPage(0);
             }}
           >
             {showingPages ? 'Collapse' : `Browse all ${spotlights.length}`}
@@ -80,27 +81,15 @@ export function WorkspaceWorkSpotlight({
           />
         ))}
       </div>
-      {showingPages && pageCount > 1 && (
-        <div className="workspace-work-pagination" aria-label="Active work pages">
-          <button
-            className="text-button"
-            disabled={page === 0}
-            onClick={() => setRequestedPage((value) => Math.max(0, value - 1))}
-          >
-            Previous
-          </button>
-          <span>
-            {pageStart + 1}–{Math.min(pageStart + PAGE_SIZE, spotlights.length)} of{' '}
-            {spotlights.length}
-          </span>
-          <button
-            className="text-button"
-            disabled={page >= pageCount - 1}
-            onClick={() => setRequestedPage((value) => Math.min(pageCount - 1, value + 1))}
-          >
-            Next
-          </button>
-        </div>
+      {showingPages && current.pageCount > 1 && (
+        <CompactPager
+          page={current.page}
+          pageSize={PAGE_SIZE}
+          count={spotlights.length}
+          label="Active work pages"
+          className="workspace-work-pagination"
+          onPage={current.setPage}
+        />
       )}
     </section>
   );

@@ -13,6 +13,7 @@ import './targets.css';
 
 type Scenario = 'standard' | 'default' | 'missing';
 type View = 'overview' | 'map' | 'inventory';
+const busyFixture = new URLSearchParams(location.search).has('busy');
 
 function repositoryFor(scenario: Scenario): Repository {
   const repository = structuredClone(createDemoSnapshot().repositories[0]);
@@ -108,7 +109,30 @@ function clonedRepository(repository: Repository, id: string, name: string): Rep
 function Fixture() {
   const [scenario, setScenario] = useState<Scenario>('standard');
   const [view, setView] = useState<View>('map');
-  const repository = useMemo(() => repositoryFor(scenario), [scenario]);
+  const repository = useMemo(() => {
+    const value = repositoryFor(scenario);
+    if (!busyFixture) return value;
+    const checkedAt = new Date().toISOString();
+    value.branches = value.branches.map((branch, index) =>
+      index < 7
+        ? {
+            ...branch,
+            tasks: [
+              {
+                id: `busy-task-${index}`,
+                tool: (['codex', 'claude-code', 'cursor'] as const)[index % 3],
+                title: `Work on ${branch.title}`,
+                status: index === 2 ? 'idle' : 'active',
+                waiting: index === 2,
+                association: 'verified',
+                checkedAt,
+              },
+            ],
+          }
+        : branch,
+    );
+    return value;
+  }, [scenario]);
   const snapshot = useMemo(() => {
     const value = createDemoSnapshot();
     return {

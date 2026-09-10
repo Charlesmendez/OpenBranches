@@ -3,6 +3,10 @@ import type { Branch, Repository } from '../../domain/types';
 import { workSpotlights } from '../../domain/workSpotlight';
 import { useClock } from '../hooks/useClock';
 import { WorkSpotlightCard } from './WorkSpotlightCard';
+import { CompactPager } from './CompactPager';
+import { usePageWindow } from '../hooks/usePageWindow';
+
+const PAGE_SIZE = 2;
 
 export function ProjectWorkSpotlight({
   repository,
@@ -15,21 +19,25 @@ export function ProjectWorkSpotlight({
 }) {
   const now = useClock();
   const spotlights = workSpotlights(branches, repository.path, now);
-  if (!spotlights.length) return null;
-
-  const shown = spotlights.slice(0, 2);
+  const spotlightKey = spotlights
+    .map(({ branch, signal }) => `${branch.id}:${signal.kind}:${signal.label}`)
+    .join('|');
+  const current = usePageWindow(spotlights, PAGE_SIZE, `${repository.id}:${spotlightKey}`);
   const live = spotlights.filter(({ signal }) => signal.kind === 'live').length;
   const waiting = spotlights.filter(({ signal }) => signal.kind === 'waiting').length;
-  const tone = live ? 'live' : waiting ? 'waiting' : spotlights[0].signal.kind;
+  const primaryKind = spotlights[0]?.signal.kind;
+  const tone = live ? 'live' : waiting ? 'waiting' : (primaryKind ?? 'checkout');
   const title = live
-    ? `${live} ${live === 1 ? 'branch is' : 'branches are'} live now`
+    ? `${live} live now${waiting ? ` · ${waiting} waiting for input` : ''}`
     : waiting
       ? `${waiting} ${waiting === 1 ? 'branch needs' : 'branches need'} input`
-      : spotlights[0].signal.kind === 'changes'
+      : primaryKind === 'changes'
         ? 'Work in progress on this Mac'
-        : spotlights[0].signal.kind === 'recent'
+        : primaryKind === 'recent'
           ? 'Recently active work'
           : 'Your current checkout';
+
+  if (!spotlights.length) return null;
 
   return (
     <section className={`project-work-spotlight ${tone}`} aria-label="Current project work">
@@ -42,7 +50,7 @@ export function ProjectWorkSpotlight({
         <small>Select a branch to focus it on the map.</small>
       </div>
       <div className="project-work-items">
-        {shown.map(({ branch, signal }) => (
+        {current.items.map(({ branch, signal }) => (
           <WorkSpotlightCard
             key={branch.id}
             repository={repository}
@@ -52,8 +60,15 @@ export function ProjectWorkSpotlight({
           />
         ))}
       </div>
-      {spotlights.length > shown.length && (
-        <span className="project-work-more">+{spotlights.length - shown.length} more</span>
+      {spotlights.length > PAGE_SIZE && (
+        <CompactPager
+          page={current.page}
+          pageSize={PAGE_SIZE}
+          count={spotlights.length}
+          label="Current work pages"
+          className="project-work-pagination"
+          onPage={current.setPage}
+        />
       )}
     </section>
   );

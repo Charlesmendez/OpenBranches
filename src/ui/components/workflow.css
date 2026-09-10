@@ -240,18 +240,40 @@
 .workspace-work-items .project-work-item.live .project-work-icon {
   animation: live-work-glow 1.8s ease-in-out infinite;
 }
-.workspace-work-pagination {
+.compact-pager {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  margin-top: 10px;
+  gap: 5px;
   color: var(--muted);
   font-size: 9px;
+  font-variant-numeric: tabular-nums;
 }
-.workspace-work-pagination button:disabled {
+.compact-pager > span {
+  margin-right: 2px;
+  white-space: nowrap;
+}
+.compact-pager button {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--text-soft);
+  background: var(--raised);
+}
+.compact-pager button:hover:not([aria-disabled='true']),
+.compact-pager button:focus-visible {
+  border-color: var(--accent);
+  background: var(--hover);
+}
+.compact-pager button[aria-disabled='true'] {
   cursor: default;
   opacity: 0.35;
+}
+.workspace-work-pagination {
+  justify-content: flex-end;
+  margin-top: 10px;
 }
 .project-work-spotlight {
   display: grid;
@@ -451,12 +473,10 @@
 .project-work-item > svg {
   color: var(--muted);
 }
-.project-work-more {
+.project-work-pagination {
   align-self: center;
-  padding: 0 5px;
-  color: var(--muted);
-  font-size: 9px;
-  white-space: nowrap;
+  justify-content: flex-end;
+  padding: 0 2px;
 }
 .route-task.work-live {
   border-color: #526387;
@@ -1069,8 +1089,8 @@
   .project-work-spotlight {
     grid-template-columns: 170px minmax(0, 1fr);
   }
-  .project-work-more {
-    display: none;
+  .project-work-pagination {
+    grid-column: 1 / -1;
   }
   .review-toolbar {
     flex-wrap: wrap;
