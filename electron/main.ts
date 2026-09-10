@@ -64,7 +64,14 @@ const refreshHistories = () =>
 let reviews: ReviewService;
 let githubAuth: GitHubAuth;
 let authTimer: ReturnType<typeof setInterval> | undefined;
+let lastForegroundGitHubRefresh = 0;
 const devUrl = !app.isPackaged ? process.env.OPENBRANCHES_DEV_URL : undefined;
+function refreshGitHubInForeground() {
+  const now = Date.now();
+  if (now - lastForegroundGitHubRefresh < 30_000) return;
+  lastForegroundGitHubRefresh = now;
+  void github?.refresh();
+}
 function showWindow() {
   window?.show();
   window?.focus();
@@ -108,6 +115,7 @@ function createWindow() {
   window.on('closed', () => {
     window = null;
   });
+  window.on('focus', refreshGitHubInForeground);
   void window.loadURL(devUrl ?? 'openbranches://app/index.html');
 }
 function handle(channel: string, listener: (...args: any[]) => unknown) {

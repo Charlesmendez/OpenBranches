@@ -21,6 +21,10 @@ export class GitHubTransport {
   private blockedUntil = 0;
   constructor(private request: Fetch = fetch) {}
 
+  resetBackoff() {
+    this.blockedUntil = 0;
+  }
+
   async json(
     path: string,
     credential?: string | (() => Promise<string | undefined>),

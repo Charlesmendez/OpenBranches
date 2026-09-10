@@ -46,6 +46,12 @@ export const cachedPullSchema = z.object({
 });
 export type CachedPull = z.infer<typeof cachedPullSchema>;
 
+export interface OpenPullSnapshot {
+  pulls: CachedPull[];
+  complete: boolean;
+  checkedAt: string;
+}
+
 /** Merge bounded listings and exact-SHA results without letting an older
  * observation replace a newer PR state. */
 export function mergeCachedPulls(...collections: CachedPull[][]): CachedPull[] {
@@ -111,39 +117,91 @@ export function parsePulls(body: unknown, repository: string): CachedPull[] {
 
 // Open work has its own listing so recent closed PRs cannot hide older drafts.
 // Missing heads still have useful PR metadata; they are never assigned by name alone.
-export async function readPulls(http: GitHubReader, repository: string, isCurrent = () => true) {
+async function readPullState(
+  http: GitHubReader,
+  repository: string,
+  state: 'open' | 'closed',
+  pages: number,
+  deadline: number,
+  isCurrent: () => boolean,
+) {
   const pulls = new Map<number, CachedPull>();
   const prefix = `/repos/${repository.split('/').map(encodeURIComponent).join('/')}`;
-  let openPullsComplete = false;
-  let closedComplete = false;
-  const deadline = Date.now() + 30_000;
-  for (const [state, pages] of [
-    ['open', 50],
-    ['closed', 3],
-  ] as const) {
-    for (let page = 1; page <= pages; page++) {
-      if (!isCurrent()) throw new Error('GitHub refresh was cancelled.');
-      if (Date.now() >= deadline) break;
-      const response = await http.get(
-        `${prefix}/pulls?state=${state}&sort=updated&direction=desc&per_page=100&page=${page}`,
-      );
-      if (!isCurrent()) throw new Error('GitHub refresh was cancelled.');
-      for (const pr of parsePulls(response.body, repository)) {
-        const previous = pulls.get(pr.number);
-        // The later response can observe a PR closing during pagination.
-        if (!previous || pr.updatedAt >= previous.updatedAt) pulls.set(pr.number, pr);
-      }
-      if (!response.hasNext) {
-        if (state === 'open') openPullsComplete = true;
-        else closedComplete = true;
-        break;
-      }
+  let complete = false;
+  for (let page = 1; page <= pages; page++) {
+    if (!isCurrent()) throw new Error('GitHub refresh was cancelled.');
+    if (Date.now() >= deadline) break;
+    const response = await http.get(
+      `${prefix}/pulls?state=${state}&sort=updated&direction=desc&per_page=100&page=${page}`,
+    );
+    if (!isCurrent()) throw new Error('GitHub refresh was cancelled.');
+    for (const pr of parsePulls(response.body, repository)) {
+      const previous = pulls.get(pr.number);
+      if (!previous || pr.updatedAt >= previous.updatedAt) pulls.set(pr.number, pr);
+    }
+    if (!response.hasNext) {
+      complete = true;
+      break;
     }
   }
+  return { pulls: [...pulls.values()], complete };
+}
+
+/** Read the small, authoritative open-PR index before slower branch and
+ * history work. A complete empty result is enough to remove closed PRs. */
+export async function readOpenPulls(
+  http: GitHubReader,
+  repository: string,
+  isCurrent = () => true,
+): Promise<OpenPullSnapshot> {
+  const checkedAt = new Date().toISOString();
+  const result = await readPullState(http, repository, 'open', 50, Date.now() + 30_000, isCurrent);
+  return { ...result, checkedAt };
+}
+
+export async function readPulls(http: GitHubReader, repository: string, isCurrent = () => true) {
+  const deadline = Date.now() + 30_000;
+  const open = await readPullState(http, repository, 'open', 50, deadline, isCurrent);
+  const closed = await readPullState(http, repository, 'closed', 3, deadline, isCurrent);
   return {
-    pulls: [...pulls.values()],
-    openPullsComplete,
-    pullHistoryComplete: openPullsComplete && closedComplete,
+    pulls: mergeCachedPulls(open.pulls, closed.pulls),
+    openPullsComplete: open.complete,
+    pullHistoryComplete: open.complete && closed.complete,
+  };
+}
+
+/** Reconcile a focused open-PR read with saved history. When the listing is
+ * complete, any previously open PR that disappeared is no longer open. */
+export function reconcileOpenPulls(
+  previous: RemoteSnapshot,
+  fresh: OpenPullSnapshot,
+): RemoteSnapshot {
+  const previousByNumber = new Map(previous.pulls.map((pull) => [pull.number, pull]));
+  const observed = fresh.pulls.map((pull) => {
+    const saved = previousByNumber.get(pull.number);
+    return {
+      ...(saved?.headSha === pull.headSha ? saved : {}),
+      ...pull,
+      observedAt: fresh.checkedAt,
+      retained: false,
+    };
+  });
+  const history = previous.pulls.filter((pull) => pull.state !== 'open');
+  const retained = fresh.complete
+    ? []
+    : previous.pulls
+        .filter(
+          (pull) =>
+            pull.state === 'open' &&
+            !fresh.pulls.some((candidate) => candidate.number === pull.number),
+        )
+        .map((pull) => ({ ...pull, retained: true }));
+  return {
+    ...previous,
+    pulls: limitCachedPulls(mergeCachedPulls(history, retained, observed), observed),
+    openPullsComplete: fresh.complete,
+    pullsCheckedAt: fresh.checkedAt,
+    pullsError: undefined,
   };
 }
 

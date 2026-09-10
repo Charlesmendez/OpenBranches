@@ -146,23 +146,26 @@ describe('workspace now control panel', () => {
     ]);
   });
 
-  it('marks old GitHub evidence as saved and filters by kind or search text', () => {
+  it('excludes unverified saved PRs from the live panel and reports that they are hidden', () => {
     const oldPull = pull(9, {
       title: 'Repair invoices',
       observedAt: new Date(now - 11 * 60_000).toISOString(),
     });
+    const currentPull = pull(10, { title: 'Current billing fix' });
     const live = branch('voice', {
       title: 'Voice controls',
       tasks: [task({ tool: 'cursor', title: 'Wire voice controls' })],
     });
-    const model = workspaceNow([repository('project', [live], [oldPull])], now);
+    const model = workspaceNow([repository('project', [live], [oldPull, currentPull])], now);
     const rows = model.projects.flatMap((project) => project.rows);
 
-    expect(rows.find((row) => row.pull)?.pull?.stale).toBe(true);
+    expect(model).toMatchObject({ pulls: 1, unverifiedPulls: 1 });
+    expect(rows.some((row) => row.pull?.pull.number === 9)).toBe(false);
     expect(filterWorkspaceNow(model, 'live', '')[0].rows).toHaveLength(1);
     expect(filterWorkspaceNow(model, 'pulls', '')[0].rows).toHaveLength(1);
     expect(filterWorkspaceNow(model, 'all', 'cursor')[0].rows[0].branch?.branch.id).toBe('voice');
-    expect(filterWorkspaceNow(model, 'all', 'invoices')[0].rows[0].pull?.pull.number).toBe(9);
+    expect(filterWorkspaceNow(model, 'all', 'billing')[0].rows[0].pull?.pull.number).toBe(10);
+    expect(filterWorkspaceNow(model, 'all', 'invoices')).toEqual([]);
     expect(filterWorkspaceNow(model, 'all', 'missing')).toEqual([]);
   });
 
@@ -175,7 +178,7 @@ describe('workspace now control panel', () => {
     const pulls = Array.from({ length: 75 }, (_, index) => pull(index + 1));
     const model = workspaceNow([repository('large-project', branches, pulls)], now);
 
-    expect(model).toMatchObject({ live: 2, waiting: 0, pulls: 75 });
+    expect(model).toMatchObject({ live: 2, waiting: 0, pulls: 75, unverifiedPulls: 0 });
     expect(model.projects).toHaveLength(1);
     expect(model.projects[0].rows).toHaveLength(77);
   });

@@ -280,6 +280,60 @@ describe('stopping project monitoring', () => {
     await work;
     expect(store.read('github.sources', {})).toEqual({});
   });
+  it('publishes closed PR removals before a slower full GitHub refresh fails', async () => {
+    const { store } = await storeFixture();
+    const snapshot = createDemoSnapshot();
+    snapshot.repositories = [snapshot.repositories[0]];
+    const repo = snapshot.repositories[0];
+    const key = `${repo.id}:origin:example/atlas-api`;
+    store.write('github.enabled', true);
+    store.write('github.sources', {
+      [key]: {
+        ...remote('old'),
+        pulls: [
+          {
+            number: 12,
+            title: 'Close me',
+            url: 'https://github.com/example/atlas-api/pull/12',
+            state: 'open',
+            base: 'main',
+            headSha: 'a'.repeat(40),
+            updatedAt: '2026-09-09T12:00:00Z',
+            headName: 'feat/closed-now',
+            headRepository: 'example/atlas-api',
+            retained: true,
+          },
+        ],
+        openPullsComplete: false,
+        pullHistoryComplete: false,
+        error: 'Previous refresh failed.',
+      },
+    });
+    const publish = vi.fn();
+    const service = new GitHubService(
+      store,
+      {
+        http: new GitHubHttp(
+          async () => undefined,
+          vi.fn<typeof fetch>().mockResolvedValue(new Response('[]')),
+        ),
+      },
+      () => snapshot,
+      publish,
+      vi.fn().mockRejectedValue(new Error('Full refresh failed.')),
+    );
+    cleanup.push(() => service.close());
+
+    await service.refresh();
+
+    const saved = store.read<Record<string, RemoteSnapshot>>('github.sources', {})[key];
+    expect(saved.pulls).toEqual([]);
+    expect(saved.openPullsComplete).toBe(true);
+    expect(saved.pullsError).toBeUndefined();
+    expect(saved.error).toBe('Full refresh failed.');
+    expect(service.enrich(snapshot).repositories[0].github?.openPullsComplete).toBe(true);
+    expect(publish).toHaveBeenCalledTimes(2);
+  });
   it('does not resurrect a repository after a pending local scan and never touches its files', async () => {
     vi.useFakeTimers();
     const { store, directory } = await storeFixture();

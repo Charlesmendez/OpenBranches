@@ -139,6 +139,7 @@ export class GitHubAuth {
     this.credentials = undefined;
     this.error = undefined;
     this.vault.write(undefined);
+    this.http.resetBackoff();
   }
 
   private token(): Promise<string | undefined> {
@@ -181,5 +182,6 @@ export class GitHubAuth {
     this.vault.write(JSON.stringify(credentials));
     this.credentials = credentials;
     this.error = undefined;
+    this.http.resetBackoff();
   }
 }

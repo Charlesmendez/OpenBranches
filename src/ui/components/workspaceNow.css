@@ -175,6 +175,54 @@
   color: var(--muted);
 }
 
+.workspace-now-freshness {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid #4d5368;
+  color: #bdc7e6;
+  background: #1e202acc;
+}
+
+.workspace-now-freshness-icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  border: 1px solid #6a7190;
+  border-radius: 8px;
+  background: #7d8fca12;
+}
+
+.workspace-now-freshness > span:nth-child(2) {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.workspace-now-freshness strong {
+  color: #e5e8f2;
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.workspace-now-freshness small {
+  color: var(--muted);
+  font-size: 8px;
+}
+
+.workspace-now-freshness .text-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  color: #b9caff;
+  font-size: 8px;
+  white-space: nowrap;
+}
+
 .workspace-now-column-labels {
   display: grid;
   grid-template-columns: 190px minmax(220px, 0.92fr) 32px minmax(235px, 1.08fr);

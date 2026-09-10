@@ -172,7 +172,7 @@ export function Settings({
                     {github.connected
                       ? `Connected as ${github.login}. Reading branches, PRs, reviews, and checks from your selected projects.`
                       : github.enabled
-                        ? 'Reading public branches, PRs, reviews, and checks. Sign in to include private repositories.'
+                        ? 'Reading public branches, PRs, reviews, and checks. Public GitHub limits can delay updates across many projects; sign in for reliable two-minute refreshes.'
                         : 'See published branches and pull requests alongside work on your Mac.'}
                   </p>
                 </div>

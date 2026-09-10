@@ -15,6 +15,9 @@ export class GitHubHttp {
   async get(path: string): Promise<{ body: unknown; hasNext: boolean }> {
     return this.transport.json(path, this.token);
   }
+  resetBackoff() {
+    this.transport.resetBackoff();
+  }
 }
 
 const oauthError = z.object({ error: z.string(), interval: z.number().optional() });

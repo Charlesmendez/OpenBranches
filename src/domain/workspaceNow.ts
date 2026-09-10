@@ -46,6 +46,7 @@ export interface WorkspaceNowModel {
   live: number;
   waiting: number;
   pulls: number;
+  unverifiedPulls: number;
 }
 
 interface MutablePull extends WorkspaceNowPull {
@@ -180,7 +181,8 @@ const projectIdentity = (repository: Repository, pull?: WorkspaceNowPull) => {
  * and PRs whose last recorded state is open. Recent commits and dirty trees do
  * not imply that somebody is working now. */
 export function workspaceNow(repositories: Repository[], now = Date.now()): WorkspaceNowModel {
-  const pulls = currentPulls(repositories, now);
+  const observedPulls = currentPulls(repositories, now);
+  const pulls = observedPulls.filter((pull) => !pull.stale);
   const attachedPulls = new Set<string>();
   const groups = new Map<
     string,
@@ -280,6 +282,7 @@ export function workspaceNow(repositories: Repository[], now = Date.now()): Work
     live: projects.reduce((sum, project) => sum + project.live, 0),
     waiting: projects.reduce((sum, project) => sum + project.waiting, 0),
     pulls: pulls.length,
+    unverifiedPulls: observedPulls.length - pulls.length,
   };
 }
 

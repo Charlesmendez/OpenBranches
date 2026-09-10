@@ -5,7 +5,9 @@ import {
   limitCachedPulls,
   mergeCachedPulls,
   parsePulls,
+  readOpenPulls,
   readPulls,
+  reconcileOpenPulls,
   retainPartialPulls,
 } from '../src/github/pulls';
 import { missingPullHeads, readPullLookups } from '../src/github/pullLookups';
@@ -290,6 +292,30 @@ describe('GitHub collaboration metadata', () => {
     const fresh = retainPartialPulls(source(), saved);
     expect(fresh.pulls[0]).toMatchObject({ retained: false, observedAt: checkedAt });
     expect(retainPartialPulls(source({ pulls: [] }), saved).pulls).toHaveLength(0);
+  });
+
+  it('clears previously open PRs after a focused complete open listing', async () => {
+    const previous = source({
+      pulls: [
+        parsePulls([sourcePull()], 'example/project')[0],
+        parsePulls(
+          [sourcePull({ number: 2, state: 'closed', merged_at: checkedAt })],
+          'example/project',
+        )[0],
+      ],
+      error: 'GitHub is rate limited.',
+    });
+    const fresh = await readOpenPulls(
+      http(vi.fn<typeof fetch>().mockResolvedValue(response([]))),
+      'example/project',
+    );
+    const reconciled = reconcileOpenPulls(previous, fresh);
+
+    expect(fresh.complete).toBe(true);
+    expect(reconciled.pulls.map((pull) => [pull.number, pull.state])).toEqual([[2, 'merged']]);
+    expect(reconciled).toMatchObject({ openPullsComplete: true, pullsCheckedAt: fresh.checkedAt });
+    expect(reconciled.pullsError).toBeUndefined();
+    expect(reconciled.error).toBe('GitHub is rate limited.');
   });
 
   it('retains authors, review requests and deleted-head PRs without bodies, private actor fields or arbitrary links', () => {

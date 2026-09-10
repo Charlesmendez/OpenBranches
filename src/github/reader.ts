@@ -33,6 +33,8 @@ export const remoteSnapshotSchema = z.object({
   pulls: z.array(cachedPullSchema).max(5300),
   pullLookups: z.array(pullLookupSchema).max(10_000).optional(),
   openPullsComplete: z.boolean().optional(),
+  pullsCheckedAt: cachedText.optional(),
+  pullsError: cachedText.optional(),
   checkedAt: cachedText,
   branchesComplete: z.boolean(),
   pullHistoryComplete: z.boolean(),

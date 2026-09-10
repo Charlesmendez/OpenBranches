@@ -160,6 +160,7 @@ export function WorkspaceNow({
   onProject,
   onFocus,
   onPulls,
+  onSources,
 }: {
   repositories: Repository[];
   now: number;
@@ -167,6 +168,7 @@ export function WorkspaceNow({
   onProject: (id: string) => void;
   onFocus: (repository: Repository, branch: Branch) => void;
   onPulls: () => void;
+  onSources: () => void;
 }) {
   const [filter, setFilter] = useState<WorkspaceNowFilter>('all');
   const [query, setQuery] = useState('');
@@ -208,7 +210,7 @@ export function WorkspaceNow({
             <Radio size={13} /> WORKSPACE NOW
           </span>
           <h2 id="workspace-now-title">What&apos;s happening right now</h2>
-          <p>Verified agent sessions and open pull requests, across every project.</p>
+          <p>Verified agent sessions and recently confirmed open pull requests.</p>
         </div>
         <div className="workspace-now-summary" aria-label="Current work summary">
           <span className={model.live ? 'is-live' : ''}>
@@ -258,6 +260,25 @@ export function WorkspaceNow({
           )}
         </label>
       </div>
+
+      {model.unverifiedPulls > 0 && (
+        <div className="workspace-now-freshness" role="status">
+          <span className="workspace-now-freshness-icon">
+            <CircleAlert size={15} />
+          </span>
+          <span>
+            <strong>{countLabel(model.unverifiedPulls, 'saved PR record')} hidden</strong>
+            <small>
+              GitHub has not confirmed that {model.unverifiedPulls === 1 ? 'it is' : 'they are'}
+              still open, so {model.unverifiedPulls === 1 ? 'it is' : 'they are'} excluded from this
+              live view.
+            </small>
+          </span>
+          <button className="text-button" onClick={onSources}>
+            Fix GitHub updates <ArrowUpRight size={12} />
+          </button>
+        </div>
+      )}
 
       {projects.length ? (
         <>

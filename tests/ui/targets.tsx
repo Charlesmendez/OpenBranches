@@ -15,6 +15,7 @@ import './targets.css';
 type Scenario = 'standard' | 'default' | 'missing';
 type View = 'overview' | 'map' | 'inventory';
 const busyFixture = new URLSearchParams(location.search).has('busy');
+const stalePullFixture = new URLSearchParams(location.search).has('stale-pulls');
 
 function repositoryFor(scenario: Scenario): Repository {
   const repository = structuredClone(createDemoSnapshot().repositories[0]);
@@ -136,15 +137,46 @@ function Fixture() {
   }, [scenario]);
   const snapshot = useMemo(() => {
     const value = createDemoSnapshot();
+    const repositories = [
+      ...value.repositories,
+      clonedRepository(value.repositories[1], 'forge', 'forge-web'),
+      clonedRepository(value.repositories[2], 'harbor', 'harbor-worker'),
+      clonedRepository(value.repositories[1], 'lumen', 'lumen-mobile'),
+      clonedRepository(value.repositories[2], 'orbit', 'orbit-jobs'),
+    ];
+    if (stalePullFixture) {
+      const observedAt = new Date(Date.now() - 15 * 60_000).toISOString();
+      for (const repository of repositories) {
+        repository.github = repository.github
+          ? {
+              ...repository.github,
+              checkedAt: observedAt,
+              partial: true,
+              error: 'GitHub is rate limited.',
+              pulls: repository.github.pulls?.map((pull) => ({
+                ...pull,
+                observedAt,
+                retained: true,
+                sourceError: 'GitHub is rate limited.',
+              })),
+            }
+          : undefined;
+        repository.branches = repository.branches.map((branch) => ({
+          ...branch,
+          pullRequest: branch.pullRequest
+            ? {
+                ...branch.pullRequest,
+                observedAt,
+                retained: true,
+                sourceError: 'GitHub is rate limited.',
+              }
+            : undefined,
+        }));
+      }
+    }
     return {
       ...value,
-      repositories: [
-        ...value.repositories,
-        clonedRepository(value.repositories[1], 'forge', 'forge-web'),
-        clonedRepository(value.repositories[2], 'harbor', 'harbor-worker'),
-        clonedRepository(value.repositories[1], 'lumen', 'lumen-mobile'),
-        clonedRepository(value.repositories[2], 'orbit', 'orbit-jobs'),
-      ],
+      repositories,
     };
   }, []);
   const [selected, setSelected] = useState<string | null>(null);
@@ -195,6 +227,7 @@ function Fixture() {
           onProject={() => {}}
           onActivity={() => {}}
           onPulls={() => {}}
+          onSources={() => {}}
           onSelect={() => {}}
           onFocus={() => setView('map')}
           onAdd={() => {}}

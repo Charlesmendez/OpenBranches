@@ -8,8 +8,9 @@ import {
   type RemoteSnapshot,
 } from '../../src/github/reader';
 import { enrichRepository } from './enrich';
-import { retainPartialPulls } from '../../src/github/pulls';
+import { readOpenPulls, reconcileOpenPulls, retainPartialPulls } from '../../src/github/pulls';
 import { limitSignalCache } from '../../src/github/signals';
+import { GitHubError } from '../../src/github/transport';
 
 export class GitHubService {
   private sources: Record<string, RemoteSnapshot>;
@@ -106,10 +107,74 @@ export class GitHubService {
     });
     return job.promise;
   }
+  private sourceKey(repository: Repository, remote: Repository['remotes'][number]) {
+    const slug = githubRepository(remote.url);
+    return slug ? `${repository.id}:${remote.name}:${slug}` : undefined;
+  }
+  private save(generation: number) {
+    if (this.closed || generation !== this.generation) return;
+    const selected = this.selectedKeys();
+    this.sources = Object.fromEntries(
+      Object.entries(this.sources).filter(([key]) => selected.has(key)),
+    );
+    this.store.write('github.sources', this.sources);
+    this.publish();
+  }
   private async refreshAll(generation: number) {
     const sources = this.current().repositories.flatMap((repository) =>
       repository.remotes.map((remote) => ({ repository, remote })),
     );
+    const verifiedPulls = new Set<string>();
+    let pullStatesChanged = false;
+    const openSources = sources
+      .flatMap(({ repository, remote }) => {
+        const slug = githubRepository(remote.url);
+        const key = this.sourceKey(repository, remote);
+        const source = key ? this.sources[key] : undefined;
+        return slug && key && source?.pulls.some((pull) => pull.state === 'open')
+          ? [{ repository, remote, slug, key, source }]
+          : [];
+      })
+      .sort(
+        (left, right) =>
+          Number(right.source.pulls.some((pull) => pull.state === 'open' && pull.retained)) -
+            Number(left.source.pulls.some((pull) => pull.state === 'open' && pull.retained)) ||
+          (left.source.pullsCheckedAt || left.source.checkedAt).localeCompare(
+            right.source.pullsCheckedAt || right.source.checkedAt,
+          ),
+      );
+    for (const { slug, key } of openSources) {
+      if (this.closed || !this.enabled || generation !== this.generation) return;
+      if (!this.selectedKeys().has(key)) continue;
+      try {
+        const fresh = await readOpenPulls(
+          this.auth.http,
+          slug,
+          () =>
+            !this.closed &&
+            this.enabled &&
+            generation === this.generation &&
+            this.selectedKeys().has(key),
+        );
+        if (this.closed || generation !== this.generation) return;
+        if (!this.selectedKeys().has(key)) continue;
+        this.sources[key] = reconcileOpenPulls(this.sources[key], fresh);
+        verifiedPulls.add(key);
+        pullStatesChanged = true;
+      } catch (error) {
+        if (this.closed || generation !== this.generation) return;
+        if (!this.selectedKeys().has(key)) continue;
+        const message =
+          error instanceof Error ? error.message : 'GitHub could not refresh pull requests.';
+        this.sources[key] = { ...this.sources[key], pullsError: message };
+        pullStatesChanged = true;
+        if (error instanceof GitHubError && error.status === 429) break;
+      }
+    }
+    // Publish this focused result before slower branch and history reads. A
+    // closed PR should disappear from the live panel as soon as GitHub proves it.
+    if (pullStatesChanged) this.save(generation);
+
     const offset = this.refreshOffset++ % Math.max(1, sources.length);
     const budget = { remaining: 12, milliseconds: 30_000 };
     const pullLookupBudget = { remaining: 6, milliseconds: 15_000 };
@@ -154,17 +219,16 @@ export class GitHubService {
         this.sources[key] = {
           ...previous,
           error: error instanceof Error ? error.message : 'GitHub could not refresh this source.',
+          pullsError: verifiedPulls.has(key)
+            ? previous.pullsError
+            : error instanceof Error
+              ? error.message
+              : 'GitHub could not refresh pull requests.',
         };
+        if (error instanceof GitHubError && error.status === 429) break;
       }
     }
-    if (!this.closed && generation === this.generation) {
-      const selected = this.selectedKeys();
-      this.sources = Object.fromEntries(
-        Object.entries(this.sources).filter(([key]) => selected.has(key)),
-      );
-      this.store.write('github.sources', this.sources);
-      this.publish();
-    }
+    this.save(generation);
   }
   close() {
     this.closed = true;

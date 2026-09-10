@@ -145,6 +145,9 @@ function githubHealth(
   const failed = observed.filter((repository) => repository.github?.error).length;
   const partial = observed.filter((repository) => repository.github?.partial).length;
   const missing = projects.length - observed.length;
+  const rateLimited = observed.some((repository) =>
+    repository.github?.error?.toLocaleLowerCase().includes('rate limited'),
+  );
   const access = providers.github.connected
     ? providers.github.login
       ? `Signed in as @${providers.github.login}.`
@@ -170,8 +173,15 @@ function githubHealth(
     return {
       id: 'github',
       label: 'GitHub',
-      value: failed || providers.github.error ? 'Update delayed' : 'Partial results',
-      detail: `${access} ${failed ? `${failed} failed. ` : ''}${partial ? `${partial} partial. ` : ''}${missing ? `${missing} awaiting data. ` : ''}Last good results remain visible.`,
+      value: rateLimited
+        ? 'Rate limited'
+        : failed || providers.github.error
+          ? 'Update delayed'
+          : 'Partial results',
+      detail:
+        rateLimited && !providers.github.connected
+          ? `${access} Sign in to keep ${projects.length} projects current. Saved PR states are excluded from “right now” until GitHub verifies them.`
+          : `${access} ${failed ? `${failed} failed. ` : ''}${partial ? `${partial} partial. ` : ''}${missing ? `${missing} awaiting data. ` : ''}Saved results remain available outside the live view.`,
       state: 'delayed',
       checkedAt,
       timeLabel: 'Checked',

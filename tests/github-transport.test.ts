@@ -78,6 +78,17 @@ describe('bounded GitHub transport', () => {
     vi.setSystemTime(Date.now() + 60_001);
     expect((await transport.json('/user')).body).toEqual({});
   });
+  it('can clear anonymous backoff after the connection changes', async () => {
+    const request = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response('{}', { status: 429 }))
+      .mockResolvedValueOnce(new Response('{}'));
+    const transport = new GitHubTransport(request);
+    await expect(transport.json('/user')).rejects.toThrow('rate limited');
+    transport.resetBackoff();
+    await expect(transport.json('/user', 'connected-token')).resolves.toMatchObject({ body: {} });
+    expect(request).toHaveBeenCalledTimes(2);
+  });
   it('stops pre-aborted requests and discards a response arriving after cancellation', async () => {
     const abort = new AbortController();
     const request = vi.fn<typeof fetch>().mockImplementation(async () => {

@@ -10,6 +10,9 @@ import { titleFromBranch } from '../../src/domain/branches';
 import type { RemoteSnapshot } from '../../src/github/reader';
 import { historyKey, publishedTargets } from '../../src/github/history';
 
+const pullSourceError = (source: RemoteSnapshot) =>
+  source.pullsError ?? (source.pullsCheckedAt ? undefined : source.error);
+
 /** Git remains the source for working files and local ancestry. GitHub adds a
  * separate observed remote tip; a new tip never inherits old ancestry. */
 export function enrichRepository(repository: Repository, sources: RemoteSnapshot[]): Repository {
@@ -140,7 +143,7 @@ export function enrichRepository(repository: Repository, sources: RemoteSnapshot
         ...pr,
         repository: source.repository,
         observedAt: pr.observedAt ?? source.checkedAt,
-        sourceError: source.error,
+        sourceError: pullSourceError(source),
       };
       const key = pullKey(pull);
       indexedPulls.set(key, mergePullEvidence(pull, indexedPulls.get(key)));
@@ -189,11 +192,13 @@ export function enrichRepository(repository: Repository, sources: RemoteSnapshot
     github: {
       pulls,
       openPullsComplete: sources.every(
-        (source) => source.openPullsComplete === true && !source.error,
+        (source) => source.openPullsComplete === true && !pullSourceError(source),
       ),
       checkedAt: sources.map((s) => s.checkedAt).sort()[0],
       partial: sources.some((s) => !s.branchesComplete || !s.pullHistoryComplete),
-      error: sources.find((s) => s.error)?.error,
+      error:
+        sources.find((source) => source.error)?.error ??
+        sources.find((source) => source.pullsError)?.pullsError,
       history: {
         checked: sources.reduce(
           (count, source) =>

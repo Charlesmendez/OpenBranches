@@ -26,6 +26,7 @@ export function Overview({
   onProject,
   onActivity,
   onPulls,
+  onSources,
   onSelect,
   onFocus,
   onAdd,
@@ -36,6 +37,7 @@ export function Overview({
   onProject: (id: string) => void;
   onActivity: () => void;
   onPulls: () => void;
+  onSources: () => void;
   onSelect: (repositoryId: string, branchId?: string) => void;
   onFocus: (repository: Repository, branch: Branch) => void;
   onAdd: () => void;
@@ -52,6 +54,7 @@ export function Overview({
         onProject={onProject}
         onFocus={onFocus}
         onPulls={onPulls}
+        onSources={onSources}
       />
       <section className={`project-directory ${projectsOpen ? 'open' : ''}`}>
         <button

@@ -607,6 +607,7 @@ export function App() {
               }}
               onActivity={() => setView('activity')}
               onPulls={() => setView('people')}
+              onSources={() => openSettings('connections')}
               onSelect={navigateBranch}
               onFocus={focusRepositoryBranch}
               onAdd={() => void addRepository()}
