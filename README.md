@@ -14,7 +14,7 @@ OpenBranches brings local Git and GitHub into one workspace: a grouped branch ma
 - Browse hundreds of branches in collapsed groups; expand a group into readable pages or search the full inventory with ⌘K.
 - Reopen your last project, selected branch, map position, and inventory filters after a restart. Demo and real workspaces keep separate view histories.
 - See local and remote copies, uncommitted work, integration history, and the evidence behind each result.
-- Watch local changes while the app is running; refresh connected GitHub sources every two minutes.
+- Watch local changes while the app is running; refresh connected GitHub sources every two minutes. The title bar summarizes source health and opens current, refreshing, partial, delayed, and disabled details without leaving the current view.
 - Read public GitHub branches and pull requests without signing in. Private-repository sign-in is implemented using GitHub App device authorization but requires the release app registration.
 - Browse People & PRs across connected GitHub projects. Search authors, requested reviewers, PRs, and recorded tools; filter open work, review requests, quiet drafts, and recent history. Filters survive branch inspection and restarts. See [collaboration scope and evidence](docs/COLLABORATION.md).
 - Review one row per branch, grouped by the decision to make. Send one branch or a multi-selection to Codex, Claude, or Cursor for a read-only investigation and concrete proposal. Selections spanning projects become one task per repository. Snooze for seven days or dismiss; choices survive restarts and new evidence brings the finding back.

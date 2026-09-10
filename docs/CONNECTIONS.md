@@ -1,5 +1,7 @@
 # Connection setup
 
+The title bar combines Local Git, GitHub, live coding activity, and saved task history into one source-health control. Its summary reports whether enabled evidence is current, refreshing, or delayed. The popover keeps each source separate, shows the oldest relevant successful scan/check time, and links to Settings. A failed or partial refresh retains and labels saved evidence rather than resetting its observation time. Optional sources that are disabled remain visible as **Off** in the popover and do not turn the overall summary into an error.
+
 ## GitHub
 
 Public GitHub reading is available in Settings without sign-in. It only reads remotes of repositories you selected; GitHub's unauthenticated rate limits apply. Private repositories require GitHub App authorization.

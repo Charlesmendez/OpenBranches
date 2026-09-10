@@ -16,40 +16,61 @@ import '../../src/ui/components/workflow.css';
 
 const discoveryFixture = new URLSearchParams(location.search).has('discovery');
 const quietFixture = new URLSearchParams(location.search).has('quiet');
+const sourceFixture = new URLSearchParams(location.search).has('sources');
+const fixtureNow = new Date().toISOString();
 let status: GitStatus = {
   state: 'missing',
   installAvailable: true,
   message:
     'Git reads the branch history in your projects. Apple includes it in a free package called Command Line Tools.',
 };
-if (discoveryFixture) status = { state: 'ready', version: '2.53.0', installAvailable: false };
+if (discoveryFixture || sourceFixture)
+  status = { state: 'ready', version: '2.53.0', installAvailable: false };
 let snapshot: Snapshot = {
   repositories: [],
   events: [],
   updatedAt: new Date().toISOString(),
   scanning: false,
 };
+if (sourceFixture) {
+  snapshot = createDemoSnapshot();
+  snapshot.repositories = snapshot.repositories.map((repository) => ({
+    ...repository,
+    scannedAt: fixtureNow,
+    github: { ...repository.github, checkedAt: fixtureNow, partial: false },
+  }));
+}
 let failInstaller = false;
+let sourceDelayed = false;
 const gitListeners = new Set<(status: GitStatus) => void>();
 const snapshotListeners = new Set<(snapshot: Snapshot) => void>();
 const discoveryListeners = new Set<(state: ProjectDiscoveryState) => void>();
 let agents: AgentHistoryStatus[] = [
-  { tool: 'claude-code', enabled: false, state: 'not-connected' },
+  sourceFixture
+    ? {
+        tool: 'claude-code',
+        enabled: true,
+        state: 'ready',
+        checkedAt: fixtureNow,
+        taskCount: 4,
+      }
+    : { tool: 'claude-code', enabled: false, state: 'not-connected' },
 ];
 const agentListeners = new Set<(statuses: AgentHistoryStatus[]) => void>();
 let liveAgents: AgentLiveStatus[] = [
   {
     tool: 'codex',
-    enabled: false,
-    installed: false,
-    state: 'not-connected',
-    activeCount: 0,
+    enabled: sourceFixture,
+    installed: sourceFixture,
+    state: sourceFixture ? 'listening' : 'not-connected',
+    activeCount: sourceFixture ? 1 : 0,
+    receivedAt: sourceFixture ? fixtureNow : undefined,
   },
   {
     tool: 'claude-code',
-    enabled: false,
-    installed: false,
-    state: 'not-connected',
+    enabled: sourceFixture,
+    installed: sourceFixture,
+    state: sourceFixture ? 'listening' : 'not-connected',
     activeCount: 0,
   },
   {
@@ -230,8 +251,23 @@ window.openbranches = {
   getProviderStatus: async () => ({
     agents,
     liveAgents,
-    codex: { installed: false, enabled: false, state: 'not-connected' },
-    github: { connected: false, configured: false },
+    codex: sourceFixture
+      ? {
+          installed: true,
+          enabled: true,
+          state: 'ready',
+          checkedAt: fixtureNow,
+          taskCount: 7,
+        }
+      : { installed: false, enabled: false, state: 'not-connected' },
+    github: sourceFixture
+      ? {
+          connected: true,
+          configured: true,
+          enabled: true,
+          login: 'fixture-user',
+        }
+      : { connected: false, configured: false },
   }),
   connectGitHub: async () => ({ connected: false, configured: false }),
   pollGitHub: async () => ({ connected: false, configured: false }),
@@ -271,11 +307,37 @@ function Fixture() {
         }}
       >
         <strong>
-          {discoveryFixture
-            ? 'Simulated project discovery · fictional folders only'
-            : 'Simulated setup'}
+          {sourceFixture
+            ? 'Simulated source health · fictional data only'
+            : discoveryFixture
+              ? 'Simulated project discovery · fictional folders only'
+              : 'Simulated setup'}
         </strong>
-        {!discoveryFixture && (
+        {sourceFixture ? (
+          <button
+            onClick={() => {
+              sourceDelayed = !sourceDelayed;
+              const checkedAt = new Date().toISOString();
+              snapshot = {
+                ...snapshot,
+                repositories: snapshot.repositories.map((repository, index) => ({
+                  ...repository,
+                  scannedAt: checkedAt,
+                  error: sourceDelayed && index === 0 ? 'Folder unavailable' : undefined,
+                  github: repository.github && {
+                    ...repository.github,
+                    checkedAt,
+                    partial: sourceDelayed,
+                  },
+                })),
+              };
+              snapshotListeners.forEach((listener) => listener(snapshot));
+              updateCounters();
+            }}
+          >
+            {sourceDelayed ? 'Restore current' : 'Show delayed'}
+          </button>
+        ) : !discoveryFixture ? (
           <>
             <button
               onClick={() => change({ state: 'ready', version: '2.53.0', installAvailable: false })}
@@ -311,7 +373,7 @@ function Fixture() {
               Installer: {installCalls} · Folders: {addCalls} · Guide: {guideCalls}
             </output>
           </>
-        )}
+        ) : null}
       </aside>
     </>
   );

@@ -4,7 +4,6 @@ import {
   Command,
   FolderPlus,
   GitBranch,
-  Cloud,
   List,
   LoaderCircle,
   Map,
@@ -37,6 +36,7 @@ import { EmptyState, IconButton } from './components/Primitives';
 import { triageFindings } from '../domain/triage';
 import { ProjectWorkSpotlight } from './components/ProjectWorkSpotlight';
 import { ProjectActivityStatus } from './components/ProjectActivityStatus';
+import { SourceStatusMenu } from './components/SourceStatusMenu';
 
 const People = lazy(() =>
   import('./components/People').then((module) => ({ default: module.People })),
@@ -278,26 +278,20 @@ export function App() {
         </button>
         <div className="connection-status">
           {mode === 'demo' ? (
-            <span className="demo-indicator">DEMO WORKSPACE</span>
+            <>
+              <span className="demo-indicator">DEMO WORKSPACE</span>
+              <span className="status-divider" />
+              <span className="github-status">Sample data</span>
+            </>
           ) : (
-            <span>
-              <i
-                className={`status-dot ${gitNeedsSetup ? 'muted' : snapshot.scanning ? 'pulsing' : ''}`}
-              />
-              {gitNeedsSetup ? 'Git setup needed' : 'Local tracking'}
-            </span>
+            <SourceStatusMenu
+              repositories={snapshot.repositories}
+              providers={providers}
+              gitState={git.status?.state ?? 'checking'}
+              scanning={snapshot.scanning}
+              onSettings={() => openSettings()}
+            />
           )}
-          <span className="status-divider" />
-          <span className="github-status">
-            <Cloud size={14} />
-            {mode === 'demo'
-              ? 'Sample data'
-              : providers.github.connected
-                ? providers.github.login
-                : providers.github.enabled
-                  ? 'Public GitHub'
-                  : 'Not connected'}
-          </span>
           <button
             className={`refresh-button ${snapshot.scanning ? 'spinning' : ''}`}
             title="Refresh repositories"
