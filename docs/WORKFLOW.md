@@ -1,6 +1,8 @@
 # Maps, activity, and attention
 
-The map compares the displayed branch copy independently with every integration target. Local Git uses the scanner's local tip (or cached remote tip when no local copy exists). The GitHub view uses the published remote tip and its exact target SHAs. The target cards identify local, cached, or GitHub history.
+The map compares the displayed branch copy independently with every integration target. The scanner first checks `develop`, `dev`, `main`, and `master`. When none exists, it uses the branch named by a verified symbolic remote `HEAD`, preferring `origin/HEAD`, and labels it as the repository default. It does not guess from the current checkout. When Git exposes neither source, the map and inventory explain that no target was detected and keep branch activity and locations visible without drawing connection lines.
+
+Local Git uses the scanner's local tip (or cached remote tip when no local copy exists). The GitHub view uses the published remote tip and its exact target SHAs. Target cards identify local, cached, or GitHub history, and a nonstandard default is labeled in the map, inventory, and inspector.
 
 A solid line means the displayed commit is included in the target's history. A dashed line means a fresh open PR from that exact tip targets that exact GitHub repository and branch. A PR never establishes inclusion and never points into a same-named local target. Missing evidence produces no line. Cached inclusion is labeled as cached. Absence from commit history cannot disprove equivalent squash-merged, rebased, or cherry-picked changes.
 
@@ -34,4 +36,4 @@ Handoffs use Codex, Claude, or Cursor already installed and signed in on the Mac
 
 Snooze, dismiss, and restore only change review choices; they never alter Git. Evidence is expandable within each row. Snoozing lasts seven days, and dismissal remains until the evidence revision changes. The connected Codex label reflects actual provider state and linked task count. Deterministic Git findings are not described as AI reviews.
 
-Verification includes a 500-branch/1,000-rule fixture, per-target and cross-fork PR checks, divergent local/remote tips, stale and missing history, runtime expiry, branch switches, waiting tasks, partial live coverage, and saved-choice behavior. Native verification confirmed that the previously blank hibe-backend map rendered and its attention screen showed the connected task count and three queues.
+Verification includes a 500-branch/1,000-rule fixture, per-target and cross-fork PR checks, divergent local/remote tips, symbolic and broken remote defaults, stale and missing history, runtime expiry, branch switches, waiting tasks, partial live coverage, and saved-choice behavior. The fictional `/tests/ui/targets.html` surface verifies the labeled remote-default and explicit no-target states in the map and inventory at 1280×720 without page overflow. Native verification confirmed that the previously blank hibe-backend map rendered and its attention screen showed the connected task count and three queues.

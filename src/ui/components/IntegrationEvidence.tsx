@@ -2,6 +2,7 @@ import { Check, Cloud, Laptop } from 'lucide-react';
 import { useState } from 'react';
 import type { Branch, Repository } from '../../domain/types';
 import { relativeTime } from '../../domain/branches';
+import { IntegrationTargetNotice } from './IntegrationTargetNotice';
 
 export function IntegrationEvidence({
   branch,
@@ -15,7 +16,12 @@ export function IntegrationEvidence({
   const github = !!published && (choice === 'github' || !branch.local);
   const ref = github ? branch.remote : (branch.local ?? branch.remote);
   const targets = github
-    ? published.targets
+    ? published.targets.map((target) => ({
+        ...target,
+        role: repository.targets.find((candidate) => candidate.name === target.name)?.role,
+        remote: published.remoteName,
+        source: 'github' as const,
+      }))
     : repository.targets.map((target) => ({
         ...target,
         state: branch.integration[target.name] ?? 'unknown',
@@ -50,7 +56,7 @@ export function IntegrationEvidence({
         {targets.map((target) => (
           <div
             key={target.name}
-            className={`path-step ${target.state === 'integrated' ? 'complete' : ''} ${target.name === 'master' || target.name === 'main' ? 'stable' : ''}`}
+            className={`path-step ${target.state === 'integrated' ? 'complete' : ''} ${target.name === 'master' || target.name === 'main' || target.role === 'default' ? 'stable' : ''}`}
           >
             <span className="step-marker">
               {target.state === 'integrated' && <Check size={12} />}
@@ -59,6 +65,7 @@ export function IntegrationEvidence({
               <strong>
                 {github ? `${published.remoteName}/` : ''}
                 {target.name}
+                {target.role === 'default' && <span className="default-target-label">Default</span>}
               </strong>
               <small>
                 {target.state === 'integrated'
@@ -84,13 +91,13 @@ export function IntegrationEvidence({
             </div>
           </div>
         ))}
-        {!targets.length && (
-          <p className="muted-note">
-            {github && published.partial
-              ? 'No integration branch observed yet. This GitHub snapshot is incomplete.'
-              : `No standard integration branch found${github ? ' on this GitHub remote' : ''}.`}
-          </p>
-        )}
+        <IntegrationTargetNotice
+          repository={repository}
+          targets={targets}
+          source={github ? 'github' : 'local'}
+          partial={published?.partial}
+          context="inspector"
+        />
       </div>
       {github && (
         <p className="history-freshness">
@@ -105,9 +112,12 @@ export function IntegrationEvidence({
             'History loads in batches and continues with each refresh, subject to GitHub’s limits.'}
         </p>
       )}
-      <p className="evidence-note">
-        Each target is checked independently. Squashed or rebased changes may need PR verification.
-      </p>
+      {!!targets.length && (
+        <p className="evidence-note">
+          Each target is checked independently. Squashed or rebased changes may need PR
+          verification.
+        </p>
+      )}
       {differs && (
         <div className="source-error inline-evidence">
           <span>

@@ -188,6 +188,8 @@ export interface Target {
   sha: string;
   source: 'local' | 'cached-remote' | 'github';
   remote?: string;
+  /** Repository default discovered from a symbolic remote HEAD. */
+  role?: 'default';
 }
 export interface Repository {
   id: string;

@@ -27,7 +27,7 @@ export function enrichRepository(repository: Repository, sources: RemoteSnapshot
     sources.find((source) => source.remoteName === 'origin') ??
     (sources.length === 1 ? sources[0] : undefined);
   if (primary)
-    for (const target of publishedTargets(primary.branches)) {
+    for (const target of publishedTargets(primary.branches, targets)) {
       if (!targets.some((existing) => existing.name === target.name))
         targets.push({ ...target, source: 'github', remote: primary.remoteName });
     }
@@ -120,7 +120,7 @@ export function enrichRepository(repository: Repository, sources: RemoteSnapshot
         checkedAt: source.checkedAt,
         unavailable: !!source.error,
         partial: !source.branchesComplete,
-        targets: publishedTargets(source.branches).map((target) => {
+        targets: publishedTargets(source.branches, targets).map((target) => {
           const check = checks.get(historyKey(ref.sha, target.sha));
           return {
             ...target,
@@ -205,7 +205,7 @@ export function enrichRepository(repository: Repository, sources: RemoteSnapshot
           (count, source) =>
             count +
             new Set(source.branches.map((branch) => branch.sha)).size *
-              new Set(publishedTargets(source.branches).map((target) => target.sha)).size,
+              new Set(publishedTargets(source.branches, targets).map((target) => target.sha)).size,
           0,
         ),
         error: sources.find((source) => source.history?.error)?.history?.error,

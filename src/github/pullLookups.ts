@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { Repository } from '../domain/types';
-import { integrationNames } from './history';
+import { integrationTargetNames } from '../domain/integrationTargets';
 import { parsePulls, type CachedPull } from './pulls';
 import { GitHubError, type GitHubReader } from './transport';
 
@@ -37,7 +37,7 @@ export function missingPullHeads(
   remoteName: string,
   local?: Repository,
 ): string[] {
-  const targets = new Set<string>(integrationNames);
+  const targets = new Set<string>(integrationTargetNames(local?.targets));
   const covered = new Set(pulls.map((pull) => pull.headSha));
   const candidates = new Set<string>();
   const add = (name: string, value?: string) => {

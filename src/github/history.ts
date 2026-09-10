@@ -1,8 +1,9 @@
 import { z } from 'zod';
-import type { Repository } from '../domain/types';
+import type { Repository, Target } from '../domain/types';
+import { integrationTargetNames, standardIntegrationNames } from '../domain/integrationTargets';
 import { GitHubError, type GitHubReader } from './transport';
 
-export const integrationNames = ['develop', 'dev', 'main', 'master'] as const;
+export const integrationNames = standardIntegrationNames;
 const sha = z.string().regex(/^[a-f\d]{40,64}$/);
 export const historyCheckSchema = z.object({
   branchSha: sha,
@@ -30,8 +31,11 @@ export interface HistoryOptions {
   isCurrent?: () => boolean;
 }
 export const historyKey = (branchSha: string, targetSha: string) => `${branchSha}:${targetSha}`;
-export function publishedTargets(branches: RemoteBranch[]): RemoteBranch[] {
-  return integrationNames.flatMap((name) => {
+export function publishedTargets(
+  branches: RemoteBranch[],
+  preferred?: readonly Target[],
+): RemoteBranch[] {
+  return integrationTargetNames(preferred).flatMap((name) => {
     const target = branches.find((branch) => branch.name === name);
     return target ? [target] : [];
   });
@@ -107,7 +111,7 @@ export async function readHistory(
   const local = localChecks(options.local);
   const checks = new Map<string, HistoryCheck>();
   const queue = new Map<string, { branchSha: string; targetSha: string }>();
-  for (const target of publishedTargets(branches)) {
+  for (const target of publishedTargets(branches, options.local?.targets)) {
     for (const branch of branches) {
       const key = historyKey(branch.sha, target.sha);
       if (checks.has(key) || queue.has(key)) continue;

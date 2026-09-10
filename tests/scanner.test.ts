@@ -158,6 +158,61 @@ describe('read-only Git inspection', () => {
     expect(result.targets).toEqual([]);
     expect(result.branches).toEqual([]);
   });
+
+  it('uses a verified symbolic remote default when no standard target exists', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'openbranches-default-'));
+    directories.push(root);
+    git(root, 'init', '-b', 'trunk');
+    await writeFile(join(root, 'readme.txt'), 'original\n');
+    git(root, 'add', '.');
+    git(root, 'commit', '-m', 'Initial');
+    const trunk = git(root, 'rev-parse', 'HEAD');
+    git(root, 'remote', 'add', 'origin', 'https://github.com/example/project.git');
+    git(root, 'update-ref', 'refs/remotes/origin/trunk', trunk);
+    git(root, 'symbolic-ref', 'refs/remotes/origin/HEAD', 'refs/remotes/origin/trunk');
+    git(root, 'checkout', '-b', 'codex/work');
+    await writeFile(join(root, 'feature.txt'), 'work\n');
+    git(root, 'add', '.');
+    git(root, 'commit', '-m', 'Work');
+
+    const result = await scanRepository(root);
+    expect(result.targets).toEqual([
+      {
+        name: 'trunk',
+        sha: trunk,
+        source: 'local',
+        remote: 'origin',
+        role: 'default',
+      },
+    ]);
+    expect(result.branches.find((branch) => branch.name === 'codex/work')?.integration).toEqual({
+      trunk: 'pending',
+    });
+    expect(result.branches.some((branch) => branch.name === 'HEAD')).toBe(false);
+  });
+
+  it('keeps all standard targets instead of adding a symbolic fallback', async () => {
+    const root = await fixture();
+    const sha = git(root, 'rev-parse', 'HEAD');
+    git(root, 'remote', 'add', 'origin', 'https://github.com/example/project.git');
+    git(root, 'update-ref', 'refs/remotes/origin/trunk', sha);
+    git(root, 'symbolic-ref', 'refs/remotes/origin/HEAD', 'refs/remotes/origin/trunk');
+    expect((await scanRepository(root)).targets.map((target) => target.name)).toEqual([
+      'develop',
+      'main',
+    ]);
+  });
+
+  it('ignores a symbolic remote default whose target ref is missing', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'openbranches-broken-default-'));
+    directories.push(root);
+    git(root, 'init', '-b', 'trunk');
+    await writeFile(join(root, 'readme.txt'), 'original\n');
+    git(root, 'add', '.');
+    git(root, 'commit', '-m', 'Initial');
+    git(root, 'symbolic-ref', 'refs/remotes/origin/HEAD', 'refs/remotes/origin/trunk');
+    expect((await scanRepository(root)).targets).toEqual([]);
+  });
 });
 
 it('parses paths containing whitespace and records missing and locked worktrees', () => {

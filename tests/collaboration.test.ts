@@ -113,6 +113,30 @@ describe('GitHub collaboration metadata', () => {
     ).toEqual(['c'.repeat(40), 'b'.repeat(40)]);
   });
 
+  it('does not send a verified nonstandard default through exact PR lookup', () => {
+    const repo = createDemoSnapshot().repositories[0];
+    repo.targets = [
+      {
+        name: 'trunk',
+        sha: 'e'.repeat(40),
+        source: 'local',
+        remote: 'origin',
+        role: 'default',
+      },
+    ];
+    expect(
+      missingPullHeads(
+        [
+          { name: 'trunk', sha: 'e'.repeat(40) },
+          { name: 'feat/work', sha: 'f'.repeat(40) },
+        ],
+        [],
+        'origin',
+        repo,
+      ),
+    ).not.toContain('e'.repeat(40));
+  });
+
   it('finds old PRs by exact commit, rejects moved heads, and resumes pagination', async () => {
     const exact = 'b'.repeat(40),
       moved = 'c'.repeat(40),

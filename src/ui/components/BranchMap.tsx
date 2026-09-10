@@ -31,6 +31,7 @@ import { MapViewport } from './MapViewport';
 import { MapConnection } from './MapConnection';
 import { BranchActivity } from './BranchActivity';
 import { mapEvidence, mapTargets, type MapTargetEvidence } from '../../domain/mapEvidence';
+import { targetHistoryLabel } from '../../domain/integrationTargets';
 import { idleWork } from '../../domain/branchActivity';
 import { useClock } from '../hooks/useClock';
 import {
@@ -39,6 +40,7 @@ import {
   type WorkSignal,
   type WorkSignalKind,
 } from '../../domain/workSpotlight';
+import { IntegrationTargetNotice } from './IntegrationTargetNotice';
 
 type MapData = {
   kind: 'target' | 'branch' | 'cluster';
@@ -295,13 +297,9 @@ export function BranchMap({
       data: {
         kind: 'target',
         label: target.name,
-        tone: ['master', 'main'].includes(target.name) ? 'amber' : 'blue',
-        hint:
-          target.source === 'local'
-            ? 'Local history'
-            : target.source === 'github'
-              ? 'GitHub history'
-              : 'Cached history',
+        tone:
+          target.role === 'default' || ['master', 'main'].includes(target.name) ? 'amber' : 'blue',
+        hint: targetHistoryLabel(target),
       },
     }));
     const edges: Edge[] = [];
@@ -311,7 +309,10 @@ export function BranchMap({
         nodes.push({
           id: branch.id,
           type: 'mapNode',
-          position: { x: (i % 3) * 350, y: 175 + Math.floor(i / 3) * 235 },
+          position: {
+            x: (i % 3) * 350,
+            y: (targets.length ? 175 : 45) + Math.floor(i / 3) * 235,
+          },
           selected: branch.id === selectedId,
           draggable: false,
           width: 320,
@@ -369,7 +370,7 @@ export function BranchMap({
         nodes.push({
           id: `cluster:${c.id}`,
           type: 'mapNode',
-          position: { x: i * 330, y: 175 },
+          position: { x: i * 330, y: targets.length ? 175 : 45 },
           draggable: false,
           width: 300,
           height: 200,
@@ -488,12 +489,12 @@ export function BranchMap({
             : `${branches.length} branches · ${clusters.length} groups`}
         </span>
       </div>
-      {source === 'github' && !targets.length && (
-        <p className="map-source-note">
-          GitHub target history is not available yet. Local Git history is available in the other
-          view.
-        </p>
-      )}
+      <IntegrationTargetNotice
+        repository={repository}
+        targets={targets}
+        source={source}
+        partial={repository.github?.partial}
+      />
       <div className="flow-canvas">
         <ReactFlow
           key={`${repository.id}:${source}:${cluster?.id ?? 'groups'}:${currentPage}`}
@@ -564,17 +565,21 @@ export function BranchMap({
           </button>
         </div>
       )}
-      <div className="map-legend">
-        <span>
-          <i className="legend-line solid" />
-          {source === 'github' ? 'Published commit included' : 'Commit included in target history'}
-        </span>
-        <span>
-          <i className="legend-line" />
-          Open PR destination
-        </span>
-        <span className="map-legend-note">No line = no verified connection</span>
-      </div>
+      {!!targets.length && (
+        <div className="map-legend">
+          <span>
+            <i className="legend-line solid" />
+            {source === 'github'
+              ? 'Published commit included'
+              : 'Commit included in target history'}
+          </span>
+          <span>
+            <i className="legend-line" />
+            Open PR destination
+          </span>
+          <span className="map-legend-note">No line = no verified connection</span>
+        </div>
+      )}
     </div>
   );
 }

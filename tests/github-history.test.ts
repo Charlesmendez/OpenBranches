@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GitHubHttp } from '../electron/github/http';
-import { comparisonState, readHistory, type RemoteHistory } from '../src/github/history';
+import {
+  comparisonState,
+  publishedTargets,
+  readHistory,
+  type RemoteHistory,
+} from '../src/github/history';
 import { enrichRepository } from '../electron/github/enrich';
 import { readRemote, type RemoteSnapshot } from '../src/github/reader';
 import type { Repository } from '../src/domain/types';
@@ -89,6 +94,35 @@ function source(history?: RemoteHistory): RemoteSnapshot {
 afterEach(() => vi.useRealTimers());
 
 describe('immutable GitHub ancestry', () => {
+  it('checks a nonstandard default only when local Git verified it', async () => {
+    const trunk = { name: 'trunk', sha: hash(1) };
+    const remoteBranches = [trunk, { name: 'codex/work', sha: hash(2) }];
+    const local = repository();
+    local.targets = [{ ...trunk, source: 'local', remote: 'origin', role: 'default' }];
+    local.branches[0].integration = { trunk: 'unknown' };
+    local.branches[0].remoteIntegration = { trunk: 'unknown' };
+    const request = vi.fn<typeof fetch>().mockResolvedValue(response(body('behind')));
+    const history = await readHistory(httpFor(request), 'example/fixture', remoteBranches, {
+      local,
+    });
+    expect(publishedTargets(remoteBranches, local.targets)).toEqual([trunk]);
+    expect(history.checks.some((check) => check.branchSha === hash(2))).toBe(true);
+    expect(String(request.mock.calls[0][0])).toContain(`/compare/${hash(1)}...${hash(2)}`);
+  });
+
+  it('still discovers every standard target from GitHub when local Git saw only one', () => {
+    expect(
+      publishedTargets(
+        [
+          { name: 'develop', sha: hash(1) },
+          { name: 'main', sha: hash(2) },
+          { name: 'trunk', sha: hash(3) },
+        ],
+        [{ name: 'develop', sha: hash(1), source: 'local' }],
+      ).map((target) => target.name),
+    ).toEqual(['develop', 'main']);
+  });
+
   it('stops metadata pagination after disconnect and timestamps the beginning of a slow snapshot', async () => {
     vi.useFakeTimers();
     const startedAt = new Date().toISOString();

@@ -1,0 +1,40 @@
+.target-fixture {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 16px;
+  width: 100vw;
+  height: 100vh;
+  padding: 20px;
+  background: var(--bg);
+}
+.target-fixture > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+.target-fixture > header > div:first-child {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.target-fixture > header span {
+  color: var(--muted);
+  font-size: 11px;
+}
+.fixture-controls {
+  display: flex;
+  gap: 10px;
+}
+.target-fixture .history-sources {
+  width: 260px;
+  margin: 0;
+}
+.target-fixture .fixture-controls .history-sources:first-child {
+  width: 180px;
+}
+.target-fixture .map-panel,
+.target-fixture .inventory {
+  height: 100%;
+}

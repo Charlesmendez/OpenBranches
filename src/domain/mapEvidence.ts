@@ -27,6 +27,7 @@ export function mapTargets(repository: Repository, source: MapSource = 'local'):
       sha: target.sha,
       source: 'github',
       remote: primary.remoteName,
+      role: repository.targets.find((candidate) => candidate.name === target.name)?.role,
     })) ?? []
   );
 }

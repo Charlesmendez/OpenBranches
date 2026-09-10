@@ -162,6 +162,22 @@ describe('map evidence', () => {
     repo.github = { checkedAt: at, partial: false };
     expect(mapEvidence(repo, b, now, 'github')[0].state).toBe('unknown');
   });
+  it('preserves a verified default-branch role in the GitHub map', () => {
+    const b = branch(),
+      repo = repository(b);
+    repo.targets = [{ name: 'trunk', sha, source: 'local', remote: 'origin', role: 'default' }];
+    b.publishedHistory = {
+      repository: 'fixture/project',
+      remoteName: 'origin',
+      branchSha: sha,
+      checkedAt: at,
+      unavailable: false,
+      targets: [{ name: 'trunk', sha, state: 'integrated' }],
+    };
+    expect(mapTargets(repo, 'github')).toEqual([
+      { name: 'trunk', sha, source: 'github', remote: 'origin', role: 'default' },
+    ]);
+  });
 });
 describe('source-backed branch activity', () => {
   it('expires live status and refuses possible, archived, future, and missing observations', () => {

@@ -5,6 +5,7 @@ import type { Branch, Repository } from '../../domain/types';
 import { integrationLabel, lifecycleOf, locationOf, relativeTime } from '../../domain/branches';
 import { EmptyState, IntegrationBadge, Locations } from './Primitives';
 import { useInventoryNavigation } from '../hooks/useInventoryNavigation';
+import { IntegrationTargetNotice } from './IntegrationTargetNotice';
 import {
   INVENTORY_ROW_HEIGHT as ROW_HEIGHT,
   INVENTORY_HEADER_HEIGHT as HEADER_HEIGHT,
@@ -109,6 +110,7 @@ export function Inventory({
           Recently updated
         </span>
       </div>
+      <IntegrationTargetNotice repository={repository} targets={targets} context="inventory" />
       <div className="inventory-table">
         <div
           className="inventory-scroll"
@@ -148,6 +150,7 @@ export function Inventory({
                   >
                     <GitBranch size={13} />
                     {target.name}
+                    {target.role === 'default' && <em>default</em>}
                   </span>
                 ))}
                 <span>Updated</span>
@@ -203,14 +206,15 @@ export function Inventory({
                       ))}
                       <span className="table-time">{relativeTime(branch.updatedAt)}</span>
                       <span id={`${rowId}-details`} className="sr-only">
-                        {branch.name}. {locationOf(branch)}.{' '}
-                        {targets
-                          .map(
-                            (target) =>
-                              `${target.name}: ${integrationLabel(branch.integration[target.name])}`,
-                          )
-                          .join('. ')}
-                        .
+                        {branch.name}. {locationOf(branch)}.
+                        {targets.length
+                          ? ` ${targets
+                              .map(
+                                (target) =>
+                                  `${target.name}: ${integrationLabel(branch.integration[target.name])}`,
+                              )
+                              .join('. ')}.`
+                          : ' Integration target unavailable.'}
                       </span>
                     </div>
                   );

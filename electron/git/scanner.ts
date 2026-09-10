@@ -3,8 +3,9 @@ import { createHash } from 'node:crypto';
 import { realpath, access } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { promisify } from 'node:util';
-import type { Branch, GitRef, Repository, Worktree } from '../../src/domain/types';
+import type { Branch, GitRef, Repository, Target, Worktree } from '../../src/domain/types';
 import { titleFromBranch } from '../../src/domain/branches';
+import { standardIntegrationNames } from '../../src/domain/integrationTargets';
 import { gitEnvironment } from './installation';
 
 const exec = promisify(execFile);
@@ -93,6 +94,20 @@ export function parseRefs(output: string): GitRef[] {
           remote: isRemote ? short.slice(0, slash) : undefined,
         },
       ];
+    });
+}
+export function parseRemoteDefaults(output: string): { name: string; remote: string }[] {
+  return output
+    .split('\n')
+    .filter(Boolean)
+    .flatMap((line) => {
+      const [fullName, , , , , symbolic] = line.split('\0');
+      const head = fullName.match(/^refs\/remotes\/(.+)\/HEAD$/);
+      if (!head || !symbolic) return [];
+      const prefix = `refs/remotes/${head[1]}/`;
+      if (!symbolic.startsWith(prefix) || symbolic === fullName) return [];
+      const name = symbolic.slice(prefix.length);
+      return name && name !== 'HEAD' ? [{ name, remote: head[1] }] : [];
     });
 }
 export function parseWorktrees(output: string): Worktree[] {
@@ -193,7 +208,7 @@ export async function scanRepository(inputPath: string, executable = 'git'): Pro
         }),
     )
   ).filter((remote): remote is { name: string; url: string } => remote !== null);
-  const targets = ['develop', 'dev', 'main', 'master'].flatMap((name) => {
+  const targets: Target[] = standardIntegrationNames.flatMap((name) => {
     const local = refs.find((r) => r.fullName === `refs/heads/${name}`);
     const remote = refs.find((r) => r.fullName === `refs/remotes/origin/${name}`);
     const ref = local ?? remote;
@@ -201,6 +216,29 @@ export async function scanRepository(inputPath: string, executable = 'git'): Pro
       ? [{ name, sha: ref.sha, source: local ? ('local' as const) : ('cached-remote' as const) }]
       : [];
   });
+  if (!targets.length) {
+    const remoteDefault = parseRemoteDefaults(refOutput).sort(
+      (left, right) =>
+        Number(right.remote === 'origin') - Number(left.remote === 'origin') ||
+        left.remote.localeCompare(right.remote) ||
+        left.name.localeCompare(right.name),
+    )[0];
+    if (remoteDefault) {
+      const local = refs.find((ref) => ref.fullName === `refs/heads/${remoteDefault.name}`);
+      const remote = refs.find(
+        (ref) => ref.fullName === `refs/remotes/${remoteDefault.remote}/${remoteDefault.name}`,
+      );
+      const ref = remote ? (local ?? remote) : undefined;
+      if (ref)
+        targets.push({
+          name: remoteDefault.name,
+          sha: ref.sha,
+          source: local ? 'local' : 'cached-remote',
+          remote: remoteDefault.remote,
+          role: 'default',
+        });
+    }
+  }
   const contained = new Map<string, Set<string>>();
   for (const target of targets) {
     try {

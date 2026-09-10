@@ -15,7 +15,7 @@ Exact local ancestry can satisfy a published comparison when **both** SHAs match
 - Up to 12 new comparison requests share a 30-second comparison-time allowance per workspace refresh. A request already in progress may finish within the HTTP layer's 15-second timeout. Metadata pagination time does not consume that allowance.
 - Sources rotate between refreshes so one large repository or remote does not monopolize the allowance. Identical SHAs and repeated branch aliases require no duplicate comparison request within a source.
 - Previously unchecked pairs precede failed retries. Unavailable pairs stay unknown and normally retry after ten minutes. GitHub authentication, rate-limit, and service errors stop the current comparison batch; the HTTP transport enforces provider backoff.
-- Up to 5,000 listed branches and four standard integration target names produce at most 20,000 cached pairs per remote. The workspace displays completed versus observed comparisons. Cold repositories with many commits absent locally can need several refreshes; public, unauthenticated GitHub access can take longer under provider limits. This is periodic observation, not a live server stream.
+- Up to 5,000 listed branches and four standard integration target names produce at most 20,000 cached pairs per remote. When local Git has verified a nonstandard default through a symbolic remote `HEAD`, that named target replaces the standard-name search for the repository. The workspace displays completed versus observed comparisons. Cold repositories with many commits absent locally can need several refreshes; public, unauthenticated GitHub access can take longer under provider limits. This is periodic observation, not a live server stream.
 - Snapshot freshness starts before pagination. A slow refresh cannot make earlier branch observations appear newly checked. Disconnect and monitoring changes stop subsequent requests and prevent late results from being adopted.
 
 ## Older pull requests by exact commit
@@ -28,7 +28,7 @@ The existing 5,300-record PR cache bound still applies. Open PRs remain first, f
 
 This closes the common gap where an older merged or closed PR fell outside the three-page recent-closed listing. It does not claim complete repository-wide PR history. “No PR” means none was present in the bounded listings or returned for that exact branch tip at its last completed lookup.
 
-The map and inventory keep their repository target identities. Existing local targets are preserved; origin (or a sole configured GitHub source) can supply missing target names. The inspector's GitHub view separately shows the published targets even when same-named local targets differ. Broader cross-source overview refinement remains on the roadmap.
+The map and inventory keep their repository target identities. Existing local targets are preserved; origin (or a sole configured GitHub source) can supply missing standard target names. A nonstandard name is queried only when local Git verified it as the remote default. The inspector's GitHub view separately shows the published targets even when same-named local targets differ. Broader cross-source overview refinement remains on the roadmap.
 
 ## Reviews and AI
 
@@ -36,7 +36,7 @@ Published states participate in semantic review revisions. Changed evidence resu
 
 ## Verification
 
-`tests/github-history.test.ts` covers comparison directions, empty/truncated pages, invalid evidence, exact-pair caching, changed tips, local/shallow evidence, a 1,000-branch batch, retries, limits, cancellation, elapsed/request bounds, source separation, new targets, review revisions, and cleanup preservation. The fictional browser fixture at `/tests/ui/history.html` covers keyboard source switching, different commits, remote-only branches, pending comparisons, unavailable GitHub, and a newly discovered target. Browser checks found and fixed duplicate sibling keys in the inspector; the production build excludes fixture entry points.
+`tests/github-history.test.ts` covers comparison directions, empty/truncated pages, invalid evidence, exact-pair caching, changed tips, local/shallow evidence, a verified nonstandard default, a 1,000-branch batch, retries, limits, cancellation, elapsed/request bounds, source separation, new targets, review revisions, and cleanup preservation. The fictional browser fixtures at `/tests/ui/history.html` and `/tests/ui/targets.html` cover keyboard source switching, different commits, remote-only branches, pending comparisons, unavailable GitHub, a newly discovered target, a labeled remote default, and the no-target state. Browser checks found and fixed duplicate sibling keys in the inspector; fixture entry points remain outside the production build.
 
 The implemented reader was also checked against the public OpenBranches repository: it listed three branches, reused identical integration tips, and correctly classified the feature commit as absent from the integration target. Native service refresh and the new inspector still need a combined packaged-app check. PR metadata now survives remote-branch deletion independently of branch rows, open work has its own bounded listing, and exact-tip lookup recovers older closed or merged PRs without attaching them to newer local commits. See [collaboration evidence](COLLABORATION.md).
 
