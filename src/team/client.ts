@@ -7,7 +7,7 @@ import {
   projectAccessSchema,
 } from './responses';
 import { readTeamResponse, TeamApiError } from './readResponse';
-import { githubCatalog, githubSetupState, githubNumericId } from './github';
+import { githubCatalog, githubSetupState, githubNumericId, githubWorkPage } from './github';
 export { TeamApiError } from './readResponse';
 const changed = z.object({ revision: z.string() });
 export interface TeamFilter {
@@ -198,6 +198,21 @@ export class TeamClient {
   githubRemove(workspace: string, project: string) {
     return this.json(this.root(workspace) + '/github/projects/' + teamId.parse(project), changed, {
       method: 'DELETE',
+    });
+  }
+  githubWork(workspace: string, filter: TeamFilter = {}, signal?: AbortSignal) {
+    const params = new URLSearchParams();
+    if (filter.person) params.set('member', teamId.parse(filter.person));
+    if (filter.project) params.set('project', teamId.parse(filter.project));
+    if (filter.query) params.set('q', filter.query);
+    if (filter.cursor) params.set('cursor', teamId.parse(filter.cursor));
+    return this.json(this.root(workspace) + '/github/work?' + params, githubWorkPage, {
+      signal,
+    }).then((value) => {
+      this.githubScope(workspace, value);
+      if (value.sources.some((source) => filter.project && source.projectId !== filter.project))
+        throw new Error('The GitHub response does not match the selected project.');
+      return value;
     });
   }
   private githubScope<T extends { workspaceId: string }>(workspace: string, value: T): T {

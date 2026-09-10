@@ -15,7 +15,7 @@ import { loadGitHubSetup } from '../src/github/load';
 import { createTeamServer } from '../src/http';
 import type { TeamConfig } from '../src/config';
 import type { Credential } from '../src/access';
-import { fictionalGitHub, pem, response, type Intercept } from '../dev/githubFixture';
+import { branchSha, fictionalGitHub, pem, response, type Intercept } from '../dev/githubFixture';
 
 const url = process.env.OPENBRANCHES_TEAM_TEST_DATABASE_URL;
 if (!url) throw new Error('Run with an isolated PostgreSQL test database.');
@@ -441,6 +441,104 @@ describe('GitHub workspace setup', () => {
       [f.workspace.id],
     );
     expect(JSON.stringify(saved.rows)).not.toMatch(/PRIVATE_BODY|PRIVATE_LOG|PRIVATE_PATCH/);
+  });
+  it('presents permission-scoped GitHub branches, PRs, checks and target history without private provider data', async () => {
+    const f = await fixture(),
+      catalog = await f.review();
+    await f.setup.select(f.owner, f.workspace.id, {
+      reviewId: catalog.id,
+      repositoryIds: ['51'],
+    });
+    const sync = new TeamGitHubSync(db, f.app);
+    await sync.refresh(true);
+    const project = (await f.setup.state(f.owner, f.workspace.id)).selections[0].projectId;
+    const ownerView = await f.store.githubWork.view(f.owner, f.workspace.id);
+    expect(ownerView.sources).toHaveLength(1);
+    expect(ownerView.sources[0]).toMatchObject({
+      projectId: project,
+      repositoryId: '51',
+      fullName: 'FictionalOrg/work',
+      syncState: 'current',
+      branchesComplete: true,
+      pullHistoryComplete: true,
+      openPullCount: 1,
+    });
+    expect(ownerView.sources[0].branches).toEqual([
+      expect.objectContaining({
+        name: 'feature/shared',
+        sha: branchSha,
+        targets: [expect.objectContaining({ name: 'develop', state: 'pending' })],
+        pullNumbers: [1],
+      }),
+    ]);
+    expect(ownerView.sources[0].pulls).toEqual([
+      expect.objectContaining({
+        number: 1,
+        author: expect.objectContaining({ id: '61', login: 'fictional-person' }),
+        checks: expect.objectContaining({ state: 'failed', label: '1 check needs attention' }),
+      }),
+    ]);
+    expect(JSON.stringify(ownerView)).not.toMatch(/PRIVATE_BODY|PRIVATE_LOG|PRIVATE_PATCH|TOKEN/);
+
+    expect((await f.store.githubWork.view(f.member, f.workspace.id)).sources).toEqual([]);
+    await f.store.members.grant(
+      f.owner,
+      f.workspace.id,
+      project,
+      f.memberSigned.user.id,
+      true,
+      false,
+    );
+    expect((await f.store.githubWork.view(f.member, f.workspace.id)).sources).toHaveLength(1);
+    expect(
+      (
+        await f.store.githubWork.view(f.owner, f.workspace.id, {
+          memberId: f.signed.user.id,
+          query: '#1',
+        })
+      ).sources[0].pulls,
+    ).toHaveLength(1);
+    expect(
+      (
+        await f.store.githubWork.view(f.owner, f.workspace.id, {
+          memberId: f.memberSigned.user.id,
+        })
+      ).sources,
+    ).toEqual([]);
+  });
+  it('serves GitHub work to authorized browser sessions and rejects device credentials', async () => {
+    const f = await fixture(),
+      catalog = await f.review();
+    await f.setup.select(f.owner, f.workspace.id, {
+      reviewId: catalog.id,
+      repositoryIds: ['51'],
+    });
+    await new TeamGitHubSync(db, f.app).refresh(true);
+    const server = createTeamServer(f.config, f.store, f.oauth, events, undefined, f.setup);
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    servers.push(server);
+    const address = server.address();
+    if (!address || typeof address === 'string') throw new Error('No fixture port');
+    f.config.origin.port = String(address.port);
+    const root = f.config.origin.origin,
+      path = `/api/workspaces/${f.workspace.id}/github/work?q=feature%2Fshared`;
+    const response = await fetch(root + path, {
+      headers: { Cookie: 'ob_session=' + f.owner.token },
+    });
+    expect(response.status).toBe(200);
+    expect((await response.json()).sources[0]).toMatchObject({ fullName: 'FictionalOrg/work' });
+    const pair = await f.store.pairings.start({ deviceName: 'Fictional read-only Mac' });
+    await f.store.pairings.approve(f.owner, {
+      workspaceId: f.workspace.id,
+      userCode: pair.userCode,
+    });
+    expect(
+      (
+        await fetch(root + path, {
+          headers: { Authorization: 'Bearer ' + pair.pairingSecret },
+        })
+      ).status,
+    ).toBe(403);
   });
   it('preserves the last verified snapshot after a failed refresh and retries by status', async () => {
     let failing = false;

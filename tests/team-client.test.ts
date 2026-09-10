@@ -83,6 +83,48 @@ describe('team browser client boundary', () => {
     expect(params.get('project')).toBe(project);
     expect(params.get('q')).toBe('name%_ / https://elsewhere.invalid');
   });
+  it('encodes GitHub work filters and rejects sources outside the requested project', async () => {
+    const checkedAt = new Date().toISOString(),
+      response = {
+        workspaceId: workspace,
+        revision: '1',
+        checkedAt,
+        sources: [],
+        nextCursor: null,
+      },
+      request = vi.fn<typeof fetch>().mockResolvedValue(Response.json(response)),
+      client = new TeamClient(request);
+    await client.githubWork(workspace, { person, project, query: '#7 review' });
+    const address = new URL('http://fixture.invalid' + String(request.mock.calls[0][0]));
+    expect(address.pathname).toBe(`/api/workspaces/${workspace}/github/work`);
+    expect(address.searchParams.get('member')).toBe(person);
+    expect(address.searchParams.get('project')).toBe(project);
+    expect(address.searchParams.get('q')).toBe('#7 review');
+
+    const otherProject = randomUUID();
+    const source = {
+      projectId: otherProject,
+      repositoryId: '51',
+      fullName: 'FictionalOrg/work',
+      lastAttemptAt: checkedAt,
+      snapshotAt: checkedAt,
+      syncState: 'current',
+      branchesComplete: true,
+      pullHistoryComplete: true,
+      branchCount: 0,
+      pullCount: 0,
+      openPullCount: 0,
+      branches: [],
+      pulls: [],
+      omittedBranches: 0,
+      omittedPulls: 0,
+    };
+    await expect(
+      new TeamClient(
+        vi.fn().mockResolvedValue(Response.json({ ...response, sources: [source] })),
+      ).githubWork(workspace, { project }),
+    ).rejects.toThrow('does not match the selected project');
+  });
   it('invalidates the matching access scope on unauthorized responses', async () => {
     const changed = vi.fn(),
       client = new TeamClient(

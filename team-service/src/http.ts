@@ -184,7 +184,7 @@ export function createTeamServer(
     const auth = credential(request, config);
     if (!['GET', 'HEAD'].includes(method) && auth.kind === 'session') sameOrigin(request, config);
     const githubRoute =
-      /^\/api\/workspaces\/([^/]+)\/github(?:\/(authorize|catalog|select|projects)(?:\/([^/]+))?)?$/.exec(
+      /^\/api\/workspaces\/([^/]+)\/github(?:\/(authorize|catalog|select|projects|work)(?:\/([^/]+))?)?$/.exec(
         path,
       );
     if (githubRoute) {
@@ -218,6 +218,19 @@ export function createTeamServer(
       }
       if (action === 'projects' && id && method === 'DELETE') {
         json(response, 200, await github.remove(auth, workspace, teamId.parse(id)));
+        return;
+      }
+      if (action === 'work' && !id && method === 'GET') {
+        json(
+          response,
+          200,
+          await store.githubWork.view(auth, workspace, {
+            projectId: url.searchParams.get('project') ?? undefined,
+            memberId: url.searchParams.get('member') ?? undefined,
+            after: url.searchParams.get('cursor') ?? undefined,
+            query: url.searchParams.get('q') ?? undefined,
+          }),
+        );
         return;
       }
       throw new TeamError(404, 'not_found', 'This GitHub endpoint is unavailable.');

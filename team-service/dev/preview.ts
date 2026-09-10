@@ -237,6 +237,8 @@ const fixtureProvider = fictionalGitHub((path, options) => {
               merged_at: null,
               updated_at: new Date().toISOString(),
               user: { id: ownerId, login: names[0], type: 'User' },
+              requested_reviewers:
+                selected.id % 2 === 1 ? [{ id: ownerId + 1, login: names[1], type: 'User' }] : [],
               base: { ref: 'develop' },
               head: {
                 ref: 'feature/shared',
@@ -253,6 +255,29 @@ const fixtureProvider = fictionalGitHub((path, options) => {
 const githubApp = new TeamGitHubApp('fixture-client', pem, fixtureProvider.request),
   github = new TeamGitHubSetup(db, githubApp),
   githubSync = new TeamGitHubSync(db, githubApp, { pollMilliseconds: 1_000 });
+const previewProof = await github.verify(
+    owners[0],
+    workspace.id,
+    { id: ownerId, login: names[0], type: 'User' },
+    'fictional-user-token',
+  ),
+  previewCatalog = await github.catalog(owners[0], workspace.id, previewProof.id, '31');
+await github.select(owners[0], workspace.id, {
+  reviewId: previewCatalog.id,
+  repositoryIds: previewRepositories.slice(0, 4).map((item) => String(item.id)),
+});
+const previewGitHubProjects = (await github.state(owners[0], workspace.id)).selections;
+for (let index = 1; index < sessions.length; index++)
+  for (const project of previewGitHubProjects)
+    await store.members.grant(
+      owners[0],
+      workspace.id,
+      project.projectId,
+      sessions[index].user.id,
+      true,
+      false,
+    );
+await githubSync.refresh(true);
 const oauth = new TeamOAuth(
   db,
   config,

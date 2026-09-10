@@ -5,6 +5,7 @@ import {
   ArrowUpRight,
   Clock,
   GitBranch,
+  GitPullRequest,
   Layers,
   Laptop,
   LogOut,
@@ -25,6 +26,7 @@ import { PairDevice } from './PairDevice';
 import { Access } from './Access';
 import { Devices } from './Devices';
 import { GitHubProjects } from './GitHubProjects';
+import { PublishedWork } from './PublishedWork';
 export function TeamApp() {
   const [session, setSession] = useState<TeamSession | null>(),
     [error, setError] = useState(''),
@@ -265,7 +267,7 @@ function Workspace({
   workspace: TeamSession['workspaces'][number];
   login: string;
 }) {
-  const [tab, setTab] = useState<'work' | 'access' | 'devices' | 'github'>(() =>
+  const [tab, setTab] = useState<'work' | 'published' | 'access' | 'devices' | 'github'>(() =>
       workspace.role === 'owner' &&
       new URLSearchParams(window.location.search).get('view') === 'github'
         ? 'github'
@@ -288,7 +290,8 @@ function Workspace({
     return () => clearInterval(timer);
   }, []);
   const tabs = [
-    { id: 'work' as const, label: 'Shared work', icon: Activity },
+    { id: 'work' as const, label: 'Live & local', icon: Activity },
+    { id: 'published' as const, label: 'Branches & PRs', icon: GitPullRequest },
     { id: 'access' as const, label: 'People & access', icon: Users },
     { id: 'devices' as const, label: 'Devices', icon: Laptop },
     ...(workspace.role === 'owner'
@@ -325,24 +328,32 @@ function Workspace({
         <div className="team-heading">
           <div>
             <span className="eyebrow">
-              {tab === 'work' ? 'YOUR TEAM, IN VIEW' : workspace.name.toUpperCase()}
+              {tab === 'work'
+                ? 'YOUR TEAM, IN VIEW'
+                : tab === 'published'
+                  ? 'GITHUB, ORGANIZED'
+                  : workspace.name.toUpperCase()}
             </span>
             <h1>
               {tab === 'work'
                 ? 'See where the work stands.'
-                : tab === 'access'
-                  ? 'The right people. The right access.'
-                  : tab === 'github'
-                    ? 'Your repositories, connected by choice.'
-                    : 'A view from every connected Mac.'}
+                : tab === 'published'
+                  ? 'Find the branches that need movement.'
+                  : tab === 'access'
+                    ? 'The right people. The right access.'
+                    : tab === 'github'
+                      ? 'Your repositories, connected by choice.'
+                      : 'A view from every connected Mac.'}
             </h1>
             <p>
               {tab === 'work'
                 ? 'Shared local branches, the people reporting them, and their place in project history.'
-                : 'Manage this workspace with clear, project-level choices.'}
+                : tab === 'published'
+                  ? 'Published branches, pull requests, reviewers, checks, and target history from GitHub.'
+                  : 'Manage this workspace with clear, project-level choices.'}
             </p>
           </div>
-          {tab !== 'devices' && (
+          {tab === 'work' && (
             <button className="secondary" onClick={() => setPair(true)}>
               <Plus size={16} />
               Connect a Mac
@@ -389,6 +400,15 @@ function Workspace({
             workspace={workspace.id}
             revision={data.workspace.revision}
             onChange={state.refresh}
+          />
+        )}
+        {data && tab === 'published' && (
+          <PublishedWork
+            client={client}
+            workspace={workspace.id}
+            people={data.people}
+            projects={data.projects}
+            refreshKey={`${data.workspace.revision}:${state.version}`}
           />
         )}
         {data && tab === 'work' && (
@@ -528,8 +548,8 @@ function Workspace({
             <div className="team-scope-note">
               <ShieldCheck size={17} />
               <span>
-                Only selected local metadata appears here. GitHub organization and PR ingestion is
-                still being connected.
+                Only selected local metadata appears here. Open Branches & PRs to inspect the
+                published GitHub side of the same projects.
               </span>
               <ArrowUpRight size={16} />
             </div>
