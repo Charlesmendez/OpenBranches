@@ -16,6 +16,8 @@ import {
   collaborationIndex,
   matchingPulls,
   peopleFor,
+  pullAttentionCues,
+  pullFilterCounts,
   pullSourceStale,
   quietDraft,
   reviewRequested,
@@ -576,5 +578,84 @@ describe('people and PR selectors', () => {
       pullSourceStale(normalized({ observedAt: new Date(now - 11 * 60_000).toISOString() }), now),
     ).toBe(true);
     expect(pullSourceStale(normalized({ sourceError: 'offline' }), now)).toBe(true);
+  });
+  it('puts actionable open PRs first and explains the evidence without inferring mergeability', () => {
+    const item = (pull: GitHubPullRequest) => ({
+      id: `example/project#${pull.number}`,
+      pull,
+      links: [],
+      projects: ['Project'],
+    });
+    const ordinary = normalized({
+      number: 4,
+      updatedAt: new Date(now).toISOString(),
+      requestedReviewers: [],
+      requestedTeams: [],
+    });
+    const quiet = normalized({
+      number: 3,
+      draft: true,
+      updatedAt: new Date(now - 20 * 86_400_000).toISOString(),
+      requestedReviewers: [],
+      requestedTeams: [],
+    });
+    const requested = normalized({
+      number: 2,
+      updatedAt: new Date(now - 2 * 86_400_000).toISOString(),
+      requestedReviewers: [{ id: '20', login: 'reviewer', kind: 'user' }],
+      requestedTeams: [],
+    });
+    const failing = normalized({
+      number: 1,
+      updatedAt: new Date(now - 3 * 86_400_000).toISOString(),
+      requestedReviewers: [],
+      requestedTeams: [],
+      signals: {
+        headSha: hash,
+        attemptedAt: checkedAt,
+        checks: {
+          observedAt: checkedAt,
+          complete: true,
+          total: 2,
+          counts: { failed: 2, pending: 0, passed: 0, other: 0 },
+          items: [],
+        },
+      },
+    });
+    const ordered = matchingPulls(
+      [ordinary, quiet, requested, failing].map(item),
+      { query: '', person: null, project: 'all', tool: 'all', filter: 'open' },
+      now,
+    );
+    expect(ordered.map(({ pull }) => pull.number)).toEqual([1, 2, 3, 4]);
+    expect(pullAttentionCues(failing, now)).toEqual([
+      {
+        kind: 'failed-checks',
+        label: 'Checks need attention',
+        detail: '2 failures reported',
+      },
+    ]);
+    expect(pullAttentionCues(requested, now)[0]).toMatchObject({
+      kind: 'review-requested',
+      detail: '1 person or team',
+    });
+    expect(pullAttentionCues(quiet, now)[0]).toMatchObject({
+      kind: 'quiet-draft',
+      detail: '20 days without a PR update',
+    });
+    expect(pullAttentionCues({ ...failing, state: 'merged' }, now)).toEqual([]);
+    expect(
+      pullFilterCounts(
+        ordered,
+        { query: 'reviewer', person: null, project: 'all', tool: 'all' },
+        now,
+      ),
+    ).toEqual({
+      open: 1,
+      requested: 1,
+      'failed-checks': 0,
+      'quiet-drafts': 0,
+      history: 0,
+    });
   });
 });

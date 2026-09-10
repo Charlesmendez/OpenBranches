@@ -18,6 +18,18 @@ export interface PersonWork {
   drafts: number;
 }
 export type PullFilter = 'open' | 'requested' | 'failed-checks' | 'quiet-drafts' | 'history';
+export type PullAttentionKind = 'failed-checks' | 'review-requested' | 'quiet-draft';
+export interface PullAttentionCue {
+  kind: PullAttentionKind;
+  label: string;
+  detail: string;
+}
+export type PullScope = {
+  query: string;
+  person: string | null;
+  project: string;
+  tool: string;
+};
 export const pullKey = (pull: Pick<GitHubPullRequest, 'repository' | 'number'>) =>
   `${pull.repository.toLowerCase()}#${pull.number}`;
 export const reviewRequested = (pull: GitHubPullRequest) =>
@@ -28,6 +40,44 @@ export const quietDraft = (pull: GitHubPullRequest, now = Date.now()) =>
   !!pull.draft &&
   Number.isFinite(Date.parse(pull.updatedAt)) &&
   now - Date.parse(pull.updatedAt) >= 14 * 86_400_000;
+
+/** Small, evidence-backed reasons for putting an open PR near the top. */
+export function pullAttentionCues(pull: GitHubPullRequest, now = Date.now()): PullAttentionCue[] {
+  if (pull.state !== 'open') return [];
+  const cues: PullAttentionCue[] = [];
+  if (hasFailedChecks(pull, now)) {
+    const count = pull.signals?.checks?.counts.failed ?? 0;
+    cues.push({
+      kind: 'failed-checks',
+      label: 'Checks need attention',
+      detail: count
+        ? `${count} ${count === 1 ? 'failure' : 'failures'} reported`
+        : 'Failure reported',
+    });
+  }
+  if (reviewRequested(pull)) {
+    const people = pull.requestedReviewers?.length ?? 0;
+    const teams = pull.requestedTeams?.length ?? 0;
+    const count = people + teams;
+    cues.push({
+      kind: 'review-requested',
+      label: 'Review requested',
+      detail: `${count} ${count === 1 ? 'person or team' : 'people or teams'}`,
+    });
+  }
+  if (quietDraft(pull, now)) {
+    const days = Math.floor((now - Date.parse(pull.updatedAt)) / 86_400_000);
+    cues.push({
+      kind: 'quiet-draft',
+      label: 'Quiet draft',
+      detail: `${days} days without a PR update`,
+    });
+  }
+  return cues;
+}
+
+export const pullAttentionRank = (pull: GitHubPullRequest, now = Date.now()) =>
+  hasFailedChecks(pull, now) ? 0 : reviewRequested(pull) ? 1 : quietDraft(pull, now) ? 2 : 3;
 export const preferPullEvidence = (candidate: GitHubPullRequest, current?: GitHubPullRequest) =>
   !current ||
   candidate.observedAt > current.observedAt ||
@@ -130,51 +180,75 @@ export function workTools(work: PullWork): CodingTool[] {
   ];
   return tools.length ? tools : ['unknown'];
 }
+
+function pullMatchesScope(item: PullWork, options: PullScope) {
+  const { pull } = item;
+  const query = options.query.trim().toLocaleLowerCase();
+  if (!pullInvolvesPerson(pull, options.person)) return false;
+  if (options.project !== 'all' && pull.repository.toLowerCase() !== options.project) return false;
+  if (options.tool !== 'all' && !workTools(item).includes(options.tool as CodingTool)) return false;
+  if (!query) return true;
+  const text = [
+    pull.title,
+    pull.repository,
+    pull.headName,
+    '#' + pull.number,
+    String(pull.number),
+    pull.author?.login,
+    ...item.projects,
+    ...(pull.requestedReviewers?.map((actor) => actor.login) ?? []),
+    ...(pull.requestedTeams?.map((team) => team.name + ' ' + team.slug) ?? []),
+    ...item.links.map(({ branch }) => agentSearchText(branch)),
+  ]
+    .join(' ')
+    .toLocaleLowerCase();
+  return text.includes(query);
+}
+
+function pullMatchesFilter(pull: GitHubPullRequest, filter: PullFilter, now: number) {
+  return filter === 'history'
+    ? pull.state !== 'open'
+    : filter === 'requested'
+      ? reviewRequested(pull)
+      : filter === 'failed-checks'
+        ? hasFailedChecks(pull, now) && !pullSourceStale(pull, now)
+        : filter === 'quiet-drafts'
+          ? quietDraft(pull, now)
+          : pull.state === 'open';
+}
+
+export const matchingPullScope = (work: PullWork[], options: PullScope) =>
+  work.filter((item) => pullMatchesScope(item, options));
+
+export function pullFilterCounts(work: PullWork[], options: PullScope, now = Date.now()) {
+  const counts: Record<PullFilter, number> = {
+    open: 0,
+    requested: 0,
+    'failed-checks': 0,
+    'quiet-drafts': 0,
+    history: 0,
+  };
+  for (const item of work) {
+    if (!pullMatchesScope(item, options)) continue;
+    for (const filter of Object.keys(counts) as PullFilter[])
+      if (pullMatchesFilter(item.pull, filter, now)) counts[filter]++;
+  }
+  return counts;
+}
+
 export function matchingPulls(
   work: PullWork[],
-  options: {
-    query: string;
-    person: string | null;
-    project: string;
-    tool: string;
-    filter: PullFilter;
-  },
+  options: PullScope & { filter: PullFilter },
   now = Date.now(),
 ) {
-  const query = options.query.trim().toLocaleLowerCase();
-  return work.filter((item) => {
-    const { pull } = item;
-    const person = pullInvolvesPerson(pull, options.person);
-    const text = [
-      pull.title,
-      pull.repository,
-      pull.headName,
-      '#' + pull.number,
-      String(pull.number),
-      pull.author?.login,
-      ...item.projects,
-      ...(pull.requestedReviewers?.map((actor) => actor.login) ?? []),
-      ...(pull.requestedTeams?.map((team) => team.name + ' ' + team.slug) ?? []),
-      ...item.links.map(({ branch }) => agentSearchText(branch)),
-    ]
-      .join(' ')
-      .toLocaleLowerCase();
-    const filter =
-      options.filter === 'history'
-        ? pull.state !== 'open'
-        : options.filter === 'requested'
-          ? reviewRequested(pull)
-          : options.filter === 'failed-checks'
-            ? hasFailedChecks(pull, now) && !pullSourceStale(pull, now)
-            : options.filter === 'quiet-drafts'
-              ? quietDraft(pull, now)
-              : pull.state === 'open';
-    return (
-      person &&
-      filter &&
-      (!query || text.includes(query)) &&
-      (options.project === 'all' || pull.repository.toLowerCase() === options.project) &&
-      (options.tool === 'all' || workTools(item).includes(options.tool as CodingTool))
-    );
-  });
+  const matches = matchingPullScope(work, options).filter((item) =>
+    pullMatchesFilter(item.pull, options.filter, now),
+  );
+  if (options.filter !== 'open') return matches;
+  return matches.sort(
+    (a, b) =>
+      pullAttentionRank(a.pull, now) - pullAttentionRank(b.pull, now) ||
+      b.pull.updatedAt.localeCompare(a.pull.updatedAt) ||
+      a.id.localeCompare(b.id),
+  );
 }

@@ -1,23 +1,39 @@
 import { taskKey } from '../../domain/agents';
 import { useState } from 'react';
-import { ArrowUpRight, ChevronRight, GitPullRequest } from 'lucide-react';
-import { pullSourceStale, quietDraft, type PullWork } from '../../domain/collaboration';
+import { ArrowUpRight, ChevronRight, CircleAlert, Clock3, Eye, GitPullRequest } from 'lucide-react';
+import {
+  pullAttentionCues,
+  pullSourceStale,
+  type PullAttentionKind,
+  type PullWork,
+} from '../../domain/collaboration';
 import { relativeTime } from '../../domain/branches';
 import { AgentBadges } from './AgentBadges';
 import { PullPeople } from './PullPeople';
 import { PullSignals } from './PullSignals';
+
+const cueIcons: Record<PullAttentionKind, typeof CircleAlert> = {
+  'failed-checks': CircleAlert,
+  'review-requested': Eye,
+  'quiet-draft': Clock3,
+};
+
 export function PeoplePullCard({
   work,
   demo,
+  now,
   onSelect,
 }: {
   work: PullWork;
   demo: boolean;
+  now: number;
   onSelect: (repositoryId: string, branchId: string) => void;
 }) {
   const [message, setMessage] = useState('');
   const pull = work.pull;
-  const stale = !demo && pullSourceStale(pull);
+  const stale = !demo && pullSourceStale(pull, now);
+  const cues = pullAttentionCues(pull, now);
+  const primaryCue = cues[0]?.kind;
   const open = async () => {
     if (demo) {
       setMessage('This pull request is part of the fictional demo.');
@@ -41,7 +57,9 @@ export function PeoplePullCard({
     ).values(),
   ];
   return (
-    <article className={'people-pull ' + (stale ? 'stale' : '')}>
+    <article
+      className={`people-pull ${stale ? 'stale ' : ''}${primaryCue ? `cue-${primaryCue}` : ''}`}
+    >
       <div className="people-pull-heading">
         <span
           className={
@@ -63,6 +81,20 @@ export function PeoplePullCard({
         <span className="people-updated">Updated {relativeTime(pull.updatedAt).toLowerCase()}</span>
       </div>
       <h3>{pull.title}</h3>
+      {cues.length > 0 && (
+        <div className="people-pull-cues" aria-label="Why this pull request needs attention">
+          {cues.map((cue) => {
+            const Icon = cueIcons[cue.kind];
+            return (
+              <span key={cue.kind} className={cue.kind}>
+                <Icon size={13} />
+                <strong>{cue.label}</strong>
+                <small>{cue.detail}</small>
+              </span>
+            );
+          })}
+        </div>
+      )}
       <div className="people-branch">
         <code>{pull.headName}</code>
         <span>→</span>
@@ -101,7 +133,7 @@ export function PeoplePullCard({
           headSha={pull.headSha}
           signals={pull.signals}
           demo={demo}
-          demoNow={Date.parse(pull.observedAt) + 60_000}
+          demoNow={now}
           open={pull.state === 'open'}
           unavailable={stale}
         />
@@ -109,11 +141,6 @@ export function PeoplePullCard({
       {pull.retained && (
         <p className="muted-note">
           Not seen in the latest partial listing. This is its last recorded PR state.
-        </p>
-      )}
-      {quietDraft(pull) && (
-        <p className="quiet-draft-note">
-          No recorded PR update for 14 days. This may be worth a check-in.
         </p>
       )}
       {message && (

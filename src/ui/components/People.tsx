@@ -1,23 +1,37 @@
-import { useEffect, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, GitPullRequest, Search, Users, X } from 'lucide-react';
+import { useEffect, useMemo, useRef } from 'react';
+import {
+  CircleAlert,
+  ChevronLeft,
+  ChevronRight,
+  Clock3,
+  Eye,
+  GitPullRequest,
+  History,
+  Search,
+  Users,
+  X,
+} from 'lucide-react';
 import type { Repository } from '../../domain/types';
 import {
   collaborationIndex,
+  matchingPullScope,
   matchingPulls,
   peopleFor,
+  pullFilterCounts,
   pullSourceStale,
-  quietDraft,
-  reviewRequested,
   workTools,
   type PullFilter,
 } from '../../domain/collaboration';
 import { toolNames } from '../../domain/agents';
-import { hasFailedChecks } from '../../domain/pullSignals';
 import { PersonAvatar } from './PullPeople';
 import { PeoplePullCard } from './PeoplePullCard';
 import './people.css';
 import type { NavigationMemory, WorkspaceMode } from '../navigationMemory';
 import { usePeoplePosition } from '../hooks/usePeoplePosition';
+import { useClock } from '../hooks/useClock';
+import { CompactPager } from './CompactPager';
+
+const PAGE_SIZE = 12;
 
 export function People({
   repositories,
@@ -35,12 +49,13 @@ export function People({
   mode: WorkspaceMode;
 }) {
   const work = useMemo(() => collaborationIndex(repositories), [repositories]);
+  const clock = useClock();
   const { position, update } = usePeoplePosition(navigation, mode);
   const { query, person, project, tool, filter, page, peoplePage } = position;
   const observedNow = demo
     ? work.reduce((latest, { pull }) => Math.max(latest, Date.parse(pull.observedAt) || 0), 0) +
       60_000
-    : Date.now();
+    : clock;
   const setQuery = (query: string) => update({ query });
   const setPerson = (person: string | null) => update({ person });
   const setProject = (project: string) => update({ project });
@@ -49,8 +64,8 @@ export function People({
   const setPage = (page: number) => update({ page });
   const setPeoplePage = (peoplePage: number) => update({ peoplePage });
   const scoped = useMemo(
-    () => matchingPulls(work, { query, person: null, project, tool, filter }, observedNow),
-    [work, query, project, tool, filter, observedNow],
+    () => matchingPullScope(work, { query, person: null, project, tool }),
+    [work, query, project, tool],
   );
   const people = useMemo(() => peopleFor(scoped), [scoped]);
   const matches = useMemo(
@@ -74,8 +89,20 @@ export function People({
     if (tool !== 'all' && !toolOptions.some((value) => value === tool)) setTool('all');
   }, [projectOptions.join('|'), toolOptions.join('|'), project, tool]);
   const selected = people.find((item) => item.id === person);
-  const pages = Math.max(1, Math.ceil(matches.length / 12));
-  const currentPage = Math.min(page, pages - 1);
+  const resultRevision = matches
+    .map(
+      ({ id, pull }) =>
+        `${id}:${pull.updatedAt}:${pull.observedAt}:${pull.signals?.attemptedAt ?? ''}`,
+    )
+    .join('|');
+  const previousRevision = useRef(resultRevision);
+  const resultsChanged = previousRevision.current !== resultRevision;
+  const pages = Math.max(1, Math.ceil(matches.length / PAGE_SIZE));
+  const currentPage = resultsChanged ? 0 : Math.min(page, pages - 1);
+  useEffect(() => {
+    previousRevision.current = resultRevision;
+    if (page !== currentPage) setPage(currentPage);
+  }, [resultRevision, page, currentPage]);
   const rosterPages = Math.max(1, Math.ceil(people.length / 8));
   const rosterPage = Math.min(peoplePage, rosterPages - 1);
   const observedProjects = repositories.filter((repository) => repository.github);
@@ -83,42 +110,60 @@ export function People({
     observedProjects.length > 0 &&
     observedProjects.every((repository) => repository.github?.openPullsComplete === true);
   const unobserved = repositories.length - observedProjects.length;
-  const stale = work.some(({ pull }) => pullSourceStale(pull));
-  const openCount = work.filter(({ pull }) => pull.state === 'open').length;
-  const metrics: { key: PullFilter; label: string; count: number; hint: string }[] = [
+  const stale = work.some(({ pull }) => pullSourceStale(pull, observedNow));
+  const metricCounts = useMemo(
+    () => pullFilterCounts(scoped, { query: '', person, project: 'all', tool: 'all' }, observedNow),
+    [scoped, person, observedNow],
+  );
+  const metrics = [
     {
       key: 'open',
-      label: 'Open pull requests',
-      count: openCount,
-      hint: 'Across connected projects',
+      label: 'All open',
+      count: metricCounts.open,
+      hint: 'In the current scope',
+      icon: GitPullRequest,
+      tone: 'open',
     },
     {
       key: 'requested',
       label: 'Review requested',
-      count: work.filter(({ pull }) => reviewRequested(pull)).length,
+      count: metricCounts.requested,
       hint: 'People or teams requested',
+      icon: Eye,
+      tone: 'review',
     },
     {
       key: 'failed-checks',
-      label: 'Checks need attention',
-      count: work.filter(
-        ({ pull }) => hasFailedChecks(pull, observedNow) && !pullSourceStale(pull, observedNow),
-      ).length,
+      label: 'Checks failing',
+      count: metricCounts['failed-checks'],
       hint: 'Reported on the PR commit',
+      icon: CircleAlert,
+      tone: 'urgent',
     },
     {
       key: 'quiet-drafts',
       label: 'Quiet drafts',
-      count: work.filter(({ pull }) => quietDraft(pull)).length,
+      count: metricCounts['quiet-drafts'],
       hint: 'No PR update in 14 days',
+      icon: Clock3,
+      tone: 'quiet',
     },
     {
       key: 'history',
       label: 'Recent history',
-      count: work.filter(({ pull }) => pull.state !== 'open').length,
+      count: metricCounts.history,
       hint: 'Merged and closed PRs',
+      icon: History,
+      tone: 'history',
     },
-  ];
+  ] satisfies {
+    key: PullFilter;
+    label: string;
+    count: number;
+    hint: string;
+    icon: typeof GitPullRequest;
+    tone: string;
+  }[];
   return (
     <section className="people-workspace" aria-label="People and pull requests">
       <div className="people-scope">
@@ -132,12 +177,15 @@ export function People({
         {metrics.map((metric) => (
           <button
             key={metric.key}
-            className={filter === metric.key ? 'selected' : ''}
+            className={`${metric.tone} ${filter === metric.key ? 'selected' : ''}`}
             aria-pressed={filter === metric.key}
             onClick={() => setFilter(metric.key)}
           >
-            <span>{metric.label}</span>
-            <strong>{metric.count}</strong>
+            <span className="people-metric-top">
+              <metric.icon size={16} />
+              <strong>{metric.count}</strong>
+            </span>
+            <span className="people-metric-label">{metric.label}</span>
             <small>{metric.hint}</small>
           </button>
         ))}
@@ -275,11 +323,13 @@ export function People({
                   ? (selected.actor?.login ?? 'Author unavailable')
                   : filter === 'requested'
                     ? 'Ready for another pair of eyes.'
-                    : filter === 'quiet-drafts'
-                      ? 'Worth picking up again.'
-                      : filter === 'history'
-                        ? 'Work that has moved on.'
-                        : 'Work in motion.'}
+                    : filter === 'failed-checks'
+                      ? 'Checks reporting failures.'
+                      : filter === 'quiet-drafts'
+                        ? 'Worth picking up again.'
+                        : filter === 'history'
+                          ? 'Work that has moved on.'
+                          : 'Work in motion.'}
               </h2>
               <p>
                 {matches.length} {matches.length === 1 ? 'pull request' : 'pull requests'}
@@ -288,6 +338,9 @@ export function People({
                     ? ' authored'
                     : ' authored or awaiting their review'
                   : ' in this view'}
+                {!selected && filter === 'open'
+                  ? ' · failed checks, review requests, and quiet drafts appear first'
+                  : ''}
               </p>
             </div>
             {person && (
@@ -297,8 +350,14 @@ export function People({
               </button>
             )}
           </div>
-          {matches.slice(currentPage * 12, (currentPage + 1) * 12).map((item) => (
-            <PeoplePullCard key={item.id} work={item} demo={demo} onSelect={onSelect} />
+          {matches.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE).map((item) => (
+            <PeoplePullCard
+              key={item.id}
+              work={item}
+              demo={demo}
+              now={observedNow}
+              onSelect={onSelect}
+            />
           ))}
           {!matches.length && (
             <div className="people-empty">
@@ -331,19 +390,14 @@ export function People({
             </div>
           )}
           {pages > 1 && (
-            <div className="people-pagination">
-              <button disabled={!currentPage} onClick={() => setPage(currentPage - 1)}>
-                <ChevronLeft size={16} />
-                Previous
-              </button>
-              <span>
-                Page {currentPage + 1} of {pages}
-              </span>
-              <button disabled={currentPage === pages - 1} onClick={() => setPage(currentPage + 1)}>
-                Next
-                <ChevronRight size={16} />
-              </button>
-            </div>
+            <CompactPager
+              page={currentPage}
+              pageSize={PAGE_SIZE}
+              count={matches.length}
+              label="Pull request pages"
+              className="people-work-pagination"
+              onPage={setPage}
+            />
           )}
         </div>
       </div>
