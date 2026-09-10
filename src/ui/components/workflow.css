@@ -464,6 +464,19 @@
   color: var(--amber);
   font-size: 10px;
 }
+.triage-bulk-summary {
+  display: grid;
+  gap: 3px;
+  min-width: max-content;
+}
+.triage-bulk-summary span {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 400;
+}
+.triage-show-selected {
+  white-space: nowrap;
+}
 .review-filters button.selected {
   background: var(--hover);
   color: var(--text);

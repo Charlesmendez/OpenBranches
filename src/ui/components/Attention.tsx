@@ -58,6 +58,7 @@ export function Attention({
   const [page, setPage] = useState(0);
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
+  const [showSelected, setShowSelected] = useState(false);
   const [handoffItems, setHandoffItems] = useState<TriageItem[] | null>(null);
   const selectVisible = useRef<HTMLInputElement>(null);
   const handoffs = useHandoffs(demo);
@@ -99,8 +100,9 @@ export function Attention({
   const branchById = new Map(
     repositories.flatMap((repo) => repo.branches.map((branch) => [branch.id, branch] as const)),
   );
+  const selectedSet = useMemo(() => new Set(selected), [selected]);
   const needle = query.trim().toLowerCase();
-  const filtered = all.filter(
+  const matching = all.filter(
     (item) =>
       (!queue || queue === 'all' || item.queue === queue) &&
       (!needle ||
@@ -114,14 +116,16 @@ export function Attention({
           .toLowerCase()
           .includes(needle)),
   );
-  const overview = bucket === 'active' && !queue && !needle;
+  const filtered = showSelected ? all.filter((item) => selectedSet.has(item.id)) : matching;
+  const overview = bucket === 'active' && !queue && !needle && !showSelected;
   const currentPage = Math.min(page, Math.max(0, Math.ceil(filtered.length / PAGE_SIZE) - 1));
   const items = overview
     ? triageHighlights(all)
     : filtered.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
-  const selectedItems = all.filter((item) => selected.includes(item.id));
-  const selectedVisibleItems = items.filter((item) => selected.includes(item.id));
-  const selectedFilteredItems = filtered.filter((item) => selected.includes(item.id));
+  const selectedItems = all.filter((item) => selectedSet.has(item.id));
+  const selectedVisibleItems = items.filter((item) => selectedSet.has(item.id));
+  const selectedFilteredItems = filtered.filter((item) => selectedSet.has(item.id));
+  const hiddenSelectionCount = selectedItems.length - selectedVisibleItems.length;
   const allFilteredSelected =
     filtered.length > 0 && selectedFilteredItems.length === filtered.length;
   const selectedProjectCount = new Set(selectedItems.map((item) => item.repositoryId)).size;
@@ -139,13 +143,23 @@ export function Attention({
     const commands = items.flatMap((item) =>
       item.findings.map(({ finding }) => ({ id: finding.id, revision: finding.revision, choice })),
     );
-    if (await reviews.decideMany(commands)) setSelected([]);
+    if (await reviews.decideMany(commands)) {
+      setSelected([]);
+      setShowSelected(false);
+    }
   };
   const change = (next: TriageQueue | 'all' | null) => {
     setQueue(next);
     setPage(0);
+    setShowSelected(false);
   };
-  useEffect(() => setSelected([]), [repositoryId]);
+  useEffect(() => {
+    setSelected([]);
+    setShowSelected(false);
+  }, [repositoryId]);
+  useEffect(() => {
+    if (showSelected && selectedItems.length === 0) setShowSelected(false);
+  }, [selectedItems.length, showSelected]);
   const linked = codex.enabled && (codex.state === 'ready' || codex.state === 'connecting');
   const activeQueues = (Object.keys(triageQueues) as TriageQueue[]).filter((key) =>
     groups.active.some((item) => item.queue === key),
@@ -183,6 +197,7 @@ export function Attention({
               onClick={() => {
                 setBucket(value);
                 setSelected([]);
+                setShowSelected(false);
                 change(null);
               }}
             >
@@ -200,6 +215,7 @@ export function Attention({
             onChange={(event) => {
               setQuery(event.target.value);
               setPage(0);
+              setShowSelected(false);
             }}
           />
           {query && (
@@ -265,25 +281,36 @@ export function Attention({
           )}
           <div className="triage-list-heading">
             <div>
-              {queue && (
-                <button className="text-button" onClick={() => change(null)}>
+              {(queue || showSelected) && (
+                <button
+                  className="text-button"
+                  onClick={() => {
+                    setPage(0);
+                    setShowSelected(false);
+                    if (queue) setQueue(null);
+                  }}
+                >
                   <ArrowLeft size={13} />
-                  All queues
+                  {showSelected ? 'Back to review' : 'All queues'}
                 </button>
               )}
               <h2>
-                {overview
-                  ? 'Start here'
-                  : queue && queue !== 'all'
-                    ? triageQueues[queue].title
-                    : `${labels[bucket]} branches`}
+                {showSelected
+                  ? 'Selected branches'
+                  : overview
+                    ? 'Start here'
+                    : queue && queue !== 'all'
+                      ? triageQueues[queue].title
+                      : `${labels[bucket]} branches`}
               </h2>
               <span>
-                {overview
-                  ? repositoryId
-                    ? 'Up to five suggestions for this project'
-                    : 'Up to five suggestions, spread across your projects'
-                  : `${filtered.length} ${filtered.length === 1 ? 'branch' : 'branches'}`}
+                {showSelected
+                  ? `${filtered.length} selected ${filtered.length === 1 ? 'branch' : 'branches'}`
+                  : overview
+                    ? repositoryId
+                      ? 'Up to five suggestions for this project'
+                      : 'Up to five suggestions, spread across your projects'
+                    : `${filtered.length} ${filtered.length === 1 ? 'branch' : 'branches'}`}
               </span>
             </div>
             {overview && all.length > items.length && (
@@ -295,10 +322,28 @@ export function Attention({
           </div>
           {selectedItems.length > 0 && (
             <div className="triage-bulk" role="status">
-              <strong>
-                {selectedItems.length} selected
-                {selectedProjectCount > 1 ? ` across ${selectedProjectCount} projects` : ''}
-              </strong>
+              <div className="triage-bulk-summary">
+                <strong>
+                  {selectedItems.length} selected
+                  {selectedProjectCount > 1 ? ` across ${selectedProjectCount} projects` : ''}
+                </strong>
+                {hiddenSelectionCount > 0 && (
+                  <span>{hiddenSelectionCount} selected outside this page</span>
+                )}
+              </div>
+              {hiddenSelectionCount > 0 && !showSelected && (
+                <button
+                  className="text-button triage-show-selected"
+                  onClick={() => {
+                    setQuery('');
+                    setQueue(null);
+                    setPage(0);
+                    setShowSelected(true);
+                  }}
+                >
+                  Show selected
+                </button>
+              )}
               {bucket === 'active' ? (
                 <>
                   <button
@@ -352,7 +397,13 @@ export function Attention({
                   Restore selected
                 </button>
               )}
-              <button className="text-button" onClick={() => setSelected([])}>
+              <button
+                className="text-button"
+                onClick={() => {
+                  setSelected([]);
+                  setShowSelected(false);
+                }}
+              >
                 Clear
               </button>
             </div>
@@ -417,7 +468,7 @@ export function Attention({
                   branch={branchById.get(item.id)}
                   projectName={repoById.get(item.repositoryId)?.name}
                   now={reviews.now}
-                  selected={selected.includes(item.id)}
+                  selected={selectedSet.has(item.id)}
                   busy={busy}
                   bucket={bucket}
                   handoff={handoffByBranch.get(`${item.repositoryId}\u0000${item.id}`)}
@@ -487,6 +538,7 @@ export function Attention({
           sent={() => {
             setHandoffItems(null);
             setSelected([]);
+            setShowSelected(false);
           }}
         />
       )}
