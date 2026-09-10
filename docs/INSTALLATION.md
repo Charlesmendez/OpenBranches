@@ -1,17 +1,17 @@
 # Mac installation and first-run setup
 
-OpenBranches is still a development preview. The public release format is a signed, notarized DMG for Apple silicon and Intel Macs. The automated pipeline and architecture-specific artifacts are implemented; release credentials, live notarization, and clean-machine installation checks remain release work. Existing unsigned artifacts are for development.
+OpenBranches v0.1.0 is available as a signed, notarized DMG for Apple silicon and Intel Macs. Choose the installer that matches your Mac; no Apple Developer account or source-code build is required.
 
-## Intended public installation
+## Install the public release
 
-1. Download the release for your Mac: `arm64` for Apple silicon or `x64` for Intel.
+1. Download [Apple silicon (`arm64`)](https://github.com/Charlesmendez/OpenBranches/releases/download/v0.1.0/OpenBranches-0.1.0-mac-arm64.dmg) for M1 and newer Apple-chip Macs, or [Intel (`x64`)](https://github.com/Charlesmendez/OpenBranches/releases/download/v0.1.0/OpenBranches-0.1.0-mac-x64.dmg) for an Intel Mac. The [latest release page](https://github.com/Charlesmendez/OpenBranches/releases/latest) includes both downloads and their checksums.
 2. Drag OpenBranches into Applications and open it.
 3. Choose a local project folder. No account is required for local Git inspection.
 4. Optionally connect GitHub or existing Codex task history in Settings.
 
-End users do not need Node.js, npm, or a source-code build. Contributors currently use the development commands in the README.
+End users do not need Node.js, npm, Xcode, an Apple Developer account, or a source-code build. Contributors use the development commands in the README.
 
-The official downloads will be signed with the project's Developer ID and notarized by Apple, so first launch uses the normal macOS identified-developer prompt. The project does not need to be listed in the Mac App Store. Unsigned preview DMGs are intentionally labeled `-unsigned` and are not the public installation path.
+The downloads are signed with the project's Developer ID and notarized by Apple, so first launch uses the normal macOS identified-developer flow. The project does not need to be listed in the Mac App Store. Unsigned local DMGs are intentionally labeled `-unsigned` and are for development.
 
 ## Git setup in the app
 
@@ -27,12 +27,13 @@ Keyboard users can reach **Skip to workspace** as the first app control. It move
 
 An unsupported or broken Git installation shows repair guidance instead of pretending local tracking is working. Saved repositories remain visible while inspection is paused. The help button opens [Apple’s official setup guide](https://developer.apple.com/documentation/xcode/installing-the-command-line-tools); it cannot open an arbitrary link supplied by repository content.
 
-## Verification and remaining release checks
+## Verification status
 
 - Automated tests cover missing Apple tools, a shim reached through a symlink, Homebrew outside the launch PATH, supported and old Apple Git, failed probes, inherited Git overrides, coalesced checks, explicit installer requests, failed requests, and recovery. Opening an installer never counts as a completed installation.
 - A real Git fixture confirms that scanning with a limited PATH and another repository’s inherited Git settings still inspects the selected folder and preserves its index.
 - The desktop build has detected Git and scanned the selected repository on the development Mac. The missing-tool, retry, demo, recovery, and old-version screens have been exercised through the browser fixture. Its accessibility tree was also checked for the named main landmark, single first-run heading, setup region, status message, and focus after skip, sidebar, and demo transitions. The rebuilt packaged app independently exposed the named workspace and kept focus on it after skip and sidebar navigation. A manual VoiceOver walkthrough remains a release check.
-- A clean Mac/VM test of Apple’s actual installer is still required. No development test downloads or installs Apple’s tools on the developer’s machine. Signed installation, Intel runtime validation, and supported macOS-version coverage remain release gates.
-- The [Mac release workflow](RELEASING.md) builds on native Apple silicon and Intel GitHub runners, checks artifact architecture and mounted bundle symlinks, verifies code signing and stapled notarization tickets, verifies each DMG, generates SHA-256 checksums, and keeps the GitHub release as a draft until a maintainer publishes it. An unsigned Apple silicon DMG has been mounted and launched successfully from its read-only volume; signed and Intel runs remain release gates.
+- The v0.1.0 release was built on native Apple silicon and Intel GitHub runners. Each job checked the executable architecture, code signature, stapled notarization tickets, mounted bundle, legal resources, DMG integrity, and SHA-256 checksum before attaching the installer to the release.
+- The signed Apple silicon and Intel installers are public. Broader clean-machine runtime checks, supported macOS-version coverage, and a manual VoiceOver walkthrough remain follow-up validation work.
+- The [Mac release workflow](RELEASING.md) creates a reviewable draft for each version tag. A maintainer publishes it only after every native build and verification job passes.
 
 For UI verification, run `npm run dev:web` and open `/tests/ui/setup.html`. Its clearly labeled controls simulate the environment. All desktop operations are mocked, and the fixture is excluded from the production entry points.
