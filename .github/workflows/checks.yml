@@ -39,5 +39,5 @@ jobs:
       - run: npm run typecheck && npm run team:typecheck
       - run: npm test && npm run test:team
       - run: npm run format:check
-      - run: npm rebuild electron --no-audit --no-fund
+      - run: npm run electron:install
       - run: npm run build && npm run team:build
