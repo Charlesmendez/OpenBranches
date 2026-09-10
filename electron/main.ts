@@ -222,7 +222,7 @@ app.whenReady().then(() => {
   );
   handle('agents:live-enable', (tool: unknown, enabled: unknown) =>
     liveAgents!.setEnabled(
-      z.enum(['claude-code', 'cursor']).parse(tool),
+      z.enum(['codex', 'claude-code', 'cursor']).parse(tool),
       z.boolean().parse(enabled),
     ),
   );

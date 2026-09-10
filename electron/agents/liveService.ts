@@ -13,8 +13,8 @@ import type { SavedAgentTask } from './types';
 const DEFAULT_PORT = 0;
 const MAX_BODY = 32 * 1024;
 const RETENTION = 5 * 60_000;
-const tools: LiveAgentTool[] = ['claude-code', 'cursor'];
-const toolSchema = z.enum(['claude-code', 'cursor']);
+const tools: LiveAgentTool[] = ['codex', 'claude-code', 'cursor'];
+const toolSchema = z.enum(['codex', 'claude-code', 'cursor']);
 
 export class LiveAgentService {
   private server?: Server;
@@ -120,8 +120,8 @@ export class LiveAgentService {
         installed,
         state: 'error',
         error: enabled
-          ? `Could not finish the OpenBranches hook setup for ${tool === 'claude-code' ? 'Claude Code' : 'Cursor'}. Existing settings were preserved.`
-          : `Could not remove the OpenBranches hook from ${tool === 'claude-code' ? 'Claude Code' : 'Cursor'}. Try again.`,
+          ? `Could not finish the OpenBranches hook setup for ${toolName(tool)}. Existing settings were preserved.`
+          : `Could not remove the OpenBranches hook from ${toolName(tool)}. Try again.`,
       });
       this.publish();
       throw new Error(this.values.get(tool)!.error);
@@ -175,7 +175,7 @@ export class LiveAgentService {
         this.values.set(tool, {
           ...current,
           state: 'error',
-          error: `Could not inspect ${tool === 'claude-code' ? 'Claude Code' : 'Cursor'} hook settings.`,
+          error: `Could not inspect ${toolName(tool)} hook settings.`,
         });
       }
     }
@@ -210,7 +210,7 @@ export class LiveAgentService {
           this.values.set(tool, {
             ...current,
             state: 'error',
-            error: `Could not repair the ${tool === 'claude-code' ? 'Claude Code' : 'Cursor'} live activity hook. Connect it again.`,
+            error: `Could not repair the ${toolName(tool)} live activity hook. Connect it again.`,
           });
         }
       }
@@ -255,7 +255,7 @@ export class LiveAgentService {
   private async handle(request: IncomingMessage, response: ServerResponse) {
     response.setHeader('Cache-Control', 'no-store');
     if (request.method !== 'POST') return finish(response, 405);
-    const match = /^\/v1\/events\/(claude-code|cursor)$/.exec(request.url ?? '');
+    const match = /^\/v1\/events\/(codex|claude-code|cursor)$/.exec(request.url ?? '');
     if (!match) return finish(response, 404);
     if (request.headers['content-type']?.split(';', 1)[0].trim() !== 'application/json')
       return finish(response, 415);
@@ -280,7 +280,12 @@ export class LiveAgentService {
         runtime: {
           state: event.state,
           checkedAt: now,
-          source: event.tool === 'claude-code' ? 'claude-hook' : 'cursor-hook',
+          source:
+            event.tool === 'codex'
+              ? 'codex-hook'
+              : event.tool === 'claude-code'
+                ? 'claude-hook'
+                : 'cursor-hook',
         },
       });
       const current = this.values.get(event.tool)!;
@@ -292,7 +297,7 @@ export class LiveAgentService {
         const current = this.values.get(tool)!;
         this.values.set(tool, {
           ...current,
-          error: `The latest ${tool === 'claude-code' ? 'Claude Code' : 'Cursor'} signal did not identify one supported local checkout.`,
+          error: `The latest ${toolName(tool)} signal did not identify one supported local checkout.`,
         });
         this.publish();
       }
@@ -331,6 +336,10 @@ export class LiveAgentService {
     if (!server) return;
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }
+}
+
+function toolName(tool: LiveAgentTool) {
+  return tool === 'codex' ? 'Codex' : tool === 'claude-code' ? 'Claude Code' : 'Cursor';
 }
 
 class BodyTooLarge extends Error {}

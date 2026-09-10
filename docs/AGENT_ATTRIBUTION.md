@@ -4,12 +4,12 @@ OpenBranches scans Git branches independently of the tool that created them. Too
 
 ## Implemented sources
 
-| Source          | Current support                                                                                                                                                                      |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Codex           | Opt-in local app-server reader for saved tasks plus fresh runtime state. Current and archived task associations remain available.                                                    |
-| Claude Code     | Separate opt-ins for bounded saved-session metadata and live lifecycle hooks. The hook supplies current state; history keeps structural metadata and explicit custom titles.         |
-| Cursor and Grok | Opt-in Cursor lifecycle hooks supply current state and the explicitly reported model ID. Grok remains a model paired with Cursor; OpenBranches never relabels Cursor itself as Grok. |
-| Unknown tools   | Explicit text and icon fallback. Branch prefixes, instruction files, configured models, recent commits, dirty worktrees, and commit-author names never supply live attribution.      |
+| Source          | Current support                                                                                                                                                                          |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Codex           | Separate opt-ins for bounded app-server task history and live lifecycle hooks, plus shared-daemon runtime state when available. Current and archived task associations remain available. |
+| Claude Code     | Separate opt-ins for bounded saved-session metadata and live lifecycle hooks. The hook supplies current state; history keeps structural metadata and explicit custom titles.             |
+| Cursor and Grok | Opt-in Cursor lifecycle hooks supply current state and the explicitly reported model ID. Grok remains a model paired with Cursor; OpenBranches never relabels Cursor itself as Grok.     |
+| Unknown tools   | Explicit text and icon fallback. Branch prefixes, instruction files, configured models, recent commits, dirty worktrees, and commit-author names never supply live attribution.          |
 
 A branch may have several sessions from several tools. Provider-scoped session keys prevent equal IDs from colliding, and one provider's overlay preserves the others. A verified saved association requires a known repository/worktree folder, the recorded branch, and an exact current local or remote commit. A folder and branch match without a saved commit remains possible. Claude history does not supply a commit, so history-only associations remain possible. Detached worktrees require folder and commit evidence.
 
@@ -27,13 +27,13 @@ The connection starts disabled. It reads only history folders corresponding to m
 
 ## Live hooks and privacy
 
-Live activity starts disabled independently for Claude Code and Cursor. Enabling a tool in Settings adds one OpenBranches-owned command handler to that tool's user hook file and writes a small reporter script beside it. Claude uses `~/.claude/settings.json`; Cursor uses `~/.cursor/hooks.json`. Existing settings and unrelated hooks are preserved. Repeated setup is idempotent, files are replaced atomically, symbolic-link targets are refused, and disconnect removes only the exact OpenBranches handlers and owned script. The app repairs an already approved hook when its private endpoint changes between launches.
+Live activity starts disabled independently for Codex, Claude Code, and Cursor. Enabling a tool in Settings adds one OpenBranches-owned command handler to that tool's user hook file and writes a small reporter script beside it. Codex uses `~/.codex/hooks.json`, Claude uses `~/.claude/settings.json`, and Cursor uses `~/.cursor/hooks.json`. Existing settings and unrelated hooks are preserved. Repeated setup is idempotent, files are replaced atomically, symbolic-link targets are refused, and disconnect removes only the exact OpenBranches handlers and owned script. The app repairs an already approved hook when its private endpoint changes between launches. Codex independently requires the user to review and trust a new or changed hook before it runs; OpenBranches cannot approve that trust decision.
 
 The reporter forwards the tool's JSON event to a random loopback port while OpenBranches is open. The listener binds only to `127.0.0.1`, requires a 256-bit bearer token, accepts JSON POSTs on a provider-specific path, limits bodies to 32 KiB and requests to 600 per minute, and does not enable browser CORS. The command stops after one second when the app is unavailable and always returns control to the coding tool.
 
 A provider-specific parser immediately drops prompts, responses, commands, tool input/output, transcript paths, file names, account email, model parameters, and unknown fields. Only provider session ID, tool, one absolute workspace folder, lifecycle state, an explicitly reported model ID, and OpenBranches' receipt time enter memory. Events are not persisted. Stopped sessions are retained in memory for at most five minutes; live state expires after 90 seconds. Team sharing can include normalized status only through the existing explicit per-project device consent flow.
 
-The integration follows the official [Claude Code hook lifecycle and configuration](https://code.claude.com/docs/en/hooks) and [Cursor hook schema](https://prod.cursor.com/docs/hooks). User-level Cursor hooks do not run in Cursor cloud agents, and local Claude settings do not describe Claude Code web sessions, so OpenBranches does not claim live coverage for those remote environments.
+The integration follows the official [Codex hook lifecycle and trust model](https://learn.chatgpt.com/docs/hooks), [Claude Code hook lifecycle and configuration](https://code.claude.com/docs/en/hooks), and [Cursor hook schema](https://prod.cursor.com/docs/hooks). User-level hooks report only local sessions, so OpenBranches does not claim live coverage for remote environments.
 
 ## Bounds and lifecycle
 
@@ -47,7 +47,7 @@ Disconnect cancels history work, clears that provider's cache, and rejects late 
 
 Automated tests cover mixed tools and confidence, explicit model evidence, unknown tools, transcript-field exclusion, hook payload stripping, lifecycle state mapping, exact checkout/head matching, event expiry, authentication, body bounds, multi-root rejection, settings preservation, idempotent install, owned removal, startup repair, malformed settings, symlink refusal, branch changes, selected-folder boundaries, rotating budgets, timeouts, cache persistence, disconnect/removal races, and transaction rollback.
 
-Live hook tests use isolated temporary homes and random loopback ports; they never modify the developer's real Claude or Cursor settings. The fictional team workspace includes live Codex, Claude Code, and Cursor activity plus a Cursor-reported Grok model for visual checks.
+Live hook tests use isolated temporary homes and random loopback ports; they never modify the developer's real Codex, Claude, or Cursor settings. The fictional team workspace includes live Codex, Claude Code, and Cursor activity plus a Cursor-reported Grok model for visual checks.
 
 Bundled SVGs are from MIT-licensed LobeHub Icons 1.95.0; [source and license](../assets/providers/README.md) accompany the assets. No repository or session can choose an arbitrary icon URL.
 

@@ -87,6 +87,26 @@ const cursorSchema = z.object({
   model_id: model.optional(),
 });
 
+const codexSchema = z.object({
+  session_id: identifier,
+  cwd: path,
+  hook_event_name: z.enum([
+    'SessionStart',
+    'UserPromptSubmit',
+    'PreToolUse',
+    'PermissionRequest',
+    'PostToolUse',
+    'PreCompact',
+    'PostCompact',
+    'SubagentStart',
+    'SubagentStop',
+    'Stop',
+    'Interrupt',
+    'SessionEnd',
+  ]),
+  model: model.optional(),
+});
+
 const claudeWaitingNotifications = new Set([
   'permission_prompt',
   'idle_prompt',
@@ -103,8 +123,24 @@ const claudeIdle = new Set([
   'SessionEnd',
 ]);
 const cursorIdle = new Set(['sessionStart', 'sessionEnd', 'stop', 'afterAgentResponse']);
+const codexIdle = new Set(['SessionStart', 'Stop', 'Interrupt', 'SessionEnd']);
 
 export function parseLiveHookEvent(tool: LiveAgentTool, input: unknown): LiveHookEvent {
+  if (tool === 'codex') {
+    const value = codexSchema.parse(input);
+    return {
+      id: value.session_id,
+      tool,
+      cwd: resolve(value.cwd),
+      state:
+        value.hook_event_name === 'PermissionRequest'
+          ? 'waiting'
+          : codexIdle.has(value.hook_event_name)
+            ? 'idle'
+            : 'active',
+      ...(value.model ? { model: { id: value.model, provider: 'openai' as const } } : {}),
+    };
+  }
   if (tool === 'claude-code') {
     const value = claudeSchema.parse(input);
     const waiting =

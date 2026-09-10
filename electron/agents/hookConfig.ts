@@ -31,6 +31,20 @@ const claudeEvents = [
   'ElicitationResult',
   'SessionEnd',
 ] as const;
+const codexEvents = [
+  'SessionStart',
+  'UserPromptSubmit',
+  'PreToolUse',
+  'PermissionRequest',
+  'PostToolUse',
+  'PreCompact',
+  'PostCompact',
+  'SubagentStart',
+  'SubagentStop',
+  'Stop',
+  'Interrupt',
+  'SessionEnd',
+] as const;
 const cursorEvents = [
   'sessionStart',
   'sessionEnd',
@@ -86,7 +100,7 @@ export class AgentHookInstaller {
     }
     const next = addHooks(value, tool, command);
     await mkdir(dirname(location.script), { recursive: true, mode: 0o700 });
-    await atomicWrite(location.script, reporterScript(endpoint, token), 0o700);
+    await atomicWrite(location.script, reporterScript(tool, endpoint, token), 0o700);
     await atomicWrite(location.config, JSON.stringify(next, null, 2) + '\n', 0o600);
   }
 
@@ -112,7 +126,7 @@ export class AgentHookInstaller {
   }
 
   private location(tool: LiveAgentTool) {
-    const folder = tool === 'claude-code' ? '.claude' : '.cursor';
+    const folder = tool === 'codex' ? '.codex' : tool === 'claude-code' ? '.claude' : '.cursor';
     return {
       config: join(this.home, folder, tool === 'claude-code' ? 'settings.json' : 'hooks.json'),
       script: join(this.home, folder, 'openbranches-live.sh'),
@@ -126,11 +140,11 @@ function addHooks(value: JsonObject, tool: LiveAgentTool, command: string): Json
     throw new Error('Cursor uses an unsupported hooks file version.');
   if (tool === 'cursor' && next.version === undefined) next.version = 1;
   const hooks = objectAt(next, 'hooks');
-  for (const event of tool === 'claude-code' ? claudeEvents : cursorEvents) {
+  for (const event of eventsFor(tool)) {
     const entries = arrayAt(hooks, event);
     if (configuredEvent(entries, tool, command)) continue;
     entries.push(
-      tool === 'claude-code'
+      tool !== 'cursor'
         ? { hooks: [{ type: 'command', command, timeout: 2, async: true }] }
         : { command },
     );
@@ -161,8 +175,7 @@ function removeHooks(value: JsonObject, tool: LiveAgentTool, command: string): J
 function configured(value: JsonObject, tool: LiveAgentTool, command: string) {
   const hooks = value.hooks;
   if (!isObject(hooks)) return false;
-  const events = tool === 'claude-code' ? claudeEvents : cursorEvents;
-  return events.every((event) => {
+  return eventsFor(tool).every((event) => {
     const entries = hooks[event];
     return Array.isArray(entries) && configuredEvent(entries, tool, command);
   });
@@ -228,11 +241,15 @@ async function atomicWrite(path: string, body: string, mode: number) {
   }
 }
 
-function reporterScript(endpoint: string, token: string) {
-  if (!/^http:\/\/127\.0\.0\.1:\d+\/v1\/events\/(?:claude-code|cursor)$/.test(endpoint))
+function reporterScript(tool: LiveAgentTool, endpoint: string, token: string) {
+  if (!/^http:\/\/127\.0\.0\.1:\d+\/v1\/events\/(?:codex|claude-code|cursor)$/.test(endpoint))
     throw new Error('Invalid local hook endpoint.');
   if (!/^[a-f\d]{64}$/.test(token)) throw new Error('Invalid local hook token.');
-  return `#!/bin/sh\n# OpenBranches live activity hook v1\n/usr/bin/curl --silent --max-time 1 --request POST --header 'Content-Type: application/json' --header 'Authorization: Bearer ${token}' --data-binary @- '${endpoint}' >/dev/null 2>&1 || true\nexit 0\n`;
+  return `#!/bin/sh\n# OpenBranches live activity hook v1\n/usr/bin/curl --silent --max-time 1 --request POST --header 'Content-Type: application/json' --header 'Authorization: Bearer ${token}' --data-binary @- '${endpoint}' >/dev/null 2>&1 || true\n${tool === 'codex' ? "printf '{}\\n'" : ''}\nexit 0\n`;
+}
+
+function eventsFor(tool: LiveAgentTool): readonly string[] {
+  return tool === 'codex' ? codexEvents : tool === 'claude-code' ? claudeEvents : cursorEvents;
 }
 
 function shellQuote(value: string) {

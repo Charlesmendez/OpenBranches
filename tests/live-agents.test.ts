@@ -21,6 +21,31 @@ async function directory() {
 }
 
 describe('live hook payloads', () => {
+  it('retains only structural Codex fields and maps lifecycle events to presence', () => {
+    const base = {
+      session_id: 'codex-session',
+      cwd: '/fixture/atlas',
+      hook_event_name: 'PreToolUse',
+      model: 'gpt-6-astra',
+      prompt: 'PRIVATE_PROMPT',
+      tool_input: { command: 'PRIVATE_COMMAND' },
+      transcript_path: '/private/transcript',
+    };
+    const active = parseLiveHookEvent('codex', base);
+    expect(active).toEqual({
+      id: base.session_id,
+      tool: 'codex',
+      cwd: base.cwd,
+      state: 'active',
+      model: { id: 'gpt-6-astra', provider: 'openai' },
+    });
+    expect(JSON.stringify(active)).not.toMatch(/PRIVATE|prompt|command|transcript/);
+    expect(
+      parseLiveHookEvent('codex', { ...base, hook_event_name: 'PermissionRequest' }).state,
+    ).toBe('waiting');
+    expect(parseLiveHookEvent('codex', { ...base, hook_event_name: 'Stop' }).state).toBe('idle');
+  });
+
   it('retains only structural Claude fields and uses explicit waiting and idle events', () => {
     const base = {
       session_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
@@ -84,6 +109,41 @@ describe('live hook payloads', () => {
 });
 
 describe('coding tool hook installation', () => {
+  it('merges and removes only the OpenBranches Codex hooks', async () => {
+    const home = await directory();
+    const folder = join(home, '.codex');
+    const config = join(folder, 'hooks.json');
+    await mkdir(folder);
+    await writeFile(
+      config,
+      JSON.stringify({
+        hooks: {
+          PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: './foreign.sh' }] }],
+        },
+      }),
+    );
+    const installer = new AgentHookInstaller(home);
+    const endpoint = 'http://127.0.0.1:47836/v1/events/codex';
+    const token = 'c'.repeat(64);
+    await installer.install('codex', endpoint, token);
+    await installer.install('codex', endpoint, token);
+    expect(await installer.installed('codex')).toBe(true);
+    const installed = JSON.parse(await readFile(config, 'utf8'));
+    expect(installed.hooks.PreToolUse).toHaveLength(2);
+    expect(installed.hooks.PreToolUse[0].hooks[0].command).toBe('./foreign.sh');
+    expect(installed.hooks.SessionStart).toHaveLength(1);
+    const script = await readFile(join(folder, 'openbranches-live.sh'), 'utf8');
+    expect(script).toContain('/v1/events/codex');
+    expect(script).toContain("printf '{}\\n'");
+    await installer.uninstall('codex');
+    const removed = JSON.parse(await readFile(config, 'utf8'));
+    expect(removed.hooks.PreToolUse).toEqual([
+      { matcher: 'Bash', hooks: [{ type: 'command', command: './foreign.sh' }] },
+    ]);
+    expect(removed.hooks.SessionStart).toBeUndefined();
+    expect(await installer.installed('codex')).toBe(false);
+  });
+
   it('merges, installs idempotently, and removes only OpenBranches Claude hooks', async () => {
     const home = await directory();
     const folder = join(home, '.claude');
@@ -284,6 +344,45 @@ describe('private live activity listener', () => {
     });
     expect((await post(endpoint!, payload, token!)).status).toBe(403);
     await service.setEnabled('claude-code', false);
+  });
+
+  it('accepts an opted-in Codex hook as verified live activity', async () => {
+    const home = await directory();
+    const store = new AppStore(join(home, 'store'));
+    const service = new LiveAgentService(store, vi.fn(), new AgentHookInstaller(home), 0);
+    cleanup.push(async () => {
+      await service.close();
+      store.close();
+    });
+    await service.setEnabled('codex', true);
+    const script = await readFile(join(home, '.codex', 'openbranches-live.sh'), 'utf8');
+    const endpoint = script.match(/'(http:\/\/127\.0\.0\.1:\d+\/v1\/events\/codex)'/)?.[1];
+    const token = script.match(/Authorization: Bearer ([a-f\d]{64})/)?.[1];
+    expect(
+      (
+        await post(
+          endpoint!,
+          {
+            session_id: 'codex-session',
+            cwd: '/fixture/atlas',
+            hook_event_name: 'UserPromptSubmit',
+            model: 'gpt-6-astra',
+            prompt: 'PRIVATE_PROMPT',
+          },
+          token!,
+        )
+      ).status,
+    ).toBe(204);
+    expect(service.enrich(snapshot(repository())).repositories[0].branches[0].tasks).toEqual([
+      expect.objectContaining({
+        id: 'codex-session',
+        tool: 'codex',
+        association: 'verified',
+        status: 'active',
+        activitySource: 'codex-hook',
+        model: { id: 'gpt-6-astra', provider: 'openai' },
+      }),
+    ]);
   });
 });
 

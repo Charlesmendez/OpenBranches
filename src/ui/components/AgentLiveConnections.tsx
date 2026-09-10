@@ -5,7 +5,7 @@ import { toolNames } from '../../domain/agents';
 import { relativeTime } from '../../domain/branches';
 import { ToolIcon } from './AgentBadges';
 
-const supported: LiveAgentTool[] = ['claude-code', 'cursor'];
+const supported: LiveAgentTool[] = ['codex', 'claude-code', 'cursor'];
 
 export function AgentLiveConnections({ statuses }: { statuses?: AgentLiveStatus[] }) {
   const [busy, setBusy] = useState<LiveAgentTool>();
@@ -41,7 +41,7 @@ export function AgentLiveConnections({ statuses }: { statuses?: AgentLiveStatus[
         <div>
           <h3>Live coding activity</h3>
           <p>
-            Make the exact branch glow while Claude Code or Cursor is working in its current
+            Make the exact branch glow while Codex, Claude Code, or Cursor is working in its current
             checkout. Each tool is opt-in on this Mac.
           </p>
         </div>
@@ -80,22 +80,30 @@ export function AgentLiveConnections({ statuses }: { statuses?: AgentLiveStatus[
                 {status.enabled
                   ? status.receivedAt
                     ? `Last signal ${relativeTime(status.receivedAt).toLowerCase()}.`
-                    : `Ready. Start work in ${name} to see the branch appear in Happening now.`
+                    : status.tool === 'codex'
+                      ? 'Hook installed. Codex may ask you to review it; then start a new turn in the checkout.'
+                      : `Ready. Start work in ${name} to see the branch appear in Happening now.`
                   : `Add a private local hook to ${name}. Existing hook settings are preserved.`}
               </p>
-              <button
-                className={status.enabled && !repair ? 'text-button' : 'secondary-button'}
-                disabled={!window.openbranches || !!busy}
-                onClick={() => void update(status.tool, repair ? true : !status.enabled)}
-              >
-                {busy === status.tool && <LoaderCircle size={14} className="spin" />}
-                {repair ? `Repair ${name}` : status.enabled ? `Turn off ${name}` : `Enable ${name}`}
-              </button>
-              {status.enabled && status.installed && (
-                <span className="agent-hook-installed">
-                  <Check size={12} /> Hook installed
-                </span>
-              )}
+              <div className="agent-live-card-action">
+                <button
+                  className={status.enabled && !repair ? 'text-button' : 'secondary-button'}
+                  disabled={!window.openbranches || !!busy}
+                  onClick={() => void update(status.tool, repair ? true : !status.enabled)}
+                >
+                  {busy === status.tool && <LoaderCircle size={14} className="spin" />}
+                  {repair
+                    ? `Repair ${name}`
+                    : status.enabled
+                      ? `Turn off ${name}`
+                      : `Enable ${name}`}
+                </button>
+                {status.enabled && status.installed && (
+                  <span className="agent-hook-installed">
+                    <Check size={12} /> Hook installed
+                  </span>
+                )}
+              </div>
               {status.error && <p className="agent-live-error">{status.error}</p>}
             </article>
           );

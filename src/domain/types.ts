@@ -65,8 +65,8 @@ export interface GitHubPullRequest extends PullRequest {
 }
 export type CodingTool = 'codex' | 'claude-code' | 'cursor' | 'other' | 'unknown';
 export type HandoffProvider = Extract<CodingTool, 'codex' | 'claude-code' | 'cursor'>;
-export type LiveAgentTool = Extract<CodingTool, 'claude-code' | 'cursor'>;
-export type RuntimeActivitySource = 'codex-runtime' | 'claude-hook' | 'cursor-hook';
+export type LiveAgentTool = Extract<CodingTool, 'codex' | 'claude-code' | 'cursor'>;
+export type RuntimeActivitySource = 'codex-runtime' | 'codex-hook' | 'claude-hook' | 'cursor-hook';
 export interface ModelIdentity {
   id: string;
   provider?: 'openai' | 'anthropic' | 'xai' | 'other';

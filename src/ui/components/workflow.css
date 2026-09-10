@@ -60,6 +60,12 @@
   border-color: #6d6246;
   box-shadow: inset 3px 0 #b99b5c;
 }
+.project-work-spotlight.recent {
+  border-color: #526995;
+  box-shadow:
+    inset 3px 0 #8aabff,
+    0 0 22px #668cff16;
+}
 .project-work-intro {
   display: flex;
   flex-direction: column;
@@ -84,6 +90,9 @@
 }
 .project-work-spotlight.changes .project-work-kicker {
   color: var(--amber);
+}
+.project-work-spotlight.recent .project-work-kicker {
+  color: #a9beff;
 }
 .project-work-intro > strong {
   margin-top: 5px;
@@ -140,6 +149,9 @@
 .project-work-item.changes .project-work-icon {
   background: #e2c47d12;
   color: var(--amber);
+}
+.project-work-item.recent {
+  border-color: #526387;
 }
 .project-work-icon .tool-icon {
   width: 14px;
@@ -262,7 +274,12 @@
   box-shadow: 0 0 20px #c29c4a1a;
 }
 .branch-map-card.work-recent,
-.cluster-card.work-recent,
+.cluster-card.work-recent {
+  border-color: #7188c4;
+  box-shadow:
+    0 0 0 1px #7188c438,
+    0 0 24px #668cff1f;
+}
 .branch-map-card.work-checkout,
 .cluster-card.work-checkout {
   border-color: #526387;

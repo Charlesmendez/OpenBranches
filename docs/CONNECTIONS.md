@@ -33,7 +33,7 @@ The local index is checked once per minute, with a 60-second pagination window, 
 
 A verified saved link requires a matching repository/worktree path, branch name, and local or remote commit. A matching GitHub origin and branch in a missing or different worktree, or a changed commit, produces a possible association. Detached worktrees require the same path and commit. Branch names alone never prove a link. Multiple tasks can appear on one branch, including archived tasks; the inspector explains each match.
 
-Saved metadata is historical evidence, not proof that Codex is currently running or owns the branch now. Tasks without sufficient saved metadata may not appear. A separate inspection process cannot establish live activity in another Codex window. Unpublished cloud work and other computers are outside this local connection.
+Saved metadata is historical evidence, not proof that Codex is currently running or owns the branch now. Tasks without sufficient saved metadata may not appear. A separate inspection process cannot establish live activity in another Codex window. The distinct live-activity control below uses Codex lifecycle hooks for future turns. Unpublished cloud work and other computers are outside this local connection.
 
 Account status and shared usage allowance are checked after task discovery and shown in Settings. Missing usage remains unknown; account emails, credentials, and reset-credit details are discarded. These checks do not run a model, and an account-limit failure does not disable task linking.
 
@@ -53,9 +53,9 @@ Only explicit custom titles, selected folder/branch metadata, timestamps, sessio
 
 The current reader supports the observed local main-session JSONL layout and an absolute inherited `CLAUDE_CONFIG_DIR`. It does not claim all Claude Desktop, Cowork, remote, subagent, or historical file formats. See [source documentation, bounds, tests, and limitations](AGENT_ATTRIBUTION.md).
 
-## Live Claude Code and Cursor
+## Live Codex, Claude Code, and Cursor
 
-Settings offers separate **Enable Claude Code** and **Enable Cursor** live controls. Each adds a private user-level lifecycle hook. A fresh signal lights only the exact currently checked-out branch whose worktree folder and head match the latest local Git scan. Stop and response-complete signals remove the working state immediately; any missing follow-up expires after 90 seconds. Claude can report an explicit waiting-for-input state. Cursor's reported model ID is shown separately, including a Grok icon when Cursor explicitly reports a Grok model.
+Settings offers separate **Enable Codex**, **Enable Claude Code**, and **Enable Cursor** live controls. Each adds a private user-level lifecycle hook. Codex requires the user to review and trust the exact hook before it can run. A fresh signal lights only the exact currently checked-out branch whose worktree folder and head match the latest local Git scan. Stop and response-complete signals remove the working state immediately; any missing follow-up expires after 90 seconds. Codex and Claude can report an explicit waiting-for-input state. Cursor's reported model ID is shown separately, including a Grok icon when Cursor explicitly reports a Grok model.
 
 The loopback receiver is authenticated, bounded, memory-only, and active only while OpenBranches is running. Prompt text, commands, responses, file names, tool input/output, transcript paths, and account identity are discarded. Disconnect removes only the OpenBranches hook entries and reporter script. See [live hook configuration, exact matching, and privacy](AGENT_ATTRIBUTION.md).
 

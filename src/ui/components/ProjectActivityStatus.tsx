@@ -75,16 +75,16 @@ export function ProjectActivityStatus({
 }
 
 function activeSources(providers: ProviderStatus) {
-  const sources: string[] = [];
+  const sources = new Set<string>();
   if (
     providers.codex.enabled &&
     (providers.codex.liveState === 'connected' || providers.codex.liveState === 'partial')
   )
-    sources.push(toolNames.codex);
+    sources.add(toolNames.codex);
   for (const status of providers.liveAgents ?? [])
     if (status.enabled && status.installed && status.state === 'listening')
-      sources.push(toolNames[status.tool]);
-  return sources;
+      sources.add(toolNames[status.tool]);
+  return [...sources];
 }
 
 function activityLabel(live: number, waiting: number) {

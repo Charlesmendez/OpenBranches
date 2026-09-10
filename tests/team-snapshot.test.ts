@@ -91,6 +91,26 @@ describe('opt-in local metadata preparation', () => {
         ],
       }).success,
     ).toBe(false);
+    expect(
+      sharedSnapshotSchema.safeParse({
+        ...summary,
+        branches: [
+          {
+            ...summary.branches[0],
+            tasks: [
+              {
+                ...summary.branches[0].tasks[0],
+                tool: 'codex',
+                association: 'verified',
+                status: 'active',
+                activitySource: 'codex-hook',
+                checkedAt: new Date().toISOString(),
+              },
+            ],
+          },
+        ],
+      }).success,
+    ).toBe(true);
   });
   it('keeps unknown worktree status unknown and omits published-only branches', () => {
     const repository = createDemoSnapshot().repositories[0];

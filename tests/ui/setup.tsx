@@ -39,6 +39,13 @@ let agents: AgentHistoryStatus[] = [
 const agentListeners = new Set<(statuses: AgentHistoryStatus[]) => void>();
 let liveAgents: AgentLiveStatus[] = [
   {
+    tool: 'codex',
+    enabled: false,
+    installed: false,
+    state: 'not-connected',
+    activeCount: 0,
+  },
+  {
     tool: 'claude-code',
     enabled: false,
     installed: false,
