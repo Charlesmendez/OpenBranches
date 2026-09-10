@@ -11,7 +11,7 @@ OpenBranches brings local Git and GitHub into one workspace: a grouped branch ma
 - Add local Git repositories through a native folder picker. Shared worktrees are inspected together.
 - Follow saved Codex projects on this Mac with one setting. Search projects from the sidebar, manage monitored folders in Settings, and keep removed projects excluded from automatic additions. See [discovery and compatibility limits](docs/PROJECT_DISCOVERY.md).
 - Detect Apple and Homebrew Git installations automatically. If Git needs setup, follow the in-app guide, open Apple’s installer explicitly, and explore the demo while it finishes.
-- Browse hundreds of branches in collapsed groups; expand a group into readable pages or search the full inventory with ⌘K.
+- Browse hundreds of branches in collapsed groups; expand a group into readable pages or press ⌘K to put verified live work first and open the exact branch on its map.
 - Reopen your last project, selected branch, map position, and inventory filters after a restart. Demo and real workspaces keep separate view histories.
 - See local and remote copies, uncommitted work, integration history, and the evidence behind each result.
 - Watch local changes while the app is running; refresh connected GitHub sources every two minutes. The title bar summarizes source health and opens current, refreshing, partial, delayed, and disabled details without leaving the current view.

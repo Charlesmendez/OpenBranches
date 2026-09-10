@@ -71,10 +71,13 @@ export function App() {
   const [settingsFocus, setSettingsFocus] = useState<'live-activity'>();
   const selectionOrigin = useRef<HTMLElement | null>(null);
   const closeDetails = () => {
+    const fallback = selectedId
+      ? document.querySelector<HTMLElement>(`[data-branch-id="${CSS.escape(selectedId)}"]`)
+      : null;
     setSelectedId(null);
     requestAnimationFrame(() => {
-      if (selectionOrigin.current?.isConnected)
-        selectionOrigin.current.focus({ preventScroll: true });
+      const target = selectionOrigin.current?.isConnected ? selectionOrigin.current : fallback;
+      if (target?.isConnected) target.focus({ preventScroll: true });
     });
   };
   const repository = snapshot.repositories.find((r) => r.id === projectId);
@@ -160,8 +163,9 @@ export function App() {
     setGroup(saved?.group ?? 'active');
   };
   const selectBranch = (branch: Branch) => {
+    const active = document.activeElement;
     selectionOrigin.current =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      active instanceof HTMLElement && active !== document.body ? active : null;
     setSelectedId(branch.id);
   };
   const focusRepositoryBranch = (targetRepository: Repository, branch: Branch) => {
@@ -661,7 +665,7 @@ export function App() {
         <SearchDialog
           repositories={snapshot.repositories}
           close={() => setSearchOpen(false)}
-          select={navigateBranch}
+          focus={focusRepositoryBranch}
         />
       )}
       {error && (

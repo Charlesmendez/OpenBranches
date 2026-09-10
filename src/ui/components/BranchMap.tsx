@@ -1,5 +1,5 @@
 import { AgentBadges, ToolIcon } from './AgentBadges';
-import { memo, useMemo, useState, useRef } from 'react';
+import { memo, useEffect, useMemo, useState, useRef } from 'react';
 import {
   Background,
   BackgroundVariant,
@@ -91,6 +91,7 @@ const MapNodeView = memo(function MapNodeView({ data, selected }: NodeProps<MapN
     return (
       <div
         {...keyboard}
+        data-branch-id={data.branch!.id}
         className={`branch-map-card ${data.tone} ${data.signal ? `work-${data.signal.kind}` : ''} ${selected ? 'selected' : ''}`}
       >
         <Handle type="source" position={Position.Top} />
@@ -219,6 +220,7 @@ export function BranchMap({
   liveState?: CodexStatus['liveState'];
 }) {
   const now = useClock();
+  const panel = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState<MapPosition>(
     initialPosition ?? { expanded: null, page: 0 },
   );
@@ -282,6 +284,15 @@ export function BranchMap({
       cluster?.branches.slice(currentPage * MAP_PAGE_SIZE, (currentPage + 1) * MAP_PAGE_SIZE) ?? [],
     [cluster, currentPage],
   );
+  useEffect(() => {
+    if (!selectedId) return;
+    const frame = requestAnimationFrame(() =>
+      panel.current
+        ?.querySelector<HTMLElement>(`[data-branch-id="${CSS.escape(selectedId)}"]`)
+        ?.focus({ preventScroll: true }),
+    );
+    return () => cancelAnimationFrame(frame);
+  }, [selectedId, currentPage, expanded]);
   const { nodes, edges } = useMemo(() => {
     const evidenceByBranch = new Map(
       branches.map((branch) => [branch.id, mapEvidence(repository, branch, now, source, targets)]),
@@ -450,7 +461,7 @@ export function BranchMap({
       </EmptyState>
     );
   return (
-    <div className="map-panel">
+    <div className="map-panel" ref={panel}>
       <div className="map-toolbar">
         <div>
           {cluster ? (

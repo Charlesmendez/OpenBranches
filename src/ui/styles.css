@@ -2871,6 +2871,7 @@ code {
   padding: 3px 10px 12px;
 }
 .search-results > button {
+  position: relative;
   display: flex;
   gap: 13px;
   align-items: center;
@@ -2879,6 +2880,14 @@ code {
   padding: 12px 11px;
   border-radius: 6px;
   color: #cad2e9;
+}
+.search-results > button.live {
+  background: linear-gradient(90deg, #668cff13, transparent 70%);
+  box-shadow: inset 2px 0 #8aabff;
+}
+.search-results > button.waiting {
+  background: linear-gradient(90deg, #a39be912, transparent 70%);
+  box-shadow: inset 2px 0 #a39be9;
 }
 .search-results > button.highlighted {
   background: var(--hover);
@@ -2896,6 +2905,21 @@ code {
   color: var(--text-soft);
   background: var(--hover);
 }
+.search-result-icon.live {
+  color: #c2d1ff;
+  border-color: #657db8;
+  background: #293249;
+  box-shadow: 0 0 16px #668cff28;
+  animation: live-work-glow 1.8s ease-in-out infinite;
+}
+.search-result-icon.waiting {
+  color: #d1c6f5;
+  border-color: #6f6596;
+  background: #2c2638;
+}
+.search-result-icon .tool-icon + .tool-icon {
+  margin-left: -5px;
+}
 .search-results strong {
   font-size: 12px;
   font-weight: 520;
@@ -2907,15 +2931,57 @@ code {
   color: var(--muted);
   margin-top: 6px;
 }
-.search-results > button > div {
+.search-result-copy {
   min-width: 0;
   flex: 1;
   overflow: hidden;
 }
-.search-results > button > div code {
+.search-result-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.search-result-title strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.search-result-title b {
+  flex-shrink: 0;
+  padding: 3px 6px;
+  border: 1px solid #657db8;
+  border-radius: 999px;
+  color: #b8c8f2;
+  background: #293249;
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.25px;
+}
+.search-result-title b.waiting {
+  color: #d0c5f0;
+  border-color: #6f6596;
+  background: #2c2638;
+}
+.search-result-copy code {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+.search-result-copy .branch-target-summary {
+  margin-top: 0;
+}
+.search-result-targets {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 7px;
+}
+.search-result-targets > small {
+  color: var(--faint);
+  font-size: 7px;
+  font-weight: 600;
+  letter-spacing: 0.65px;
 }
 .search-results > button > svg {
   color: var(--muted);
