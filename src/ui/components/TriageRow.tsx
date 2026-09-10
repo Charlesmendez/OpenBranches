@@ -37,8 +37,7 @@ export function TriageRow({
 }) {
   return (
     <article
-      className="triage-row"
-
+      className={`triage-row ${selected ? 'selected' : ''}`}
       aria-label={`Review ${branch?.name ?? 'branch'}`}
     >
       <input

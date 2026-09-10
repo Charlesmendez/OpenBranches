@@ -974,6 +974,10 @@
   border-bottom: 1px solid var(--line);
   background: var(--bg);
 }
+.triage-row.selected {
+  background: var(--accent-soft);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
 .triage-row:last-child {
   border-bottom: 0;
 }

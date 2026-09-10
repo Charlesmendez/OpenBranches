@@ -2360,17 +2360,18 @@ code {
 }
 .review-filters {
   display: flex;
-  gap: 3px;
+  gap: 5px;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--surface);
-  padding: 7px;
+  padding: 8px;
 }
 .review-filters button {
   display: flex;
   align-items: center;
   gap: 9px;
-  padding: 9px 14px;
+  min-height: 36px;
+  padding: 9px 16px;
   color: var(--muted);
   border-radius: 6px;
   font-size: 12px;

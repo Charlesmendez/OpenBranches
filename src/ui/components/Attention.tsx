@@ -38,6 +38,8 @@ const labels: Record<ReviewBucket, string> = {
   snoozed: 'Snoozed',
   dismissed: 'Dismissed',
 };
+const selectionKey = (item: Pick<TriageItem, 'repositoryId' | 'id'>) =>
+  `${item.repositoryId}\u0000${item.id}`;
 export function Attention({
   reviews,
   repositories,
@@ -117,7 +119,9 @@ export function Attention({
           .toLowerCase()
           .includes(needle)),
   );
-  const filtered = showSelected ? all.filter((item) => selectedSet.has(item.id)) : matching;
+  const filtered = showSelected
+    ? all.filter((item) => selectedSet.has(selectionKey(item)))
+    : matching;
   const overview = bucket === 'active' && !queue && !needle && !showSelected;
   const pageKey = [
     bucket,
@@ -133,9 +137,9 @@ export function Attention({
   ].join('\u0001');
   const current = usePageWindow(filtered, PAGE_SIZE, pageKey);
   const items = overview ? triageHighlights(all) : current.items;
-  const selectedItems = all.filter((item) => selectedSet.has(item.id));
-  const selectedVisibleItems = items.filter((item) => selectedSet.has(item.id));
-  const selectedFilteredItems = filtered.filter((item) => selectedSet.has(item.id));
+  const selectedItems = all.filter((item) => selectedSet.has(selectionKey(item)));
+  const selectedVisibleItems = items.filter((item) => selectedSet.has(selectionKey(item)));
+  const selectedFilteredItems = filtered.filter((item) => selectedSet.has(selectionKey(item)));
   const hiddenSelectionCount = selectedItems.length - selectedVisibleItems.length;
   const allFilteredSelected =
     filtered.length > 0 && selectedFilteredItems.length === filtered.length;
@@ -159,13 +163,16 @@ export function Attention({
       setShowSelected(false);
     }
   };
-  const change = (next: TriageQueue | 'all' | null) => {
-    setQueue(next);
-    setShowSelected(false);
-  };
-  useEffect(() => {
+  const clearSelection = () => {
     setSelected([]);
     setShowSelected(false);
+  };
+  const change = (next: TriageQueue | 'all' | null) => {
+    setQueue(next);
+    clearSelection();
+  };
+  useEffect(() => {
+    clearSelection();
   }, [repositoryId]);
   useEffect(() => {
     if (showSelected && selectedItems.length === 0) setShowSelected(false);
@@ -206,8 +213,6 @@ export function Attention({
               className={bucket === value ? 'selected' : ''}
               onClick={() => {
                 setBucket(value);
-                setSelected([]);
-                setShowSelected(false);
                 change(null);
               }}
             >
@@ -224,11 +229,17 @@ export function Attention({
             value={query}
             onChange={(event) => {
               setQuery(event.target.value);
-              setShowSelected(false);
+              clearSelection();
             }}
           />
           {query && (
-            <button aria-label="Clear review search" onClick={() => setQuery('')}>
+            <button
+              aria-label="Clear review search"
+              onClick={() => {
+                setQuery('');
+                clearSelection();
+              }}
+            >
               <X size={13} />
             </button>
           )}
@@ -411,7 +422,7 @@ export function Attention({
                   setShowSelected(false);
                 }}
               >
-                Clear
+                Clear selection
               </button>
             </div>
           )}
@@ -441,7 +452,7 @@ export function Attention({
                     aria-label="Select visible review branches"
                     checked={items.length > 0 && selectedVisibleItems.length === items.length}
                     onChange={(event) => {
-                      const visibleIds = new Set(items.map((item) => item.id));
+                      const visibleIds = new Set(items.map(selectionKey));
                       setSelected((previous) =>
                         event.target.checked
                           ? [...new Set([...previous, ...visibleIds])]
@@ -455,7 +466,7 @@ export function Attention({
                   <button
                     className="text-button triage-select-results"
                     onClick={() => {
-                      const filteredIds = new Set(filtered.map((item) => item.id));
+                      const filteredIds = new Set(filtered.map(selectionKey));
                       setSelected((previous) =>
                         allFilteredSelected
                           ? previous.filter((id) => !filteredIds.has(id))
@@ -475,7 +486,7 @@ export function Attention({
                   branch={branchById.get(item.id)}
                   projectName={repoById.get(item.repositoryId)?.name}
                   now={reviews.now}
-                  selected={selectedSet.has(item.id)}
+                  selected={selectedSet.has(selectionKey(item))}
                   busy={busy}
                   bucket={bucket}
                   handoff={handoffByBranch.get(`${item.repositoryId}\u0000${item.id}`)}
@@ -489,8 +500,8 @@ export function Attention({
                   onSelection={(checked) =>
                     setSelected((previous) =>
                       checked
-                        ? [...new Set([...previous, item.id])]
-                        : previous.filter((id) => id !== item.id),
+                        ? [...new Set([...previous, selectionKey(item)])]
+                        : previous.filter((id) => id !== selectionKey(item)),
                     )
                   }
                   onInspect={() => onSelect(item.repositoryId, item.id)}
