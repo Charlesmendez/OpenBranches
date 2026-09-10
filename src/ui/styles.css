@@ -1672,6 +1672,18 @@ code {
   line-height: 1.6;
   margin-top: 5px;
 }
+.pull-lookup {
+  padding: 18px 0;
+}
+.pull-lookup h3 {
+  margin-bottom: 12px;
+}
+.pull-lookup .location-detail {
+  margin-top: 0;
+}
+.pull-lookup .location-detail > svg {
+  color: #8aabff;
+}
 .text-icon {
   padding: 0;
   color: var(--muted);

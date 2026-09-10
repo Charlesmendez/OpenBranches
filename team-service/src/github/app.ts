@@ -332,6 +332,8 @@ export class TeamGitHubApp {
       {
         previous: previous?.history,
         previousPulls: previous?.pulls,
+        previousPullLookups: previous?.pullLookups,
+        pullLookupBudget: { remaining: 6, milliseconds: 10_000 },
         budget: { remaining: 8, milliseconds: 10_000 },
         signalsBudget: { remaining: 12, milliseconds: 15_000 },
         isCurrent: () => !operation.signal.aborted && options.isCurrent?.() !== false,

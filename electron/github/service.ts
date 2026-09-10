@@ -112,6 +112,7 @@ export class GitHubService {
     );
     const offset = this.refreshOffset++ % Math.max(1, sources.length);
     const budget = { remaining: 12, milliseconds: 30_000 };
+    const pullLookupBudget = { remaining: 6, milliseconds: 15_000 };
     const signalsBudget = { remaining: 6, milliseconds: 20_000 };
     for (const { repository, remote } of [...sources.slice(offset), ...sources.slice(0, offset)]) {
       if (this.closed || !this.enabled || generation !== this.generation) return;
@@ -123,6 +124,8 @@ export class GitHubService {
         const fresh = await this.read(this.auth.http, slug, remote.name, {
           previous: this.sources[key]?.history,
           previousPulls: this.sources[key]?.pulls,
+          previousPullLookups: this.sources[key]?.pullLookups,
+          pullLookupBudget,
           signalsBudget,
           local: repository,
           budget,

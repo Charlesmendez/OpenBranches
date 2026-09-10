@@ -17,6 +17,7 @@ export function enrichRepository(repository: Repository, sources: RemoteSnapshot
   const branches: Branch[] = repository.branches.map((branch) => ({
     ...branch,
     pullRequest: undefined,
+    pullLookup: undefined,
     publishedHistory: undefined,
   }));
   const targets = [...repository.targets];
@@ -159,9 +160,10 @@ export function enrichRepository(repository: Repository, sources: RemoteSnapshot
   for (const branch of branches) {
     const remoteName =
       branch.remote?.remote ?? branch.local?.upstream?.match(/^refs\/remotes\/([^/]+)\//)?.[1];
-    const identities = sources
-      .filter((source) => (remoteName ? source.remoteName === remoteName : source === primary))
-      .map((source) => source.repository.toLowerCase());
+    const relatedSources = sources.filter((source) =>
+      remoteName ? source.remoteName === remoteName : source === primary,
+    );
+    const identities = relatedSources.map((source) => source.repository.toLowerCase());
     branch.pullRequest = identities
       .flatMap((identity) => byHead.get(identity + ':' + branch.name) ?? [])
       .filter((pr) =>
@@ -174,6 +176,11 @@ export function enrichRepository(repository: Repository, sources: RemoteSnapshot
           Number(b.state === 'open') - Number(a.state === 'open') ||
           b.updatedAt.localeCompare(a.updatedAt),
       )[0];
+    const lookupHead = branch.local?.sha ?? branch.remote?.sha;
+    branch.pullLookup = relatedSources
+      .flatMap((source) => source.pullLookups ?? [])
+      .filter((lookup) => lookup.headSha === lookupHead)
+      .sort((a, b) => b.checkedAt.localeCompare(a.checkedAt))[0];
   }
   return {
     ...repository,

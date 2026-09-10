@@ -1,7 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GitHubAuth, type TokenVault } from '../electron/github/auth';
 import { GitHubHttp } from '../electron/github/http';
-import { githubRepository, readRemote, type RemoteSnapshot } from '../src/github/reader';
+import {
+  githubRepository,
+  readRemote,
+  remoteSnapshotSchema,
+  type RemoteSnapshot,
+} from '../src/github/reader';
 import { enrichRepository } from '../electron/github/enrich';
 import { createDemoSnapshot } from '../src/data/demo';
 
@@ -121,6 +126,50 @@ describe('GitHub device sign-in', () => {
 });
 
 describe('remote evidence', () => {
+  it('adds an older pull request discovered from the exact branch tip', async () => {
+    const main = 'a'.repeat(40),
+      feature = 'b'.repeat(40),
+      get = vi.fn(async (path: string) => {
+        if (path.includes('/branches?'))
+          return {
+            body: [
+              { name: 'main', commit: { sha: main } },
+              { name: 'feat/older', commit: { sha: feature } },
+            ],
+            hasNext: false,
+          };
+        if (path.includes(`/commits/${feature}/pulls`))
+          return {
+            body: [
+              {
+                number: 81,
+                title: 'Older work',
+                state: 'closed',
+                merged_at: '2025-01-02T00:00:00Z',
+                updated_at: '2025-01-02T00:00:00Z',
+                base: { ref: 'main' },
+                head: {
+                  ref: 'feat/older',
+                  sha: feature,
+                  repo: { full_name: 'example/repo' },
+                },
+              },
+            ],
+            hasNext: false,
+          };
+        if (path.includes('/pulls?')) return { body: [], hasNext: false };
+        throw new Error(`Unexpected GitHub path: ${path}`);
+      });
+    const source = await readRemote({ get }, 'example/repo', 'origin', {
+      budget: { remaining: 0, milliseconds: 0 },
+      pullLookupBudget: { remaining: 1, milliseconds: 10_000 },
+    });
+    expect(source.pulls).toMatchObject([{ number: 81, state: 'merged', headSha: feature }]);
+    expect(source.pullLookups).toMatchObject([{ headSha: feature, complete: true, found: true }]);
+    expect(remoteSnapshotSchema.parse(source).pullLookups).toHaveLength(1);
+    expect(get.mock.calls.some(([path]) => path.includes(`/commits/${feature}/pulls`))).toBe(true);
+  });
+
   it('supports canonical GitHub remotes and rejects lookalike hosts', () => {
     expect(githubRepository('git@github.com:example/repo.git')).toBe('example/repo');
     expect(githubRepository('https://github.com/example/repo.git')).toBe('example/repo');

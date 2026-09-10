@@ -1,12 +1,21 @@
 import { z } from 'zod';
 import type { GitHubReader } from './transport';
-import { cachedPullSchema, readPulls } from './pulls';
+import { cachedPullSchema, limitCachedPulls, mergeCachedPulls, readPulls } from './pulls';
 import { historySchema, readHistory, type HistoryOptions } from './history';
 import { readPullSignals, type SignalsBudget } from './signals';
 import type { CachedPull } from './pulls';
+import {
+  missingPullHeads,
+  pullLookupSchema,
+  readPullLookups,
+  type PullLookup,
+  type PullLookupBudget,
+} from './pullLookups';
 
 export interface RemoteOptions extends HistoryOptions {
   previousPulls?: CachedPull[];
+  previousPullLookups?: PullLookup[];
+  pullLookupBudget?: PullLookupBudget;
   signalsBudget?: SignalsBudget;
 }
 
@@ -22,6 +31,7 @@ export const remoteSnapshotSchema = z.object({
   remoteName: cachedText,
   branches: z.array(z.object({ name: cachedText, sha: cachedText })).max(5000),
   pulls: z.array(cachedPullSchema).max(5300),
+  pullLookups: z.array(pullLookupSchema).max(10_000).optional(),
   openPullsComplete: z.boolean().optional(),
   checkedAt: cachedText,
   branchesComplete: z.boolean(),
@@ -64,11 +74,27 @@ export async function readRemote(
     }
   }
   const pullIndex = await readPulls(http, repository, () => options.isCurrent?.() !== false);
-  if (options.signalsBudget)
-    pullIndex.pulls = await readPullSignals(
+  let pulls = pullIndex.pulls;
+  let pullLookups: PullLookup[] | undefined;
+  if (options.pullLookupBudget) {
+    const exact = await readPullLookups(
       http,
       repository,
-      pullIndex.pulls,
+      missingPullHeads(branches, pulls, remoteName, options.local),
+      {
+        previous: options.previousPullLookups,
+        budget: options.pullLookupBudget,
+        isCurrent: options.isCurrent,
+      },
+    );
+    pulls = limitCachedPulls(mergeCachedPulls(pulls, exact.pulls), exact.pulls);
+    pullLookups = exact.lookups;
+  }
+  if (options.signalsBudget)
+    pulls = await readPullSignals(
+      http,
+      repository,
+      pulls,
       options.previousPulls ?? [],
       options.signalsBudget,
       () => options.isCurrent?.() !== false,
@@ -79,6 +105,8 @@ export async function readRemote(
     remoteName,
     branches,
     ...pullIndex,
+    pulls,
+    ...(pullLookups ? { pullLookups } : {}),
     branchesComplete,
     checkedAt,
     history,

@@ -1,6 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { GitHubHttp } from '../electron/github/http';
-import { cachedPullSchema, parsePulls, readPulls, retainPartialPulls } from '../src/github/pulls';
+import { GitHubError, GitHubHttp } from '../electron/github/http';
+import {
+  cachedPullSchema,
+  limitCachedPulls,
+  mergeCachedPulls,
+  parsePulls,
+  readPulls,
+  retainPartialPulls,
+} from '../src/github/pulls';
+import { missingPullHeads, readPullLookups } from '../src/github/pullLookups';
 import { enrichRepository } from '../electron/github/enrich';
 import { remoteSnapshotSchema, type RemoteSnapshot } from '../src/github/reader';
 import { createDemoSnapshot } from '../src/data/demo';
@@ -66,6 +74,185 @@ const source = (overrides: Partial<RemoteSnapshot> = {}): RemoteSnapshot => ({
 afterEach(() => vi.useRealTimers());
 
 describe('GitHub collaboration metadata', () => {
+  it('targets only uncovered non-integration tips that belong to the GitHub source', () => {
+    const repo = createDemoSnapshot(now).repositories[0];
+    const related = repo.branches[0];
+    repo.branches = [
+      {
+        ...related,
+        name: 'feat/local-ahead',
+        local: {
+          ...related.local!,
+          sha: 'b'.repeat(40),
+          upstream: 'refs/remotes/origin/feat/local-ahead',
+        },
+        remote: { ...related.remote!, sha: 'c'.repeat(40), remote: 'origin' },
+      },
+      {
+        ...related,
+        name: 'feat/other',
+        local: {
+          ...related.local!,
+          sha: 'd'.repeat(40),
+          upstream: 'refs/remotes/upstream/feat/other',
+        },
+        remote: { ...related.remote!, sha: 'd'.repeat(40), remote: 'upstream' },
+      },
+    ];
+    expect(
+      missingPullHeads(
+        [
+          { name: 'develop', sha: 'e'.repeat(40) },
+          { name: 'feat/covered', sha: hash },
+          { name: 'feat/remote', sha: 'c'.repeat(40) },
+        ],
+        [parsePulls([sourcePull()], 'example/project')[0]],
+        'origin',
+        repo,
+      ),
+    ).toEqual(['c'.repeat(40), 'b'.repeat(40)]);
+  });
+
+  it('finds old PRs by exact commit, rejects moved heads, and resumes pagination', async () => {
+    const exact = 'b'.repeat(40),
+      moved = 'c'.repeat(40),
+      request = vi
+        .fn<typeof fetch>()
+        .mockResolvedValueOnce(
+          response(
+            [
+              sourcePull({
+                number: 9,
+                head: { ref: 'feat/old', sha: exact, repo: { full_name: 'example/project' } },
+              }),
+              sourcePull({
+                number: 10,
+                head: { ref: 'feat/moved', sha: moved, repo: { full_name: 'example/project' } },
+              }),
+            ],
+            true,
+          ),
+        )
+        .mockResolvedValueOnce(
+          response([
+            sourcePull({
+              number: 11,
+              head: { ref: 'feat/old', sha: exact, repo: { full_name: 'example/project' } },
+            }),
+          ]),
+        );
+    const first = await readPullLookups(http(request), 'example/project', [exact], {
+      budget: { remaining: 1, milliseconds: 10_000 },
+    });
+    expect(String(request.mock.calls[0][0])).toContain(
+      `/commits/${exact}/pulls?per_page=100&page=1`,
+    );
+    expect(first.pulls.map((pull) => pull.number)).toEqual([9]);
+    expect(JSON.stringify(first)).not.toMatch(/PRIVATE|attacker|email|avatar/);
+    expect(first.lookups[0]).toMatchObject({ complete: false, found: true, nextPage: 2 });
+    const second = await readPullLookups(http(request), 'example/project', [exact], {
+      previous: first.lookups,
+      budget: { remaining: 1, milliseconds: 10_000 },
+    });
+    expect(String(request.mock.calls[1][0])).toContain('page=2');
+    expect(second.pulls.map((pull) => pull.number)).toEqual([11]);
+    expect(second.lookups[0]).toMatchObject({ complete: true, found: true });
+    expect(second.lookups[0].nextPage).toBeUndefined();
+  });
+
+  it('rotates exact lookups, caches empty coverage, and retries it after ten minutes', async () => {
+    vi.useFakeTimers();
+    const firstSha = 'b'.repeat(40),
+      secondSha = 'c'.repeat(40),
+      get = vi.fn().mockResolvedValue({ body: [], hasNext: false }),
+      reader = { get };
+    const first = await readPullLookups(reader, 'example/project', [firstSha, secondSha], {
+      budget: { remaining: 1, milliseconds: 10_000 },
+    });
+    expect(get).toHaveBeenCalledTimes(1);
+    expect(first.lookups).toHaveLength(1);
+    const second = await readPullLookups(reader, 'example/project', [firstSha, secondSha], {
+      previous: first.lookups,
+      budget: { remaining: 1, milliseconds: 10_000 },
+    });
+    expect(get).toHaveBeenCalledTimes(2);
+    expect(second.lookups).toHaveLength(2);
+    await readPullLookups(reader, 'example/project', [firstSha, secondSha], {
+      previous: second.lookups,
+      budget: { remaining: 2, milliseconds: 10_000 },
+    });
+    expect(get).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(10 * 60_000 + 1);
+    await readPullLookups(reader, 'example/project', [firstSha, secondSha], {
+      previous: second.lookups,
+      budget: { remaining: 2, milliseconds: 10_000 },
+    });
+    expect(get).toHaveBeenCalledTimes(4);
+  });
+
+  it('continues after an unavailable commit and rejects a result received after disconnect', async () => {
+    const firstSha = 'b'.repeat(40),
+      secondSha = 'c'.repeat(40),
+      get = vi
+        .fn()
+        .mockRejectedValueOnce(new GitHubError('Commit unavailable.', 422))
+        .mockResolvedValueOnce({ body: [], hasNext: false });
+    const result = await readPullLookups({ get }, 'example/project', [firstSha, secondSha], {
+      budget: { remaining: 2, milliseconds: 10_000 },
+    });
+    expect(get).toHaveBeenCalledTimes(2);
+    expect(result.lookups.find((item) => item.headSha === firstSha)?.error).toBe(
+      'Commit unavailable.',
+    );
+    expect(result.lookups.find((item) => item.headSha === secondSha)?.complete).toBe(true);
+
+    let current = true;
+    await expect(
+      readPullLookups(
+        {
+          get: async () => {
+            current = false;
+            return { body: [], hasNext: false };
+          },
+        },
+        'example/project',
+        [firstSha],
+        { budget: { remaining: 1, milliseconds: 10_000 }, isCurrent: () => current },
+      ),
+    ).rejects.toThrow('cancelled');
+  });
+
+  it('keeps every open PR and exact-tip result inside the source cache bound', () => {
+    const open = Array.from({ length: 5000 }, (_, index) =>
+        normalized({
+          number: index + 1,
+          headName: `feat/open-${index}`,
+          headSha: index.toString(16).padStart(40, '0'),
+        }),
+      ),
+      closed = Array.from({ length: 300 }, (_, index) =>
+        normalized({
+          number: 6000 + index,
+          state: 'closed',
+          headName: `feat/closed-${index}`,
+          headSha: (6000 + index).toString(16).padStart(40, '0'),
+          updatedAt: new Date(now - index * 1000).toISOString(),
+        }),
+      ),
+      exact = normalized({
+        number: 9000,
+        state: 'merged',
+        headName: 'feat/exact-old-pr',
+        headSha: 'f'.repeat(40),
+        updatedAt: '2020-01-01T00:00:00.000Z',
+      });
+    const limited = limitCachedPulls(mergeCachedPulls([...open, ...closed], [exact]), [exact]);
+    expect(limited).toHaveLength(5300);
+    expect(limited.filter((pull) => pull.state === 'open')).toHaveLength(5000);
+    expect(limited.some((pull) => pull.number === exact.number)).toBe(true);
+    expect(limited.some((pull) => pull.number === 6299)).toBe(false);
+  });
+
   it('preserves older PR evidence on partial listings with its original observation time, then replaces it when observed', () => {
     const previous = source({ checkedAt: '2026-09-08T12:00:00Z' });
     const partial = source({ openPullsComplete: false, pullHistoryComplete: false, pulls: [] });
@@ -199,6 +386,36 @@ describe('GitHub collaboration metadata', () => {
     expect(enrichRepository(repo, [source({ error: 'offline' })]).github?.openPullsComplete).toBe(
       false,
     );
+  });
+
+  it('attaches exact-tip PR lookup coverage only to the branch commit it describes', () => {
+    const repo = createDemoSnapshot(now).repositories[0],
+      branch = repo.branches[0];
+    repo.branches = [
+      {
+        ...branch,
+        name: 'feat/history',
+        local: {
+          ...branch.local!,
+          sha: hash,
+          upstream: 'refs/remotes/origin/feat/history',
+        },
+        remote: { ...branch.remote!, name: 'feat/history', sha: hash, remote: 'origin' },
+      },
+    ];
+    const lookup = source({
+      pulls: [],
+      pullLookups: [
+        { headSha: hash, checkedAt, complete: true, found: false, retryAt: now + 60_000 },
+      ],
+    });
+    expect(enrichRepository(repo, [lookup]).branches[0].pullLookup).toMatchObject({
+      headSha: hash,
+      complete: true,
+      found: false,
+    });
+    repo.branches[0].local!.sha = 'b'.repeat(40);
+    expect(enrichRepository(repo, [lookup]).branches[0].pullLookup).toBeUndefined();
   });
 });
 

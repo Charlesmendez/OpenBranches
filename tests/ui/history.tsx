@@ -10,6 +10,7 @@ const scenarios = [
   'Different commits',
   'Waiting for GitHub',
   'Remote only',
+  'Older PR checked',
   'GitHub unavailable',
   'New target',
 ] as const;
@@ -34,6 +35,15 @@ function Fixture() {
   };
   branch.tasks = [];
   branch.pullRequest = undefined;
+  branch.pullLookup =
+    scenario === 'Older PR checked'
+      ? {
+          headSha: branch.local.sha,
+          checkedAt: new Date().toISOString(),
+          complete: true,
+          found: false,
+        }
+      : undefined;
   branch.worktrees = [];
   branch.integration = { develop: 'pending', master: 'pending' };
   branch.publishedHistory = {

@@ -45,6 +45,38 @@ export const cachedPullSchema = z.object({
   signals: pullSignalsSchema.optional(),
 });
 export type CachedPull = z.infer<typeof cachedPullSchema>;
+
+/** Merge bounded listings and exact-SHA results without letting an older
+ * observation replace a newer PR state. */
+export function mergeCachedPulls(...collections: CachedPull[][]): CachedPull[] {
+  const pulls = new Map<number, CachedPull>();
+  for (const collection of collections)
+    for (const pull of collection) {
+      const previous = pulls.get(pull.number);
+      if (!previous || pull.updatedAt >= previous.updatedAt) pulls.set(pull.number, pull);
+    }
+  return [...pulls.values()];
+}
+
+/** Open work remains complete and exact branch-tip matches take precedence
+ * over unrelated closed history when the persisted source reaches its cap. */
+export function limitCachedPulls(
+  pulls: CachedPull[],
+  exact: CachedPull[] = [],
+  limit = 5300,
+): CachedPull[] {
+  const exactNumbers = new Set(exact.map((pull) => pull.number));
+  return [...pulls]
+    .sort(
+      (a, b) =>
+        Number(b.state === 'open') - Number(a.state === 'open') ||
+        Number(exactNumbers.has(b.number)) - Number(exactNumbers.has(a.number)) ||
+        b.updatedAt.localeCompare(a.updatedAt) ||
+        b.number - a.number,
+    )
+    .slice(0, limit);
+}
+
 export function parsePulls(body: unknown, repository: string): CachedPull[] {
   return z
     .array(pullSchema)

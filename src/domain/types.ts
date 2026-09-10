@@ -170,6 +170,13 @@ export interface Branch {
     error?: string;
   };
   pullRequest?: PullRequest;
+  pullLookup?: {
+    headSha: string;
+    checkedAt: string;
+    complete: boolean;
+    found: boolean;
+    error?: string;
+  };
   tasks?: TaskLink[];
   codexNamed: boolean;
   detached: boolean;
