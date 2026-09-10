@@ -1,4 +1,4 @@
-import { AgentBadges, ToolIcon } from './AgentBadges';
+import { AgentBadges } from './AgentBadges';
 import { memo, useEffect, useMemo, useState, useRef } from 'react';
 import {
   Background,
@@ -34,13 +34,9 @@ import { mapEvidence, mapTargets, type MapTargetEvidence } from '../../domain/ma
 import { targetHistoryLabel } from '../../domain/integrationTargets';
 import { idleWork } from '../../domain/branchActivity';
 import { useClock } from '../hooks/useClock';
-import {
-  prioritizeWork,
-  workSignal,
-  type WorkSignal,
-  type WorkSignalKind,
-} from '../../domain/workSpotlight';
+import { prioritizeWork, workSignal, type WorkSignal } from '../../domain/workSpotlight';
 import { IntegrationTargetNotice } from './IntegrationTargetNotice';
+import { WorkSignalIcon, workSignalStateLabel } from './WorkSignalIcon';
 
 type MapData = {
   kind: 'target' | 'branch' | 'cluster';
@@ -59,7 +55,6 @@ type MapData = {
 } & Record<string, unknown>;
 type MapNode = Node<MapData, 'mapNode'>;
 const MapNodeView = memo(function MapNodeView({ data, selected }: NodeProps<MapNode>) {
-  const SignalIcon = data.signal ? signalIcons[data.signal.kind] : Radio;
   const keyboard = {
     role: 'button',
     tabIndex: 0,
@@ -95,17 +90,21 @@ const MapNodeView = memo(function MapNodeView({ data, selected }: NodeProps<MapN
         className={`branch-map-card ${data.tone} ${data.signal ? `work-${data.signal.kind}` : ''} ${selected ? 'selected' : ''}`}
       >
         <Handle type="source" position={Position.Top} />
-        <span className="node-indicator" />
-        {data.signal && (
-          <div className={`map-work-signal ${data.signal.kind}`} title={data.signal.detail}>
-            {data.signal.tools.length ? (
-              data.signal.tools.slice(0, 2).map((tool) => <ToolIcon key={tool} tool={tool} />)
-            ) : (
-              <SignalIcon size={12} />
-            )}
-            <span>{data.signal.label}</span>
-          </div>
-        )}
+        <div className="map-node-status">
+          <span className="node-indicator" />
+          {data.signal && (
+            <>
+              <span className={`map-state-badge ${data.signal.kind}`}>
+                <i aria-hidden="true" />
+                {workSignalStateLabel(data.signal.kind)}
+              </span>
+              <div className={`map-work-signal ${data.signal.kind}`} title={data.signal.detail}>
+                <WorkSignalIcon signal={data.signal} size={12} />
+                <span>{data.signal.label}</span>
+              </div>
+            </>
+          )}
+        </div>
         <div className="node-card-title">
           {data.label}
           <ArrowUpRight size={15} />
@@ -172,16 +171,9 @@ const MapNodeView = memo(function MapNodeView({ data, selected }: NodeProps<MapN
     </div>
   );
 });
-const signalIcons = {
-  live: Radio,
-  waiting: Radio,
-  changes: Laptop,
-  recent: Radio,
-  checkout: Laptop,
-} satisfies Record<WorkSignalKind, typeof Radio>;
 const clusterSignalLabel = (signal: WorkSignal, liveCount = 0) =>
   liveCount
-    ? `${liveCount} live`
+    ? `${liveCount} LIVE NOW`
     : signal.kind === 'waiting'
       ? 'Waiting'
       : signal.kind === 'changes'
@@ -317,6 +309,7 @@ export function BranchMap({
     if (cluster) {
       visible.forEach((branch, i) => {
         const tone = cluster.tone;
+        const signal = workSignal(branch, repository.path, now);
         nodes.push({
           id: branch.id,
           type: 'mapNode',
@@ -335,7 +328,7 @@ export function BranchMap({
             tone,
             branch,
             evidence: evidenceByBranch.get(branch.id),
-            signal: workSignal(branch, repository.path, now),
+            signal,
             now,
             activate: () => onSelect(branch),
           },
@@ -350,12 +343,14 @@ export function BranchMap({
             source: branch.id,
             target: `target:${targetName}`,
             type: 'mapConnection',
+            className: signal ? `work-${signal.kind}` : undefined,
             data: { lane: targets.findIndex((target) => target.name === targetName) },
             style: {
               stroke: color,
-              strokeWidth: branch.id === selectedId ? 2.3 : 1.3,
+              strokeWidth: branch.id === selectedId ? 2.6 : signal?.kind === 'live' ? 2.2 : 1.3,
               strokeDasharray: integrated ? undefined : '5 6',
-              opacity: selectedId && selectedId !== branch.id ? 0.25 : 0.85,
+              opacity:
+                selectedId && selectedId !== branch.id ? 0.2 : signal?.kind === 'live' ? 1 : 0.85,
             },
             label:
               branch.id === selectedId
@@ -476,7 +471,7 @@ export function BranchMap({
           ) : (
             <span className="map-instruction">
               <Radio size={14} />
-              Expand a group to follow the work
+              Live and in-progress branches glow. Expand a group to follow them.
             </span>
           )}
         </div>

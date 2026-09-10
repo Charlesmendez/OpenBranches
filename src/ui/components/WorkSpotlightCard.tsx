@@ -2,7 +2,7 @@ import { ArrowUpRight } from 'lucide-react';
 import type { Branch, Repository } from '../../domain/types';
 import type { WorkSignal } from '../../domain/workSpotlight';
 import { BranchTargetSummary } from './BranchTargetSummary';
-import { WorkSignalIcon } from './WorkSignalIcon';
+import { WorkSignalIcon, workSignalStateLabel } from './WorkSignalIcon';
 
 export function WorkSpotlightCard({
   repository,
@@ -28,13 +28,20 @@ export function WorkSpotlightCard({
         <WorkSignalIcon signal={signal} />
       </span>
       <span className="project-work-copy">
+        <span className="project-work-state">
+          <i aria-hidden="true" />
+          {workSignalStateLabel(signal.kind)}
+        </span>
         {showRepository && <span className="project-work-repository">{repository.name}</span>}
         <strong>{branch.title}</strong>
         <code>{branch.name}</code>
         <small>{signal.label}</small>
         <BranchTargetSummary branch={branch} targets={repository.targets} />
       </span>
-      <ArrowUpRight size={14} aria-hidden="true" />
+      <span className="project-work-open">
+        Show on map
+        <ArrowUpRight size={13} aria-hidden="true" />
+      </span>
     </button>
   );
 }

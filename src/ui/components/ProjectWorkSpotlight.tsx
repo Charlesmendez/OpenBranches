@@ -28,14 +28,23 @@ export function ProjectWorkSpotlight({
   const primaryKind = spotlights[0]?.signal.kind;
   const tone = live ? 'live' : waiting ? 'waiting' : (primaryKind ?? 'checkout');
   const title = live
-    ? `${live} live now${waiting ? ` · ${waiting} waiting for input` : ''}`
+    ? live === 1
+      ? spotlights[0].signal.label
+      : `${live} branches are active now${waiting ? ` · ${waiting} waiting` : ''}`
     : waiting
       ? `${waiting} ${waiting === 1 ? 'branch needs' : 'branches need'} input`
       : primaryKind === 'changes'
-        ? 'Work in progress on this Mac'
+        ? 'This checkout has work in progress'
         : primaryKind === 'recent'
           ? 'Recently active work'
           : 'Your current checkout';
+  const guidance = live
+    ? 'Choose a branch and the map will jump straight to it.'
+    : waiting
+      ? 'Choose a branch to see what is waiting and where it will land.'
+      : primaryKind === 'changes'
+        ? 'This is the strongest local signal. Live detection adds the coding agent.'
+        : 'Choose a branch to center it on the map.';
 
   if (!spotlights.length) return null;
 
@@ -44,12 +53,12 @@ export function ProjectWorkSpotlight({
       <div className="project-work-intro">
         <span className="project-work-kicker">
           <CircleDot size={12} />
-          {live ? 'HAPPENING NOW' : waiting ? 'NEEDS YOU' : 'CURRENT WORK'}
+          {live ? 'LIVE IN THIS PROJECT' : waiting ? 'NEEDS YOU' : 'CURRENT WORK'}
         </span>
         <strong>{title}</strong>
-        <small>Select a branch to focus it on the map.</small>
+        <small>{guidance}</small>
       </div>
-      <div className="project-work-items">
+      <div className={`project-work-items ${current.items.length === 1 ? 'single' : ''}`}>
         {current.items.map(({ branch, signal }) => (
           <WorkSpotlightCard
             key={branch.id}

@@ -21,7 +21,7 @@ import { useProviders } from './hooks/useProviders';
 import { useGit } from './hooks/useGit';
 import { useReviews } from './hooks/useReviews';
 import { useProjectMemory } from './hooks/useProjectMemory';
-import { mapPositionFor, revealSelection } from './navigation';
+import { mapPositionFor, revealCurrentWork, revealSelection } from './navigation';
 import { NavigationMemory, type WorkspaceMode } from './navigationMemory';
 import { GitSetup } from './components/GitSetup';
 import { Sidebar } from './components/Sidebar';
@@ -162,12 +162,14 @@ export function App() {
   }, [error, setError]);
   const selectProject = (id: string | null) => {
     const target = snapshot.repositories.find((repository) => repository.id === id);
-    const saved =
-      id && target ? revealSelection(memory.read(id), featureBranches(target)) : undefined;
-    if (id && saved) memory.remember(id, saved);
+    const saved = id && target ? memory.read(id) : undefined;
+    const restored =
+      target && saved ? revealCurrentWork(saved, featureBranches(target), target.path) : undefined;
+    if (id && restored) memory.remember(id, restored);
+    setNavigationRequest((request) => request + 1);
     setProjectId(id);
-    setSelectedId(saved?.selectedId ?? null);
-    setGroup(saved?.group ?? 'active');
+    setSelectedId(restored?.selectedId ?? null);
+    setGroup(restored?.group ?? 'active');
   };
   const selectBranch = (branch: Branch) => {
     const active = document.activeElement;
@@ -647,7 +649,7 @@ export function App() {
               </div>
               <div className="group-context">
                 <span>
-                  Showing {grouped.length} of {branches.length} working branches <i />{' '}
+                  Showing {grouped.length} of {branches.length} branches <i />{' '}
                   {branches.length - grouped.length} in other groups
                 </span>
                 <button className="text-button" onClick={() => setView('inventory')}>

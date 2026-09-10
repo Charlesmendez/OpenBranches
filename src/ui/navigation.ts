@@ -1,6 +1,6 @@
 import type { Branch, Lifecycle } from '../domain/types';
 import { lifecycleOf } from '../domain/branches';
-import { prioritizeWork } from '../domain/workSpotlight';
+import { prioritizeWork, workSpotlights } from '../domain/workSpotlight';
 
 export const INVENTORY_ROW_HEIGHT = 76;
 export const INVENTORY_HEADER_HEIGHT = 44;
@@ -64,6 +64,26 @@ export function revealSelection(position: ProjectPosition, branches: Branch[]): 
   const previous = position.maps[group];
   const samePage = previous?.expanded === target.expanded && previous?.page === target.page;
   return { ...position, group, maps: { ...position.maps, [group]: samePage ? previous : target } };
+}
+
+/** Opening a project should land on its strongest current-work signal. The
+ * branch stays unselected so the map remains wide; the beacon opens details. */
+export function revealCurrentWork(
+  position: ProjectPosition,
+  branches: Branch[],
+  repositoryPath: string,
+  now = Date.now(),
+): ProjectPosition {
+  const current = workSpotlights(branches, repositoryPath, now).find(({ signal }) =>
+    ['live', 'waiting', 'changes'].includes(signal.kind),
+  );
+  if (!current) return revealSelection(position, branches);
+  const group = lifecycleOf(current.branch);
+  const grouped = branches.filter((branch) => lifecycleOf(branch) === group);
+  const map = mapPositionFor(grouped, current.branch.id, repositoryPath);
+  return map
+    ? { ...position, selectedId: null, group, maps: { ...position.maps, [group]: map } }
+    : position;
 }
 
 /** Keep the same visible branch when a refresh inserts/reorders preceding rows. */

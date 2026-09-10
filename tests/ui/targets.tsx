@@ -7,6 +7,7 @@ import { BranchMap } from '../../src/ui/components/BranchMap';
 import { Inventory } from '../../src/ui/components/Inventory';
 import { ProjectWorkSpotlight } from '../../src/ui/components/ProjectWorkSpotlight';
 import { Overview } from '../../src/ui/components/Overview';
+import { mapPositionFor, type MapPosition } from '../../src/ui/navigation';
 import '../../src/ui/styles.css';
 import '../../src/ui/components/workflow.css';
 import './targets.css';
@@ -147,6 +148,13 @@ function Fixture() {
     };
   }, []);
   const [selected, setSelected] = useState<string | null>(null);
+  const [mapRequest, setMapRequest] = useState(0);
+  const [mapPosition, setMapPosition] = useState<MapPosition>({ expanded: 'tracked', page: 0 });
+  const focusMapBranch = (branch: Repository['branches'][number]) => {
+    setSelected(branch.id);
+    setMapPosition(mapPositionFor(repository.branches, branch.id, repository.path)!);
+    setMapRequest((value) => value + 1);
+  };
   return (
     <main className="target-fixture">
       <header>
@@ -194,16 +202,16 @@ function Fixture() {
           <ProjectWorkSpotlight
             repository={repository}
             branches={repository.branches}
-            onFocus={(branch) => setSelected(branch.id)}
+            onFocus={focusMapBranch}
           />
           <BranchMap
-            key={`map:${scenario}`}
+            key={`map:${scenario}:${mapRequest}`}
             repository={repository}
             branches={repository.branches}
             selectedId={selected}
             onSelect={(branch) => setSelected(branch.id)}
             onInventory={() => {}}
-            initialPosition={{ expanded: 'tracked', page: 0 }}
+            initialPosition={mapPosition}
             remember={() => {}}
             onScopeChange={() => setSelected(null)}
           />

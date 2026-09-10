@@ -7,6 +7,7 @@ import {
   initialInventory,
   inventoryCursor,
   mapPositionFor,
+  revealCurrentWork,
   revealSelection,
   typeaheadIndex,
 } from '../src/ui/navigation';
@@ -91,6 +92,39 @@ describe('large workspace navigation', () => {
       }));
     expect(mapPositionFor(branches, 'branch-6')).toMatchObject({ page: 1 });
     expect(mapPositionFor(branches, 'branch-6', '/fixture/project')).toMatchObject({ page: 0 });
+  });
+
+  it('opens a project on the strongest current work without covering the map with details', () => {
+    const branches = createDemoSnapshot()
+      .repositories[0].branches.slice(0, 8)
+      .map((branch, index) => ({
+        ...branch,
+        id: `branch-${index}`,
+        pullRequest: undefined,
+        remote: undefined,
+        worktrees: [],
+        tasks:
+          index === 7
+            ? [
+                {
+                  id: 'live-task',
+                  tool: 'codex' as const,
+                  title: 'Active task',
+                  status: 'active' as const,
+                  association: 'verified' as const,
+                  checkedAt: new Date().toISOString(),
+                },
+              ]
+            : [],
+      }));
+    const restored = revealCurrentWork(
+      { selectedId: 'branch-1', group: 'quiet', maps: {} },
+      branches,
+      '/fixture/project',
+    );
+    expect(restored.selectedId).toBeNull();
+    expect(restored.group).toBe('active');
+    expect(restored.maps.active).toMatchObject({ expanded: 'local', page: 0 });
   });
 
   it('supports type-ahead across the full list and wraps without changing unmatched focus', () => {

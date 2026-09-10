@@ -42,6 +42,7 @@ export function ProjectActivityStatus({
 
   const { sources, configured } = liveCoverage(providers);
   if (!providers.liveAgents && !providers.codex.enabled) return null;
+  const taskHistoryConnected = providers.codex.enabled;
   return (
     <button
       className={`project-activity-status ${sources.length ? 'watching' : configured ? 'issue' : 'off'}`}
@@ -50,7 +51,9 @@ export function ProjectActivityStatus({
           ? `Watching for verified activity from ${sources.join(', ')}. Manage live activity.`
           : configured
             ? 'An enabled live source is unavailable. Open Settings for details.'
-            : 'Turn on Codex, Claude Code, or Cursor live activity so the exact branch can glow while work runs.'
+            : taskHistoryConnected
+              ? 'Codex task history is connected. Enable live activity to make the exact branch glow while Codex works.'
+              : 'Enable Codex, Claude Code, or Cursor live activity so the exact branch can glow while work runs.'
       }
       onClick={onSettings}
     >
@@ -66,7 +69,7 @@ export function ProjectActivityStatus({
           ? `Watching ${sourceLabel(sources)}`
           : configured
             ? 'Live activity unavailable'
-            : 'Turn on live detection'}
+            : 'Enable live branch glow'}
       </span>
     </button>
   );
