@@ -557,6 +557,50 @@ code {
   color: var(--muted);
   font-size: 10px;
 }
+.project-toolbar-statuses {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.project-activity-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 5px 9px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  font-size: 10px;
+}
+.project-activity-status:hover,
+.project-activity-status:focus-visible {
+  color: var(--text-soft);
+  border-color: var(--line-strong);
+  background: var(--hover);
+}
+.project-activity-status.live {
+  color: #b8c8f2;
+  border-color: #6478ae;
+  background: #293249;
+  box-shadow: 0 0 18px #637bc53d;
+}
+.project-activity-status.live svg {
+  filter: drop-shadow(0 0 5px #8ba1e8);
+}
+.project-activity-status.waiting {
+  color: #d0c0ee;
+  border-color: #66547d;
+  background: #2c2638;
+}
+.project-activity-status.watching {
+  color: #aeb9d8;
+}
+.project-activity-status.issue {
+  color: var(--amber);
+  border-color: color-mix(in srgb, var(--amber) 35%, var(--line));
+}
 .page-body {
   flex: 1;
   min-height: 0;

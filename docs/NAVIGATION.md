@@ -6,6 +6,8 @@ Startup waits for an authoritative snapshot before restoring branch context or p
 
 Switching from the inventory to the map reveals the selected working branch in its current lifecycle group and six-branch page. An unchanged page retains its viewport. Explicit map group/page navigation clears the inspector selection, so an unrelated branch does not stay highlighted elsewhere. Incoming snapshot changes clear selections that no longer exist.
 
+The project toolbar keeps current activity reachable across both primary views. The map uses the **Happening now** rail as the single active-work callout. The branch inventory adds a compact live/waiting control that focuses the highest-priority current branch on the map. A quiet project shows the connected live sources, while an unconfigured project links directly to live activity settings.
+
 The inventory has one scrolling surface for its sticky header and rows. All discovered integration targets have a column, including projects with develop, dev, main, and master together. Horizontal scrolling moves headers and values together. Refreshes anchor the viewport to its visible branch when earlier rows are inserted or reordered. Closing and reopening the inventory preserves filters, horizontal position, and the visible row offset. A global search result clears conflicting inventory filters and focuses the selected result.
 
 ## Keyboard behavior

@@ -12,8 +12,10 @@ import type {
 } from '../../src/domain/types';
 import { createDemoSnapshot } from '../../src/data/demo';
 import '../../src/ui/styles.css';
+import '../../src/ui/components/workflow.css';
 
 const discoveryFixture = new URLSearchParams(location.search).has('discovery');
+const quietFixture = new URLSearchParams(location.search).has('quiet');
 let status: GitStatus = {
   state: 'missing',
   installAvailable: true,
@@ -193,6 +195,14 @@ window.openbranches = {
     addCalls++;
     updateCounters();
     const repository = createDemoSnapshot().repositories[0];
+    if (quietFixture)
+      repository.branches = repository.branches.map((branch) => ({
+        ...branch,
+        tasks: branch.tasks?.map(({ activitySource: _, waiting: __, ...task }) => ({
+          ...task,
+          status: 'idle',
+        })),
+      }));
     snapshot = { ...snapshot, repositories: [repository] };
     snapshotListeners.forEach((listener) => listener(snapshot));
     return repository;

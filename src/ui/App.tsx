@@ -36,6 +36,7 @@ import { Settings } from './components/Settings';
 import { EmptyState, IconButton } from './components/Primitives';
 import { triageFindings } from '../domain/triage';
 import { ProjectWorkSpotlight } from './components/ProjectWorkSpotlight';
+import { ProjectActivityStatus } from './components/ProjectActivityStatus';
 
 const People = lazy(() =>
   import('./components/People').then((module) => ({ default: module.People })),
@@ -372,10 +373,20 @@ export function App() {
                   Branches<span>{repository.branches.length}</span>
                 </button>
               </div>
-              <span className="project-scan-status">
-                <ShieldCheck size={13} />
-                Read-only
-              </span>
+              <div className="project-toolbar-statuses">
+                <ProjectActivityStatus
+                  branches={branches}
+                  repositoryPath={repository.path}
+                  providers={providers}
+                  showCurrent={view === 'inventory'}
+                  onFocus={focusMapBranch}
+                  onSettings={() => setView('settings')}
+                />
+                <span className="project-scan-status">
+                  <ShieldCheck size={13} />
+                  Read-only
+                </span>
+              </div>
             </div>
           )}
         </div>
