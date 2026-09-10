@@ -2178,8 +2178,7 @@ code {
   font-size: 9px;
   padding: 13px 0 0;
 }
-.attention-content,
-.settings-content {
+.attention-content {
   max-width: 1030px;
 }
 .advisor-callout {

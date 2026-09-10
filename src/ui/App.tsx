@@ -31,7 +31,7 @@ import { Inventory } from './components/Inventory';
 import { Inspector } from './components/Inspector';
 import { Attention } from './components/Attention';
 import { SearchDialog } from './components/SearchDialog';
-import { Settings } from './components/Settings';
+import { Settings, type SettingsFocus } from './components/Settings';
 import { EmptyState, IconButton } from './components/Primitives';
 import { triageFindings } from '../domain/triage';
 import { ProjectWorkSpotlight } from './components/ProjectWorkSpotlight';
@@ -71,7 +71,7 @@ export function App() {
   const [restoredMode, setRestoredMode] = useState<WorkspaceMode | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [navigationRequest, setNavigationRequest] = useState(0);
-  const [settingsFocus, setSettingsFocus] = useState<'live-activity'>();
+  const [settingsFocus, setSettingsFocus] = useState<SettingsFocus>();
   const selectionOrigin = useRef<HTMLElement | null>(null);
   const closeDetails = () => {
     const fallback = selectedId
@@ -206,13 +206,13 @@ export function App() {
     setSettingsFocus(undefined);
     setView(next);
   };
-  const openSettings = (focus?: 'live-activity') => {
+  const openSettings = (focus: SettingsFocus = 'projects') => {
     setSettingsFocus(focus);
     setView('settings');
   };
   const addRepository = async () => {
     if (gitNeedsSetup) {
-      openSettings();
+      openSettings('connections');
       return;
     }
     const added = await add();
@@ -296,7 +296,7 @@ export function App() {
               providers={providers}
               gitState={git.status?.state ?? 'checking'}
               scanning={snapshot.scanning}
-              onSettings={() => openSettings()}
+              onSettings={() => openSettings('connections')}
             />
           )}
           <button
@@ -335,7 +335,7 @@ export function App() {
         <div className="page-header">
           <div className="breadcrumb">
             <span>Workspace</span>
-            {repository && view !== 'people' && view !== 'activity' && (
+            {repository && view !== 'people' && view !== 'activity' && view !== 'settings' && (
               <>
                 <span>/</span>
                 <button onClick={() => changeView('map')}>{repository.name}</button>
@@ -412,7 +412,7 @@ export function App() {
                 Local inspection is paused until Git is ready. Your saved workspace is still
                 available.
               </span>
-              <button onClick={() => openSettings()}>Set up Git</button>
+              <button onClick={() => openSettings('connections')}>Set up Git</button>
             </div>
           )}
         {repository?.error && !gitNeedsSetup && view !== 'people' && view !== 'activity' && (
@@ -463,6 +463,7 @@ export function App() {
             </EmptyState>
           ) : view === 'settings' ? (
             <Settings
+              key={mode}
               git={git}
               repositories={snapshot.repositories}
               demo={mode === 'demo'}
@@ -488,7 +489,7 @@ export function App() {
                 repositories={snapshot.repositories}
                 demo={mode === 'demo'}
                 onSelect={navigateBranch}
-                onSettings={() => openSettings()}
+                onSettings={() => openSettings('connections')}
               />
             </Suspense>
           ) : view === 'attention' ? (
@@ -498,7 +499,7 @@ export function App() {
               repositoryId={projectId}
               repositories={snapshot.repositories}
               onSelect={navigateBranch}
-              onSettings={() => openSettings()}
+              onSettings={() => openSettings('connections')}
               demo={mode === 'demo'}
               codex={providers.codex}
             />

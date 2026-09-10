@@ -1,6 +1,8 @@
 # Connection setup
 
-The title bar combines Local Git, GitHub, live coding activity, and saved task history into one source-health control. Its summary reports whether enabled evidence is current, refreshing, or delayed. The popover keeps each source separate, shows the oldest relevant successful scan/check time, and links to Settings. A failed or partial refresh retains and labels saved evidence rather than resetting its observation time. Optional sources that are disabled remain visible as **Off** in the popover and do not turn the overall summary into an error.
+The title bar combines Local Git, GitHub, live coding activity, and saved task history into one source-health control. Its summary reports whether enabled evidence is current, refreshing, or delayed. The popover keeps each source separate, shows the oldest relevant successful scan/check time, and opens the Connections section in Settings. A failed or partial refresh retains and labels saved evidence rather than resetting its observation time. Optional sources that are disabled remain visible as **Off** in the popover and do not turn the overall summary into an error.
+
+Settings is divided into Projects, Connections, Team sharing, and Privacy instead of placing every control in one long page. Contextual setup links open the relevant section. Connections begins with separate status summaries for This Mac, GitHub, saved task history, and live activity; loading, pending authorization, enabled, ready, and off states remain distinct. Demo status is explicitly labeled as preview data.
 
 ## GitHub
 
