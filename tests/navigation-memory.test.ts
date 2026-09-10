@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { NavigationMemory, NAVIGATION_STORAGE_KEY } from '../src/ui/navigationMemory';
 import { peoplePosition, updatePeoplePosition } from '../src/ui/peopleNavigation';
+import { activityPosition, updateActivityPosition } from '../src/ui/activityNavigation';
 import { initialInventory } from '../src/ui/navigation';
 
 function storage(initial?: string) {
@@ -16,6 +17,36 @@ function storage(initial?: string) {
 afterEach(() => vi.useRealTimers());
 
 describe('saved workspace positions', () => {
+  it('restores Activity filters and paging across branch navigation, isolated from the demo', () => {
+    const disk = storage();
+    const memory = new NavigationMemory(() => disk);
+    const position = activityPosition({
+      query: 'billing',
+      project: 'atlas',
+      filter: 'integration',
+      page: 3,
+    });
+    memory.rememberActivity('live', position);
+    memory.rememberWorkspace('live', { projectId: 'atlas', view: 'map' });
+    memory.rememberWorkspace('live', { projectId: null, view: 'activity' });
+    memory.flush();
+    const restored = new NavigationMemory(() => disk);
+    expect(restored.activity('live')).toEqual(position);
+    expect(restored.activity('demo')).toEqual({
+      query: '',
+      project: 'all',
+      filter: 'all',
+      page: 0,
+    });
+    expect(updateActivityPosition(position, { query: 'voice' })).toMatchObject({
+      query: 'voice',
+      page: 0,
+    });
+    expect(
+      activityPosition({ query: 'x'.repeat(3000), project: {}, filter: 'unknown', page: Infinity }),
+    ).toEqual({ query: '', project: 'all', filter: 'all', page: 0 });
+  });
+
   it('restores people filters across branch navigation and restarts, isolated from the demo', () => {
     const disk = storage();
     const memory = new NavigationMemory(() => disk);

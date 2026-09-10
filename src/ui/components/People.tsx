@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo } from 'react';
 import {
   CircleAlert,
   ChevronLeft,
@@ -29,6 +29,7 @@ import './people.css';
 import type { NavigationMemory, WorkspaceMode } from '../navigationMemory';
 import { usePeoplePosition } from '../hooks/usePeoplePosition';
 import { useClock } from '../hooks/useClock';
+import { usePageWindow } from '../hooks/usePageWindow';
 import { CompactPager } from './CompactPager';
 
 const PAGE_SIZE = 12;
@@ -95,14 +96,7 @@ export function People({
         `${id}:${pull.updatedAt}:${pull.observedAt}:${pull.signals?.attemptedAt ?? ''}`,
     )
     .join('|');
-  const previousRevision = useRef(resultRevision);
-  const resultsChanged = previousRevision.current !== resultRevision;
-  const pages = Math.max(1, Math.ceil(matches.length / PAGE_SIZE));
-  const currentPage = resultsChanged ? 0 : Math.min(page, pages - 1);
-  useEffect(() => {
-    previousRevision.current = resultRevision;
-    if (page !== currentPage) setPage(currentPage);
-  }, [resultRevision, page, currentPage]);
+  const current = usePageWindow(matches, PAGE_SIZE, resultRevision, { page, onPage: setPage });
   const rosterPages = Math.max(1, Math.ceil(people.length / 8));
   const rosterPage = Math.min(peoplePage, rosterPages - 1);
   const observedProjects = repositories.filter((repository) => repository.github);
@@ -350,7 +344,7 @@ export function People({
               </button>
             )}
           </div>
-          {matches.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE).map((item) => (
+          {current.items.map((item) => (
             <PeoplePullCard
               key={item.id}
               work={item}
@@ -389,14 +383,14 @@ export function People({
               )}
             </div>
           )}
-          {pages > 1 && (
+          {current.pageCount > 1 && (
             <CompactPager
-              page={currentPage}
+              page={current.page}
               pageSize={PAGE_SIZE}
               count={matches.length}
               label="Pull request pages"
               className="people-work-pagination"
-              onPage={setPage}
+              onPage={current.setPage}
             />
           )}
         </div>

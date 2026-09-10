@@ -1,0 +1,26 @@
+.activity-fixture {
+  width: min(1180px, calc(100% - 64px));
+  margin: 42px auto;
+}
+
+.activity-fixture > header {
+  margin-bottom: 28px;
+}
+
+.activity-fixture > header > span {
+  color: var(--faint);
+  font-size: 9px;
+  letter-spacing: 1.4px;
+}
+
+.activity-fixture > header h1 {
+  margin: 11px 0 0;
+  font-size: 30px;
+  letter-spacing: -0.8px;
+}
+
+.activity-fixture > header p {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 11px;
+}

@@ -1,5 +1,6 @@
 import { watch, type FSWatcher } from 'node:fs';
-import type { ActivityEvent, Repository, Snapshot } from '../../src/domain/types';
+import type { Repository, Snapshot } from '../../src/domain/types';
+import { observedActivity } from '../../src/domain/activity';
 import { AppStore } from './store';
 import { GitWorkerClient } from '../git/client';
 import type { GitInstallation } from '../git/installation';
@@ -126,23 +127,7 @@ export class RepositoryService {
     if (this.closed) return;
     const previous = this.snapshot.repositories.find((r) => r.id === repository.id);
     if (previous) {
-      const events: ActivityEvent[] = [];
-      for (const branch of repository.branches) {
-        const prior = previous.branches.find((b) => b.id === branch.id);
-        const changed =
-          prior &&
-          (prior.local?.sha ?? prior.remote?.sha) !== (branch.local?.sha ?? branch.remote?.sha);
-        if (!prior || changed)
-          events.push({
-            id: `${branch.id}:${repository.scannedAt}`,
-            repositoryId: repository.id,
-            branchId: branch.id,
-            kind: prior ? 'commit' : 'branch',
-            title: prior ? 'Branch tip changed' : 'Branch discovered',
-            detail: branch.title,
-            at: repository.scannedAt,
-          });
-      }
+      const events = observedActivity(previous, repository);
       this.snapshot.events = [...events, ...this.snapshot.events].slice(0, 500);
     }
     this.snapshot.repositories = [

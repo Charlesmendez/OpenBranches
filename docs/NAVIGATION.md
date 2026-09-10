@@ -1,6 +1,6 @@
 # Keeping your place
 
-OpenBranches restores the last workspace mode, project, and view after a restart. Each project's selected branch, lifecycle group, expanded map group, map page, viewport, inventory search, filters, cursor, and scroll position are saved locally. Demo and real projects have independent histories, including when they share a project identifier. Persisted review decisions remain separate.
+OpenBranches restores the last workspace mode, project, and view after a restart. Each project's selected branch, lifecycle group, expanded map group, map page, viewport, inventory search, filters, cursor, and scroll position are saved locally. The workspace Activity timeline also restores its search, project, event-type filter, and current page. Demo and real projects have independent histories, including when they share a project identifier. Persisted review decisions remain separate.
 
 Startup waits for an authoritative snapshot before restoring branch context or pruning removed projects. A failed load preserves saved positions and offers a retry. A newer snapshot event supersedes an older in-flight read, so a delayed empty response cannot erase the current workspace. Removed projects are discarded after the renderer receives the updated project list. Callbacks captured before a mode or project-membership change cannot reintroduce an old position, including after removal and re-addition.
 
@@ -12,7 +12,7 @@ The all-projects overview begins with a bounded **Live across projects** rail wh
 
 The sidebar workspace control opens Personal plus every connected team. Personal remains in the Mac app; a team destination opens its authenticated browser dashboard. Pending and unavailable connections stay visible with their actual state and lead to the appropriate team page. Arrow keys, Home, and End move through destinations, while Escape closes the menu and returns focus to its trigger.
 
-Review queues use the same bounded page controller as active-work rails. A changed filter or evidence ordering starts at the first page immediately, while ordinary selection keeps the current page. Previous and Next retain keyboard focus when they reach a boundary.
+Review and Activity queues use the same bounded page controller as active-work rails. A changed filter or evidence ordering starts at the first page immediately, while opening an item and returning keeps the current page. Previous and Next retain keyboard focus when they reach a boundary.
 
 Project cards use the broader activity ranking from the map: verified running or waiting work appears before dirty work, recent activity, and the current checkout. The corresponding tool icon and evidence tone remain visible on each project card. Compact project summaries prefer one development target and one stable target so `develop` and `main` remain visible when alias targets also exist. They say **Compared with** and do not draw a relationship line; verified ancestry and PR lines remain exclusive to the evidence map.
 

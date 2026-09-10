@@ -4,69 +4,19 @@ import {
   ChevronRight,
   FolderGit2,
   GitBranch,
-  GitCommitHorizontal,
-  GitMerge,
   GitPullRequest,
   Laptop,
   Plus,
 } from 'lucide-react';
 import type { ActivityEvent, Branch, Repository } from '../../domain/types';
-import { featureBranches, groupCounts, relativeTime } from '../../domain/branches';
+import { activityItems } from '../../domain/activity';
+import { featureBranches, groupCounts } from '../../domain/branches';
 import { primaryIntegrationTargets } from '../../domain/integrationTargets';
 import { workPreviews } from '../../domain/workSpotlight';
 import { useClock } from '../hooks/useClock';
 import { WorkSignalIcon } from './WorkSignalIcon';
 import { WorkspaceWorkSpotlight } from './WorkspaceWorkSpotlight';
-
-export function ActivityList({
-  events,
-  repositories,
-  onSelect,
-  limit,
-}: {
-  events: ActivityEvent[];
-  repositories: Repository[];
-  onSelect: (repositoryId: string, branchId?: string) => void;
-  limit?: number;
-}) {
-  if (!events.length)
-    return (
-      <div className="quiet-activity">
-        Changes will appear here as you work. Your first scan establishes the starting point.
-      </div>
-    );
-  return (
-    <div className="activity-list">
-      {events.slice(0, limit).map((event) => {
-        const Icon =
-          event.kind === 'commit'
-            ? GitCommitHorizontal
-            : event.kind === 'integration'
-              ? GitMerge
-              : GitBranch;
-        return (
-          <button
-            key={event.id}
-            className="activity-row"
-            onClick={() => onSelect(event.repositoryId, event.branchId)}
-          >
-            <span className="activity-time">{relativeTime(event.at)}</span>
-            <span className={`activity-icon ${event.kind}`}>
-              <Icon size={17} />
-            </span>
-            <strong>{event.title}</strong>
-            <span className="activity-detail">
-              {event.detail}
-              <i />
-              {repositories.find((r) => r.id === event.repositoryId)?.name}
-            </span>
-            <ChevronRight size={14} />
-          </button>
-        );
-      })}
-    </div>
-  );
-}
+import { ActivityList } from './ActivityList';
 export function Overview({
   repositories,
   events,
@@ -85,6 +35,7 @@ export function Overview({
   onAdd: () => void;
 }) {
   const now = useClock();
+  const activity = activityItems(events, repositories);
   return (
     <div className="overview-content">
       <WorkspaceWorkSpotlight repositories={repositories} now={now} onFocus={onFocus} />
@@ -202,7 +153,7 @@ export function Overview({
             <ArrowUpRight size={13} />
           </button>
         </div>
-        <ActivityList events={events} repositories={repositories} onSelect={onSelect} limit={4} />
+        <ActivityList items={activity} now={now} onSelect={onSelect} limit={4} />
       </section>
       <div className="overview-note">
         <span>Your projects stay on your Mac. You choose what to connect.</span>

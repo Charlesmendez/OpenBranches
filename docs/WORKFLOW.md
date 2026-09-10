@@ -12,6 +12,10 @@ The controlled graph keeps explicit measured card dimensions across snapshots. F
 
 ## Activity coverage
 
+The full Activity view is a bounded local timeline rather than an unstructured dump. It sorts the latest observations first, groups the visible page by day, supports project, event-type, and text filters, and keeps at most 20 rows on screen. Counts describe the current search and project scope. A separate 85-event fixture verifies paging and filter resets. The compact overview shelf reuses the same event presentation for its four newest changes.
+
+Activity begins after a repository's first scan. Later scans record newly observed branches, changed branch tips, changes to available worktree locations, and a branch's transition into verified integration-target history. Worktree paths are used only for local comparison and are not copied into activity records. The timeline is capped at 500 saved events and removing a monitored project also removes its events.
+
 When available, the Codex adapter attaches read-only to the existing local app-server daemon through `app-server proxy`. It does not start a daemon. Every 15 seconds it reads at most 100 loaded task metadata records, without turns, using bounded concurrency and deadlines. Missing pages or failures are reported as partial coverage. Runtime status is held only in memory and stripped from the persisted task index.
 
 Running or waiting labels require a fresh runtime observation and a fresh Git checkout whose folder, branch, and HEAD match. A saved task's old branch cannot inherit live status after a checkout switch. Runtime evidence expires after 90 seconds; incomplete or unavailable coverage never means nobody is working. A shared Codex daemon is optional; the separate opt-in Codex lifecycle hook supplies the reliable local path when desktop sessions use private stdio app servers.

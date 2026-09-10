@@ -1,4 +1,5 @@
 import { peoplePosition, type PeoplePosition } from './peopleNavigation';
+import { activityPosition, type ActivityPosition } from './activityNavigation';
 import type { Lifecycle, View } from '../domain/types';
 import type { MapPosition, ProjectPosition } from './navigation';
 
@@ -7,6 +8,7 @@ export interface WorkspacePosition {
   projectId: string | null;
   view: View;
   people?: PeoplePosition;
+  activity?: ActivityPosition;
 }
 type StorageAccess = () => Pick<Storage, 'getItem' | 'setItem'>;
 export const NAVIGATION_STORAGE_KEY = 'ob-navigation-v1';
@@ -119,6 +121,7 @@ export class NavigationMemory {
             projectId: id(route.projectId) ?? null,
             view: option(route.view, views, 'map'),
             ...(route.people === undefined ? {} : { people: peoplePosition(route.people) }),
+            ...(route.activity === undefined ? {} : { activity: activityPosition(route.activity) }),
           };
         const entries = saved.projects[mode];
         if (Array.isArray(entries))
@@ -159,12 +162,25 @@ export class NavigationMemory {
     this.routes[mode] = { ...this.routes[mode], people };
     this.changed();
   }
+  activity(mode: WorkspaceMode): ActivityPosition {
+    return activityPosition(this.routes[mode].activity);
+  }
+  rememberActivity(mode: WorkspaceMode, value: ActivityPosition): void {
+    const activity = activityPosition(value);
+    if (JSON.stringify(this.routes[mode].activity) === JSON.stringify(activity)) return;
+    this.routes[mode] = { ...this.routes[mode], activity };
+    this.changed();
+  }
   rememberWorkspace(mode: WorkspaceMode, position: WorkspacePosition): void {
     const old = this.routes[mode];
     if (this.mode === mode && old.projectId === position.projectId && old.view === position.view)
       return;
     this.mode = mode;
-    this.routes[mode] = { ...position, ...(old.people ? { people: old.people } : {}) };
+    this.routes[mode] = {
+      ...position,
+      ...(old.people ? { people: old.people } : {}),
+      ...(old.activity ? { activity: old.activity } : {}),
+    };
     const current = position.projectId && this.projects[mode].get(position.projectId);
     if (current && position.projectId) {
       this.projects[mode].delete(position.projectId);

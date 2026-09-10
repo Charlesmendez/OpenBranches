@@ -25,7 +25,7 @@ import { mapPositionFor, revealSelection } from './navigation';
 import { NavigationMemory, type WorkspaceMode } from './navigationMemory';
 import { GitSetup } from './components/GitSetup';
 import { Sidebar } from './components/Sidebar';
-import { Overview, ActivityList } from './components/Overview';
+import { Overview } from './components/Overview';
 import { BranchMap } from './components/BranchMap';
 import { Inventory } from './components/Inventory';
 import { Inspector } from './components/Inspector';
@@ -40,6 +40,9 @@ import { SourceStatusMenu } from './components/SourceStatusMenu';
 
 const People = lazy(() =>
   import('./components/People').then((module) => ({ default: module.People })),
+);
+const Activity = lazy(() =>
+  import('./components/Activity').then((module) => ({ default: module.Activity })),
 );
 
 export function App() {
@@ -332,7 +335,7 @@ export function App() {
         <div className="page-header">
           <div className="breadcrumb">
             <span>Workspace</span>
-            {repository && view !== 'people' && (
+            {repository && view !== 'people' && view !== 'activity' && (
               <>
                 <span>/</span>
                 <button onClick={() => changeView('map')}>{repository.name}</button>
@@ -412,19 +415,20 @@ export function App() {
               <button onClick={() => openSettings()}>Set up Git</button>
             </div>
           )}
-        {repository?.error && !gitNeedsSetup && view !== 'people' && (
+        {repository?.error && !gitNeedsSetup && view !== 'people' && view !== 'activity' && (
           <div className="source-error">
             <span>Source unavailable. Showing the last snapshot.</span>
             <button onClick={() => void refresh()}>Retry</button>
           </div>
         )}
-        {repository?.github?.error && view !== 'people' && (
+        {repository?.github?.error && view !== 'people' && view !== 'activity' && (
           <div className="source-error">
             <span>{repository.github.error} Showing the last GitHub snapshot.</span>
             <button onClick={() => void refresh()}>Retry</button>
           </div>
         )}
         {view !== 'people' &&
+          view !== 'activity' &&
           repository?.github?.history &&
           repository.github.history.checked < repository.github.history.total &&
           !repository.github.error && (
@@ -499,17 +503,25 @@ export function App() {
               codex={providers.codex}
             />
           ) : view === 'activity' ? (
-            <section className="full-activity">
-              <div className="section-kicker">
-                <span>RECENT ACTIVITY</span>
-                <span>{snapshot.events.length} events</span>
-              </div>
-              <ActivityList
+            <Suspense
+              fallback={
+                <EmptyState
+                  icon={LoaderCircle}
+                  title="Opening activity"
+                  description="Loading your local timeline…"
+                />
+              }
+            >
+              <Activity
+                key={mode}
                 events={snapshot.events}
                 repositories={snapshot.repositories}
+                demo={mode === 'demo'}
+                navigation={positions}
+                mode={mode}
                 onSelect={navigateBranch}
               />
-            </section>
+            </Suspense>
           ) : !snapshot.repositories.length && mode === 'live' && gitNeedsSetup ? (
             <GitSetup git={git} onDemo={switchMode} />
           ) : !snapshot.repositories.length ? (

@@ -1000,66 +1000,6 @@ code {
 .project-card-foot > span:last-child {
   color: var(--muted);
 }
-.activity-shelf {
-  margin-top: 28px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  padding: 17px 18px 5px;
-}
-.activity-list {
-  display: flex;
-  flex-direction: column;
-}
-.activity-row {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 15px 3px;
-  border-top: 1px solid var(--line);
-  text-align: left;
-  font-size: 11px;
-}
-.activity-row:hover {
-  background: var(--raised);
-}
-.activity-time {
-  width: 58px;
-  font-size: 10px;
-  color: var(--muted);
-  flex-shrink: 0;
-}
-.activity-icon {
-  color: #8697cb;
-  display: flex;
-}
-.activity-icon.branch {
-  color: #d1bc89;
-}
-.activity-row strong {
-  font-weight: 500;
-  white-space: nowrap;
-}
-.activity-detail {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  margin-left: auto;
-  color: var(--muted);
-  font-size: 10px;
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-.activity-detail i {
-  height: 10px;
-  width: 1px;
-  background: var(--hover);
-}
-.activity-row > svg {
-  color: var(--muted);
-}
 .overview-note {
   display: flex;
   align-items: center;
@@ -1067,12 +1007,6 @@ code {
   font-size: 9px;
   color: var(--muted);
   margin-top: 22px;
-}
-.quiet-activity {
-  padding: 25px 0;
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 1.7;
 }
 .map-content {
   display: flex;
@@ -2716,15 +2650,6 @@ code {
   line-height: 1.8;
   color: var(--muted);
   max-width: 700px;
-}
-.full-activity {
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  padding: 20px;
-  background: var(--surface);
-}
-.full-activity .activity-row {
-  padding: 20px 4px;
 }
 .git-setup {
   width: min(580px, calc(100% - 64px));
