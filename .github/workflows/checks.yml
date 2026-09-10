@@ -13,7 +13,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
       OPENBRANCHES_TEAM_TEST_DATABASE_URL: postgresql://postgres:openbranches-ci-fixture@127.0.0.1:5432/openbranches_test
     services:
       postgres:
@@ -40,4 +39,5 @@ jobs:
       - run: npm run typecheck && npm run team:typecheck
       - run: npm test && npm run test:team
       - run: npm run format:check
+      - run: npm rebuild electron --no-audit --no-fund
       - run: npm run build && npm run team:build
