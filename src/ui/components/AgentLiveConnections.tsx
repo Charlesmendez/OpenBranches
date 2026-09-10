@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Check, LoaderCircle, Radio, ShieldCheck } from 'lucide-react';
 import type { AgentLiveStatus, LiveAgentTool } from '../../domain/types';
 import { toolNames } from '../../domain/agents';
@@ -7,9 +7,24 @@ import { ToolIcon } from './AgentBadges';
 
 const supported: LiveAgentTool[] = ['codex', 'claude-code', 'cursor'];
 
-export function AgentLiveConnections({ statuses }: { statuses?: AgentLiveStatus[] }) {
+export function AgentLiveConnections({
+  statuses,
+  focusOnMount = false,
+}: {
+  statuses?: AgentLiveStatus[];
+  focusOnMount?: boolean;
+}) {
+  const container = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState<LiveAgentTool>();
   const [error, setError] = useState('');
+  useEffect(() => {
+    if (!focusOnMount) return;
+    const frame = requestAnimationFrame(() => {
+      container.current?.scrollIntoView({ block: 'start' });
+      container.current?.focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [focusOnMount]);
   const values = supported.map(
     (tool) =>
       statuses?.find((status) => status.tool === tool) ?? {
@@ -33,7 +48,11 @@ export function AgentLiveConnections({ statuses }: { statuses?: AgentLiveStatus[
     }
   };
   return (
-    <div className="agent-live-connections">
+    <div
+      ref={container}
+      className={`agent-live-connections ${focusOnMount ? 'focused' : ''}`}
+      tabIndex={-1}
+    >
       <div className="settings-row agent-live-heading">
         <span className="settings-icon live-listener-icon">
           <Radio size={20} />

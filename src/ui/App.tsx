@@ -68,6 +68,7 @@ export function App() {
   const [restoredMode, setRestoredMode] = useState<WorkspaceMode | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [navigationRequest, setNavigationRequest] = useState(0);
+  const [settingsFocus, setSettingsFocus] = useState<'live-activity'>();
   const selectionOrigin = useRef<HTMLElement | null>(null);
   const closeDetails = () => {
     setSelectedId(null);
@@ -191,11 +192,16 @@ export function App() {
       memory.remember(repository.id, restored);
       setGroup(restored.group);
     }
+    setSettingsFocus(undefined);
     setView(next);
+  };
+  const openSettings = (focus?: 'live-activity') => {
+    setSettingsFocus(focus);
+    setView('settings');
   };
   const addRepository = async () => {
     if (gitNeedsSetup) {
-      setView('settings');
+      openSettings();
       return;
     }
     const added = await add();
@@ -314,7 +320,7 @@ export function App() {
         demo={mode === 'demo'}
         gitNeedsSetup={gitNeedsSetup}
         onProject={selectProject}
-        onView={setView}
+        onView={changeView}
         onAdd={() => void addRepository()}
         onMode={switchMode}
       />
@@ -380,7 +386,7 @@ export function App() {
                   providers={providers}
                   showCurrent={view === 'inventory'}
                   onFocus={focusMapBranch}
-                  onSettings={() => setView('settings')}
+                  onSettings={() => openSettings('live-activity')}
                 />
                 <span className="project-scan-status">
                   <ShieldCheck size={13} />
@@ -399,7 +405,7 @@ export function App() {
                 Local inspection is paused until Git is ready. Your saved workspace is still
                 available.
               </span>
-              <button onClick={() => setView('settings')}>Set up Git</button>
+              <button onClick={() => openSettings()}>Set up Git</button>
             </div>
           )}
         {repository?.error && !gitNeedsSetup && view !== 'people' && (
@@ -455,6 +461,7 @@ export function App() {
               onRemove={workspace.remove}
               onAdd={() => void addRepository()}
               onLive={switchMode}
+              focusSection={settingsFocus}
             />
           ) : view === 'people' ? (
             <Suspense
@@ -473,7 +480,7 @@ export function App() {
                 repositories={snapshot.repositories}
                 demo={mode === 'demo'}
                 onSelect={navigateBranch}
-                onSettings={() => setView('settings')}
+                onSettings={() => openSettings()}
               />
             </Suspense>
           ) : view === 'attention' ? (
@@ -483,7 +490,7 @@ export function App() {
               repositoryId={projectId}
               repositories={snapshot.repositories}
               onSelect={navigateBranch}
-              onSettings={() => setView('settings')}
+              onSettings={() => openSettings()}
               demo={mode === 'demo'}
               codex={providers.codex}
             />
@@ -519,7 +526,7 @@ export function App() {
                 title="Every branch has a story."
                 description="Bring your projects together. See where your work lives, what’s ready, and what deserves a second look."
               >
-                <button className="primary-button" onClick={() => setView('settings')}>
+                <button className="primary-button" onClick={() => openSettings()}>
                   Find my Codex projects
                 </button>
                 <button

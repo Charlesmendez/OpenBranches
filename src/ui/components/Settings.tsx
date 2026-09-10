@@ -20,6 +20,7 @@ export function Settings({
   onRemove,
   onAdd,
   onLive,
+  focusSection,
 }: {
   git: GitSetupController;
   repositories: Repository[];
@@ -27,6 +28,7 @@ export function Settings({
   onRemove: (id: string) => Promise<boolean>;
   onAdd: () => void;
   onLive: () => void;
+  focusSection?: 'live-activity';
 }) {
   const providers = useProviders();
   const [github, setGitHub] = useState<GitHubStatus>(providers.github);
@@ -199,7 +201,10 @@ export function Settings({
           </p>
         )}
         <CodexConnection status={providers.codex} />
-        <AgentLiveConnections statuses={providers.liveAgents} />
+        <AgentLiveConnections
+          statuses={providers.liveAgents}
+          focusOnMount={focusSection === 'live-activity'}
+        />
         {(
           providers.agents ?? [
             { tool: 'claude-code' as const, enabled: false, state: 'not-connected' as const },

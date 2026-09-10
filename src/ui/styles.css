@@ -3329,6 +3329,13 @@ code {
 .agent-live-connections {
   border-top: 1px solid var(--line);
   padding-bottom: 22px;
+  scroll-margin-top: 14px;
+}
+.agent-live-connections:focus {
+  outline: 0;
+}
+.agent-live-connections.focused {
+  animation: settings-section-focus 1.4s ease-out;
 }
 .agent-live-heading {
   border-top: 0;
@@ -3448,6 +3455,14 @@ code {
 .agent-live-global-error {
   margin: 13px 0 0 54px;
 }
+@keyframes settings-section-focus {
+  0% {
+    box-shadow: inset 3px 0 #8aabff;
+  }
+  100% {
+    box-shadow: inset 3px 0 transparent;
+  }
+}
 @media (max-width: 1180px) {
   .agent-live-card {
     grid-template-columns: minmax(0, 1fr) auto;
@@ -3456,5 +3471,11 @@ code {
   .agent-live-card > p,
   .agent-live-card .agent-live-error {
     grid-column: 1 / -1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .agent-live-connections.focused {
+    animation: none;
+    box-shadow: inset 3px 0 #8aabff;
   }
 }
