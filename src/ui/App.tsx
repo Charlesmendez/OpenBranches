@@ -72,7 +72,11 @@ export function App() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [navigationRequest, setNavigationRequest] = useState(0);
   const [settingsFocus, setSettingsFocus] = useState<SettingsFocus>();
+  const workspaceContent = useRef<HTMLElement | null>(null);
   const selectionOrigin = useRef<HTMLElement | null>(null);
+  const focusWorkspace = () => {
+    window.setTimeout(() => workspaceContent.current?.focus({ preventScroll: true }), 0);
+  };
   const closeDetails = () => {
     const fallback = selectedId
       ? document.querySelector<HTMLElement>(`[data-branch-id="${CSS.escape(selectedId)}"]`)
@@ -206,9 +210,14 @@ export function App() {
     setSettingsFocus(undefined);
     setView(next);
   };
+  const changeSidebarView = (next: View) => {
+    changeView(next);
+    focusWorkspace();
+  };
   const openSettings = (focus: SettingsFocus = 'projects') => {
     setSettingsFocus(focus);
     setView('settings');
+    if (focus !== 'live-activity') focusWorkspace();
   };
   const addRepository = async () => {
     if (gitNeedsSetup) {
@@ -219,6 +228,7 @@ export function App() {
     if (added) {
       selectProject(added.id);
       setView('map');
+      focusWorkspace();
     }
   };
   const switchMode = () => {
@@ -274,6 +284,9 @@ export function App() {
               : 'One place to see what’s happening, and what happens next.';
   return (
     <div className={`app ${selected && isProjectView ? 'has-inspector' : ''}`}>
+      <button type="button" className="skip-link" onClick={focusWorkspace}>
+        Skip to workspace
+      </button>
       <header className="titlebar">
         <div className="titlebar-spacer" />
         <button className="global-search" onClick={() => setSearchOpen(true)}>
@@ -325,84 +338,95 @@ export function App() {
         demo={mode === 'demo'}
         gitNeedsSetup={gitNeedsSetup}
         onProject={selectProject}
-        onView={changeView}
+        onView={changeSidebarView}
         onAdd={() => void addRepository()}
-        onMode={switchMode}
+        onMode={() => {
+          switchMode();
+          focusWorkspace();
+        }}
         teamApi={mode === 'live' ? window.openbranches?.teams : undefined}
         onError={setError}
       />
-      <main className={`main ${firstSetup ? 'initial-setup' : ''}`}>
-        <div className="page-header">
-          <div className="breadcrumb">
-            <span>Workspace</span>
-            {repository && view !== 'people' && view !== 'activity' && view !== 'settings' && (
-              <>
-                <span>/</span>
-                <button onClick={() => changeView('map')}>{repository.name}</button>
-              </>
-            )}
-            {view === 'attention' && (
-              <>
-                <span>/</span>
-                <span>Needs attention</span>
-              </>
+      <main
+        ref={workspaceContent}
+        id="workspace-content"
+        className={`main ${firstSetup ? 'initial-setup' : ''}`}
+        tabIndex={-1}
+        aria-labelledby={firstSetup ? 'git-setup-title' : 'page-title'}
+      >
+        {!firstSetup && (
+          <div className="page-header">
+            <div className="breadcrumb">
+              <span>Workspace</span>
+              {repository && view !== 'people' && view !== 'activity' && view !== 'settings' && (
+                <>
+                  <span>/</span>
+                  <button onClick={() => changeView('map')}>{repository.name}</button>
+                </>
+              )}
+              {view === 'attention' && (
+                <>
+                  <span>/</span>
+                  <span>Needs attention</span>
+                </>
+              )}
+            </div>
+            <div className="page-title-row">
+              <div>
+                <h1 id="page-title">{title}</h1>
+                <p>{subtitle}</p>
+              </div>
+              {!repository && view === 'map' && (
+                <button
+                  className="secondary-button add-project-button"
+                  onClick={() => void addRepository()}
+                  disabled={adding}
+                >
+                  {adding ? <LoaderCircle className="spin" size={16} /> : <Plus size={16} />}Add
+                  project
+                </button>
+              )}
+            </div>
+            {isProjectView && (
+              <div className="project-toolbar">
+                <div className="view-switch" role="tablist" aria-label="Repository view">
+                  <button
+                    role="tab"
+                    aria-selected={view === 'map'}
+                    className={view === 'map' ? 'selected' : ''}
+                    onClick={() => changeView('map')}
+                  >
+                    <Map size={14} />
+                    Map
+                  </button>
+                  <button
+                    role="tab"
+                    aria-selected={view === 'inventory'}
+                    className={view === 'inventory' ? 'selected' : ''}
+                    onClick={() => setView('inventory')}
+                  >
+                    <List size={14} />
+                    Branches<span>{repository.branches.length}</span>
+                  </button>
+                </div>
+                <div className="project-toolbar-statuses">
+                  <ProjectActivityStatus
+                    branches={branches}
+                    repositoryPath={repository.path}
+                    providers={providers}
+                    showCurrent={view === 'inventory'}
+                    onFocus={focusMapBranch}
+                    onSettings={() => openSettings('live-activity')}
+                  />
+                  <span className="project-scan-status">
+                    <ShieldCheck size={13} />
+                    Read-only
+                  </span>
+                </div>
+              </div>
             )}
           </div>
-          <div className="page-title-row">
-            <div>
-              <h1>{title}</h1>
-              <p>{subtitle}</p>
-            </div>
-            {!repository && view === 'map' && (
-              <button
-                className="secondary-button add-project-button"
-                onClick={() => void addRepository()}
-                disabled={adding}
-              >
-                {adding ? <LoaderCircle className="spin" size={16} /> : <Plus size={16} />}Add
-                project
-              </button>
-            )}
-          </div>
-          {isProjectView && (
-            <div className="project-toolbar">
-              <div className="view-switch" role="tablist" aria-label="Repository view">
-                <button
-                  role="tab"
-                  aria-selected={view === 'map'}
-                  className={view === 'map' ? 'selected' : ''}
-                  onClick={() => changeView('map')}
-                >
-                  <Map size={14} />
-                  Map
-                </button>
-                <button
-                  role="tab"
-                  aria-selected={view === 'inventory'}
-                  className={view === 'inventory' ? 'selected' : ''}
-                  onClick={() => setView('inventory')}
-                >
-                  <List size={14} />
-                  Branches<span>{repository.branches.length}</span>
-                </button>
-              </div>
-              <div className="project-toolbar-statuses">
-                <ProjectActivityStatus
-                  branches={branches}
-                  repositoryPath={repository.path}
-                  providers={providers}
-                  showCurrent={view === 'inventory'}
-                  onFocus={focusMapBranch}
-                  onSettings={() => openSettings('live-activity')}
-                />
-                <span className="project-scan-status">
-                  <ShieldCheck size={13} />
-                  Read-only
-                </span>
-              </div>
-            </div>
-          )}
-        </div>
+        )}
         {mode === 'live' &&
           gitNeedsSetup &&
           snapshot.repositories.length > 0 &&
@@ -524,7 +548,13 @@ export function App() {
               />
             </Suspense>
           ) : !snapshot.repositories.length && mode === 'live' && gitNeedsSetup ? (
-            <GitSetup git={git} onDemo={switchMode} />
+            <GitSetup
+              git={git}
+              onDemo={() => {
+                switchMode();
+                focusWorkspace();
+              }}
+            />
           ) : !snapshot.repositories.length ? (
             <div className="welcome">
               <div className="welcome-map" aria-hidden="true">

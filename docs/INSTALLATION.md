@@ -21,13 +21,15 @@ When Git is missing, the app explains the prerequisite and offers **Install Appl
 
 Keep OpenBranches open and finish the steps in Apple’s window. It rechecks while visible and when you return to it. **Check again** is available at any time; **Open installer again** handles a canceled dialog. The demo remains available during setup.
 
+Keyboard users can reach **Skip to workspace** as the first app control. It moves focus past the title bar and project navigation to the current page. Choosing a page or project in the sidebar also moves focus to the newly named workspace, so assistive technology announces the destination instead of leaving focus on a control that changed the page. The first-run Git screen exposes one page heading, identifies its setup region, reports busy installation checks, and announces installer progress and failures.
+
 An unsupported or broken Git installation shows repair guidance instead of pretending local tracking is working. Saved repositories remain visible while inspection is paused. The help button opens [Apple’s official setup guide](https://developer.apple.com/documentation/xcode/installing-the-command-line-tools); it cannot open an arbitrary link supplied by repository content.
 
 ## Verification and remaining release checks
 
 - Automated tests cover missing Apple tools, a shim reached through a symlink, Homebrew outside the launch PATH, supported and old Apple Git, failed probes, inherited Git overrides, coalesced checks, explicit installer requests, failed requests, and recovery. Opening an installer never counts as a completed installation.
 - A real Git fixture confirms that scanning with a limited PATH and another repository’s inherited Git settings still inspects the selected folder and preserves its index.
-- The desktop build has detected Git and scanned the selected repository on the development Mac. The missing-tool, retry, demo, recovery, and old-version screens have been exercised through the browser fixture.
+- The desktop build has detected Git and scanned the selected repository on the development Mac. The missing-tool, retry, demo, recovery, and old-version screens have been exercised through the browser fixture. Its accessibility tree was also checked for the named main landmark, single first-run heading, setup region, status message, and focus after skip, sidebar, and demo transitions. The rebuilt packaged app independently exposed the named workspace and kept focus on it after skip and sidebar navigation. A manual VoiceOver walkthrough remains a release check.
 - A clean Mac/VM test of Apple’s actual installer is still required. No development test downloads or installs Apple’s tools on the developer’s machine. Signed installation, Intel runtime validation, and supported macOS-version coverage remain release gates.
 - The [Mac release workflow](RELEASING.md) builds on native Apple silicon and Intel GitHub runners, checks artifact architecture and mounted bundle symlinks, verifies code signing and stapled notarization tickets, verifies each DMG, generates SHA-256 checksums, and keeps the GitHub release as a draft until a maintainer publishes it. An unsigned Apple silicon DMG has been mounted and launched successfully from its read-only volume; signed and Intel runs remain release gates.
 

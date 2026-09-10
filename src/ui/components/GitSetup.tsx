@@ -30,17 +30,26 @@ export function GitSetup({
         ? 'Your Git needs an update.'
         : 'Let’s get Git working again.';
   return (
-    <section className={`git-setup ${compact ? 'compact' : ''}`} aria-label="Git setup">
+    <section
+      className={`git-setup ${compact ? 'compact' : ''}`}
+      aria-label="Git setup"
+      aria-busy={initial || checking || installing}
+    >
       <div className="setup-symbol" aria-hidden="true">
         {initial ? <LoaderCircle size={26} className="spin" /> : <GitBranch size={26} />}
       </div>
       <div className="section-kicker">{initial ? 'CHECKING THIS MAC' : 'SET UP ONCE'}</div>
-      <Heading>{title}</Heading>
+      <Heading id={compact ? undefined : 'git-setup-title'}>{title}</Heading>
       <p className="setup-description">
         {initial
           ? 'Looking for the Git installation that reads your project history.'
           : status.message}
       </p>
+      {(initial || checking || installing) && (
+        <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+          {installing ? 'Opening Apple’s installer.' : 'Checking this Mac for Git.'}
+        </p>
+      )}
       {!initial && (
         <>
           {status.installAvailable && (
@@ -62,8 +71,8 @@ export function GitSetup({
             </ol>
           )}
           {requested && status.installAvailable && (
-            <p className="setup-progress" role="status">
-              <LoaderCircle size={14} className="spin" />
+            <p className="setup-progress" role="status" aria-live="polite" aria-atomic="true">
+              <LoaderCircle size={14} className="spin" aria-hidden="true" />
               Finish installation in Apple’s window. You can explore the demo while it runs.
             </p>
           )}
@@ -74,7 +83,11 @@ export function GitSetup({
                 disabled={installing || checking}
                 onClick={() => void git.install()}
               >
-                {installing ? <LoaderCircle className="spin" size={16} /> : <Download size={16} />}
+                {installing ? (
+                  <LoaderCircle className="spin" size={16} aria-hidden="true" />
+                ) : (
+                  <Download size={16} aria-hidden="true" />
+                )}
                 {requested ? 'Open installer again' : 'Install Apple’s tools'}
               </button>
             )}
@@ -85,7 +98,7 @@ export function GitSetup({
               disabled={checking || installing}
               onClick={() => void git.recheck()}
             >
-              <RefreshCw size={15} className={checking ? 'spin' : ''} />
+              <RefreshCw size={15} className={checking ? 'spin' : ''} aria-hidden="true" />
               {checking ? 'Checking…' : 'Check again'}
             </button>
           </div>

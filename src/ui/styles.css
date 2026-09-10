@@ -111,6 +111,27 @@ code {
   height: 100vh;
   overflow: hidden;
 }
+.skip-link {
+  position: fixed;
+  z-index: 1000;
+  top: 10px;
+  left: 50%;
+  min-height: 36px;
+  padding: 8px 14px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--raised);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 8px 28px #0009;
+  transform: translate(-50%, calc(-100% - 18px));
+  transition: transform 0.15s ease;
+  -webkit-app-region: no-drag;
+}
+.skip-link:focus-visible {
+  transform: translate(-50%, 0);
+}
 .app.has-inspector {
   grid-template-columns: var(--sidebar) minmax(0, 1fr) var(--inspector);
 }
@@ -544,6 +565,9 @@ code {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+.main:focus {
+  outline: none;
 }
 .page-header {
   padding: 27px 34px 0;
@@ -2674,9 +2698,6 @@ code {
   border-radius: 15px;
   background: #6680cf0d;
   color: var(--accent);
-}
-.initial-setup .page-header {
-  display: none;
 }
 .initial-setup .page-body {
   padding: 24px;
