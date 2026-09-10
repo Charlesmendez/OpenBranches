@@ -1,4 +1,4 @@
-import { AgentBadges } from './AgentBadges';
+import { AgentBadges, ToolIcon } from './AgentBadges';
 import { memo, useMemo, useState, useRef } from 'react';
 import {
   Background,
@@ -31,8 +31,14 @@ import { MapViewport } from './MapViewport';
 import { MapConnection } from './MapConnection';
 import { BranchActivity } from './BranchActivity';
 import { mapEvidence, mapTargets, type MapTargetEvidence } from '../../domain/mapEvidence';
-import { idleWork, liveTasks } from '../../domain/branchActivity';
+import { idleWork } from '../../domain/branchActivity';
 import { useClock } from '../hooks/useClock';
+import {
+  prioritizeWork,
+  workSignal,
+  type WorkSignal,
+  type WorkSignalKind,
+} from '../../domain/workSpotlight';
 
 type MapData = {
   kind: 'target' | 'branch' | 'cluster';
@@ -45,17 +51,20 @@ type MapData = {
   clusterId?: string;
   activate?: () => void;
   evidence?: MapTargetEvidence[];
+  signal?: WorkSignal;
+  liveCount?: number;
   now?: number;
 } & Record<string, unknown>;
 type MapNode = Node<MapData, 'mapNode'>;
 const MapNodeView = memo(function MapNodeView({ data, selected }: NodeProps<MapNode>) {
+  const SignalIcon = data.signal ? signalIcons[data.signal.kind] : Radio;
   const keyboard = {
     role: 'button',
     tabIndex: 0,
     'aria-label':
       data.kind === 'cluster'
         ? `Expand ${data.label}, ${data.count} branches`
-        : `Inspect ${data.label}`,
+        : `Inspect ${data.label}${data.signal ? `, ${data.signal.label}` : ''}`,
     onKeyDown: (event: React.KeyboardEvent) => {
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault();
@@ -78,9 +87,22 @@ const MapNodeView = memo(function MapNodeView({ data, selected }: NodeProps<MapN
     );
   if (data.kind === 'branch')
     return (
-      <div {...keyboard} className={`branch-map-card ${data.tone} ${selected ? 'selected' : ''}`}>
+      <div
+        {...keyboard}
+        className={`branch-map-card ${data.tone} ${data.signal ? `work-${data.signal.kind}` : ''} ${selected ? 'selected' : ''}`}
+      >
         <Handle type="source" position={Position.Top} />
         <span className="node-indicator" />
+        {data.signal && (
+          <div className={`map-work-signal ${data.signal.kind}`} title={data.signal.detail}>
+            {data.signal.tools.length ? (
+              data.signal.tools.slice(0, 2).map((tool) => <ToolIcon key={tool} tool={tool} />)
+            ) : (
+              <SignalIcon size={12} />
+            )}
+            <span>{data.signal.label}</span>
+          </div>
+        )}
         <div className="node-card-title">
           {data.label}
           <ArrowUpRight size={15} />
@@ -95,7 +117,7 @@ const MapNodeView = memo(function MapNodeView({ data, selected }: NodeProps<MapN
             <span className="pill neutral">PR #{data.branch!.pullRequest.number}</span>
           )}
         </div>
-        <BranchActivity branch={data.branch!} now={data.now} />
+        <BranchActivity branch={data.branch!} now={data.now} showPresence={!data.signal} />
         <div className="map-target-checks">
           {data.evidence?.map((item) => (
             <span
@@ -117,13 +139,22 @@ const MapNodeView = memo(function MapNodeView({ data, selected }: NodeProps<MapN
   const Icon =
     data.clusterId === 'review' ? GitPullRequest : data.clusterId === 'local' ? Laptop : Layers;
   return (
-    <div {...keyboard} className={`cluster-card ${data.tone}`}>
+    <div
+      {...keyboard}
+      className={`cluster-card ${data.tone} ${data.signal ? `work-${data.signal.kind}` : ''}`}
+    >
       <Handle type="source" position={Position.Top} />
       <div className="cluster-heading">
         <span className="cluster-icon">
           <Icon size={18} />
         </span>
         <span>{data.label}</span>
+        {data.signal && (
+          <span className={`cluster-work-signal ${data.signal.kind}`}>
+            <i />
+            {clusterSignalLabel(data.signal, data.liveCount)}
+          </span>
+        )}
         <ChevronRight size={16} />
       </div>
       <div className="cluster-number">
@@ -138,6 +169,23 @@ const MapNodeView = memo(function MapNodeView({ data, selected }: NodeProps<MapN
     </div>
   );
 });
+const signalIcons = {
+  live: Radio,
+  waiting: Radio,
+  changes: Laptop,
+  recent: Radio,
+  checkout: Laptop,
+} satisfies Record<WorkSignalKind, typeof Radio>;
+const clusterSignalLabel = (signal: WorkSignal, liveCount = 0) =>
+  liveCount
+    ? `${liveCount} live`
+    : signal.kind === 'waiting'
+      ? 'Waiting'
+      : signal.kind === 'changes'
+        ? 'In progress'
+        : signal.kind === 'recent'
+          ? 'Recent'
+          : 'Current';
 const nodeTypes = { mapNode: MapNodeView };
 const edgeTypes = { mapConnection: MapConnection };
 const colors: Record<string, string> = {
@@ -185,33 +233,43 @@ export function BranchMap({
     onScopeChange();
     move({ source, ...next });
   };
-  const clusters = useMemo(
-    () =>
-      [
-        {
-          id: 'review',
-          label: 'Pull requests',
-          tone: 'violet',
-          branches: branches.filter((b) => clusterFor(b) === 'review'),
-          hint: 'Drafts and review',
-        },
-        {
-          id: 'local',
-          label: 'On your Mac',
-          tone: 'amber',
-          branches: branches.filter((b) => clusterFor(b) === 'local'),
-          hint: 'Local branches',
-        },
-        {
-          id: 'tracked',
-          label: 'Remote branches',
-          tone: 'blue',
-          branches: branches.filter((b) => clusterFor(b) === 'tracked'),
-          hint: 'Published or cached references',
-        },
-      ].filter((c) => c.branches.length),
-    [branches],
-  );
+  const clusters = useMemo(() => {
+    return [
+      {
+        id: 'review',
+        label: 'Pull requests',
+        tone: 'violet',
+        branches: prioritizeWork(
+          branches.filter((b) => clusterFor(b) === 'review'),
+          repository.path,
+          now,
+        ),
+        hint: 'Drafts and review',
+      },
+      {
+        id: 'local',
+        label: 'On your Mac',
+        tone: 'amber',
+        branches: prioritizeWork(
+          branches.filter((b) => clusterFor(b) === 'local'),
+          repository.path,
+          now,
+        ),
+        hint: 'Local branches',
+      },
+      {
+        id: 'tracked',
+        label: 'Remote branches',
+        tone: 'blue',
+        branches: prioritizeWork(
+          branches.filter((b) => clusterFor(b) === 'tracked'),
+          repository.path,
+          now,
+        ),
+        hint: 'Published or cached references',
+      },
+    ].filter((c) => c.branches.length);
+  }, [branches, repository.path, now]);
   const cluster = clusters.find((c) => c.id === expanded);
   const currentPage = Math.min(
     page,
@@ -265,6 +323,7 @@ export function BranchMap({
             tone,
             branch,
             evidence: evidenceByBranch.get(branch.id),
+            signal: workSignal(branch, repository.path, now),
             now,
             activate: () => onSelect(branch),
           },
@@ -300,6 +359,13 @@ export function BranchMap({
       });
     } else {
       clusters.forEach((c, i) => {
+        const signals = c.branches.flatMap((branch) => {
+          const signal = workSignal(branch, repository.path, now);
+          return signal ? [{ branch, signal }] : [];
+        });
+        const primarySignal = signals[0];
+        const liveCount = signals.filter(({ signal }) => signal.kind === 'live').length;
+        const idleCount = c.branches.filter((b) => idleWork(b, now)).length;
         nodes.push({
           id: `cluster:${c.id}`,
           type: 'mapNode',
@@ -313,8 +379,14 @@ export function BranchMap({
             label: c.label,
             tone: c.tone,
             count: c.branches.length,
-            preview: c.branches[0].title,
-            hint: `${liveState === 'connected' || liveState === 'partial' ? `${c.branches.filter((b) => liveTasks(b, now).length).length} confirmed running` : 'Live status unavailable'} · ${c.branches.filter((b) => idleWork(b, now)).length} idle`,
+            preview: primarySignal?.branch.title ?? c.branches[0].title,
+            signal: primarySignal?.signal,
+            liveCount,
+            hint: liveCount
+              ? `${liveCount} live now · ${idleCount} idle`
+              : primarySignal
+                ? `${primarySignal.signal.label} · ${idleCount} idle`
+                : `${liveState === 'connected' || liveState === 'partial' ? 'No confirmed live work' : 'Live agent status unavailable'} · ${idleCount} idle`,
             clusterId: c.id,
             activate: () => {
               changeScope({ expanded: c.id as MapPosition['expanded'], page: 0 });

@@ -11,6 +11,7 @@ import { mapHasVisibleCard } from '../src/ui/mapViewport';
 import { recommendationsFor } from '../src/domain/branches';
 import { groupReviews } from '../src/domain/reviews';
 import { triageFindings, triageHighlights } from '../src/domain/triage';
+import { prioritizeWork, workSignal, workSpotlights } from '../src/domain/workSpotlight';
 const now = Date.parse('2026-09-09T20:00:00Z');
 const at = new Date(now).toISOString();
 const old = new Date(now - 30 * 86400000).toISOString();
@@ -216,6 +217,69 @@ describe('source-backed branch activity', () => {
       },
     ];
     expect(idleWork(b, now)).toBeUndefined();
+  });
+});
+describe('current work spotlight', () => {
+  it('puts fresh verified agent runtime first and names the coding tool', () => {
+    const ordinary = branch();
+    ordinary.id = 'ordinary';
+    const running = branch();
+    running.id = 'running';
+    running.tasks = [task()];
+    expect(workSignal(running, '/fixture/project', now)).toMatchObject({
+      kind: 'live',
+      label: 'Codex working now',
+      tools: ['codex'],
+    });
+    expect(prioritizeWork([ordinary, running], '/fixture/project', now).map((b) => b.id)).toEqual([
+      'running',
+      'ordinary',
+    ]);
+  });
+
+  it('surfaces the current dirty checkout without inventing an active agent', () => {
+    const current = branch();
+    current.worktrees = [
+      {
+        path: '/fixture/project/',
+        head: sha,
+        branch: 'feat/work',
+        detached: false,
+        available: true,
+        dirty: true,
+        changedFiles: 2,
+      },
+    ];
+    current.tasks = [task({ association: 'possible' })];
+    expect(workSignal(current, '/fixture/project', now)).toMatchObject({
+      kind: 'changes',
+      label: 'Local changes here',
+      tools: [],
+    });
+    expect(workSignal(current, '/fixture/project', now)?.detail).toContain(
+      'active person or agent is not confirmed',
+    );
+    expect(workSpotlights([current], '/fixture/project', now)).toHaveLength(1);
+  });
+
+  it('labels a clean project-root branch as the current checkout without calling it live', () => {
+    const current = branch();
+    current.worktrees = [
+      {
+        path: '/fixture/project',
+        head: sha,
+        branch: 'feat/work',
+        detached: false,
+        available: true,
+        dirty: false,
+        changedFiles: 0,
+      },
+    ];
+    expect(workSignal(current, '/fixture/project', now)).toMatchObject({
+      kind: 'checkout',
+      label: 'Current checkout',
+      tools: [],
+    });
   });
 });
 describe('attention triage at scale', () => {

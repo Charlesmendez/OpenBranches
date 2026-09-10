@@ -2,7 +2,15 @@ import { Radio, Clock3, FilePenLine, UserRound } from 'lucide-react';
 import type { Branch } from '../../domain/types';
 import { branchActivity, idleWork } from '../../domain/branchActivity';
 
-export function BranchActivity({ branch, now = Date.now() }: { branch: Branch; now?: number }) {
+export function BranchActivity({
+  branch,
+  now = Date.now(),
+  showPresence = true,
+}: {
+  branch: Branch;
+  now?: number;
+  showPresence?: boolean;
+}) {
   const activity = branchActivity(branch, now);
   const idle = idleWork(branch, now);
   const Icon =
@@ -12,12 +20,15 @@ export function BranchActivity({ branch, now = Date.now() }: { branch: Branch; n
         ? FilePenLine
         : Clock3;
   const author = branch.pullRequest?.author?.login ?? (branch.local ?? branch.remote)?.author;
+  if (!showPresence && !idle && !author) return null;
   return (
     <div className="branch-activity">
-      <span className={`activity-presence ${activity.kind}`} title={activity.detail}>
-        <Icon size={12} />
-        {activity.label}
-      </span>
+      {showPresence && (
+        <span className={`activity-presence ${activity.kind}`} title={activity.detail}>
+          <Icon size={12} />
+          {activity.label}
+        </span>
+      )}
       {idle && (
         <span
           className="idle-work-flag"

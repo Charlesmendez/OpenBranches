@@ -35,6 +35,7 @@ import { SearchDialog } from './components/SearchDialog';
 import { Settings } from './components/Settings';
 import { EmptyState, IconButton } from './components/Primitives';
 import { triageFindings } from '../domain/triage';
+import { ProjectWorkSpotlight } from './components/ProjectWorkSpotlight';
 
 const People = lazy(() =>
   import('./components/People').then((module) => ({ default: module.People })),
@@ -160,6 +161,20 @@ export function App() {
     selectionOrigin.current =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setSelectedId(branch.id);
+  };
+  const focusMapBranch = (branch: Branch) => {
+    if (!repository) return;
+    const nextGroup = lifecycleOf(branch);
+    const nextBranches = branches.filter((candidate) => lifecycleOf(candidate) === nextGroup);
+    const mapPosition = mapPositionFor(nextBranches, branch.id, repository.path);
+    if (mapPosition)
+      memory.remember(repository.id, {
+        maps: { ...memory.read(repository.id).maps, [nextGroup]: mapPosition },
+      });
+    setNavigationRequest((request) => request + 1);
+    setView('map');
+    setGroup(nextGroup);
+    selectBranch(branch);
   };
   const navigateBranch = (repoId: string, branchId?: string) => {
     memory.remember(repoId, { inventory: undefined });
@@ -541,6 +556,11 @@ export function App() {
             />
           ) : (
             <div className="map-content">
+              <ProjectWorkSpotlight
+                repository={repository}
+                branches={branches}
+                onFocus={focusMapBranch}
+              />
               <div className="lifecycle-tabs" role="tablist" aria-label="Branch groups">
                 {(Object.keys(lifecycleLabels) as Lifecycle[]).map((value) => (
                   <button
@@ -570,7 +590,7 @@ export function App() {
                 </button>
               </div>
               <BranchMap
-                key={`${repository.id}:${group}`}
+                key={`${repository.id}:${group}:${navigationRequest}`}
                 repository={repository}
                 branches={grouped}
                 selectedId={selectedId}

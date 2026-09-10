@@ -1,5 +1,6 @@
 import type { Branch, Lifecycle } from '../domain/types';
 import { lifecycleOf } from '../domain/branches';
+import { prioritizeWork } from '../domain/workSpotlight';
 
 export const INVENTORY_ROW_HEIGHT = 76;
 export const INVENTORY_HEADER_HEIGHT = 44;
@@ -40,13 +41,15 @@ export function clusterFor(branch: Branch): ClusterId {
 export function mapPositionFor(
   branches: Branch[],
   selectedId: string | null,
+  repositoryPath?: string,
 ): MapPosition | undefined {
   const selected = branches.find((branch) => branch.id === selectedId);
   if (!selected) return;
   const expanded = clusterFor(selected);
-  const index = branches
-    .filter((branch) => clusterFor(branch) === expanded)
-    .findIndex((branch) => branch.id === selectedId);
+  const clustered = branches.filter((branch) => clusterFor(branch) === expanded);
+  const index = (repositoryPath ? prioritizeWork(clustered, repositoryPath) : clustered).findIndex(
+    (branch) => branch.id === selectedId,
+  );
   return { expanded, page: Math.floor(index / MAP_PAGE_SIZE) };
 }
 

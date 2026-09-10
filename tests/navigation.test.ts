@@ -65,6 +65,34 @@ describe('large workspace navigation', () => {
     expect(mapPositionFor(branches, 'missing')).toBeUndefined();
   });
 
+  it('puts a live branch on the first map page when work-aware ordering is requested', () => {
+    const now = new Date().toISOString();
+    const branches = createDemoSnapshot()
+      .repositories[0].branches.slice(0, 7)
+      .map((branch, index) => ({
+        ...branch,
+        id: `branch-${index}`,
+        pullRequest: undefined,
+        remote: undefined,
+        worktrees: [],
+        tasks:
+          index === 6
+            ? [
+                {
+                  id: 'live-task',
+                  tool: 'codex' as const,
+                  title: 'Active task',
+                  status: 'active' as const,
+                  association: 'verified' as const,
+                  checkedAt: now,
+                },
+              ]
+            : [],
+      }));
+    expect(mapPositionFor(branches, 'branch-6')).toMatchObject({ page: 1 });
+    expect(mapPositionFor(branches, 'branch-6', '/fixture/project')).toMatchObject({ page: 0 });
+  });
+
   it('supports type-ahead across the full list and wraps without changing unmatched focus', () => {
     const branches = createDemoSnapshot()
       .repositories[0].branches.slice(0, 3)

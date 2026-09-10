@@ -40,7 +40,7 @@ export function branchActivity(branch: Branch, now = Date.now()) {
   if (waiting.length)
     return {
       kind: 'waiting' as const,
-      label: 'Codex waiting for input',
+      label: `${[...new Set(waiting.map((task) => toolNames[knownTool(task.tool)]))].join(' + ')} waiting for input`,
       detail: waiting.map((task) => task.title).join(' · '),
     };
   const recent = (branch.tasks ?? []).filter(
