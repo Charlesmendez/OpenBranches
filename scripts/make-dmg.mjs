@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import {
   absoluteBundleSymlinks,
+  lipoArchitecture,
   macArguments,
   macArtifactPaths,
   releaseMetadata,
@@ -24,9 +25,13 @@ await Promise.all([access(artifact.application), access(artifact.executable)]);
 await validateLegalResources(artifact.application);
 await mkdir(dirname(artifact.diskImage), { recursive: true });
 
-execFileSync('/usr/bin/lipo', [artifact.executable, '-verify_arch', options.architecture], {
-  stdio: 'inherit',
-});
+execFileSync(
+  '/usr/bin/lipo',
+  [artifact.executable, '-verify_arch', lipoArchitecture(options.architecture)],
+  {
+    stdio: 'inherit',
+  },
+);
 if (release)
   execFileSync(
     '/usr/bin/codesign',
