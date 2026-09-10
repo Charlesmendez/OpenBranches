@@ -29,6 +29,8 @@ import { EmptyState } from './Primitives';
 import { AgentHandoffDialog } from './AgentHandoffDialog';
 import { HandoffActivity } from './HandoffActivity';
 import { useHandoffs } from '../hooks/useHandoffs';
+import { CompactPager } from './CompactPager';
+import { usePageWindow } from '../hooks/usePageWindow';
 
 const PAGE_SIZE = 12;
 const labels: Record<ReviewBucket, string> = {
@@ -55,7 +57,6 @@ export function Attention({
 }) {
   const [bucket, setBucket] = useState<ReviewBucket>('active');
   const [queue, setQueue] = useState<TriageQueue | 'all' | null>(null);
-  const [page, setPage] = useState(0);
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
   const [showSelected, setShowSelected] = useState(false);
@@ -118,10 +119,20 @@ export function Attention({
   );
   const filtered = showSelected ? all.filter((item) => selectedSet.has(item.id)) : matching;
   const overview = bucket === 'active' && !queue && !needle && !showSelected;
-  const currentPage = Math.min(page, Math.max(0, Math.ceil(filtered.length / PAGE_SIZE) - 1));
-  const items = overview
-    ? triageHighlights(all)
-    : filtered.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
+  const pageKey = [
+    bucket,
+    queue ?? '',
+    needle,
+    showSelected ? 'selected' : 'matching',
+    ...filtered.map(
+      (item) =>
+        `${item.repositoryId}:${item.id}:${item.updatedAt}:${item.findings
+          .map(({ finding }) => finding.revision)
+          .join(',')}`,
+    ),
+  ].join('\u0001');
+  const current = usePageWindow(filtered, PAGE_SIZE, pageKey);
+  const items = overview ? triageHighlights(all) : current.items;
   const selectedItems = all.filter((item) => selectedSet.has(item.id));
   const selectedVisibleItems = items.filter((item) => selectedSet.has(item.id));
   const selectedFilteredItems = filtered.filter((item) => selectedSet.has(item.id));
@@ -150,7 +161,6 @@ export function Attention({
   };
   const change = (next: TriageQueue | 'all' | null) => {
     setQueue(next);
-    setPage(0);
     setShowSelected(false);
   };
   useEffect(() => {
@@ -214,7 +224,6 @@ export function Attention({
             value={query}
             onChange={(event) => {
               setQuery(event.target.value);
-              setPage(0);
               setShowSelected(false);
             }}
           />
@@ -285,7 +294,6 @@ export function Attention({
                 <button
                   className="text-button"
                   onClick={() => {
-                    setPage(0);
                     setShowSelected(false);
                     if (queue) setQueue(null);
                   }}
@@ -337,7 +345,6 @@ export function Attention({
                   onClick={() => {
                     setQuery('');
                     setQueue(null);
-                    setPage(0);
                     setShowSelected(true);
                   }}
                 >
@@ -494,26 +501,14 @@ export function Attention({
             </div>
           )}
           {!overview && filtered.length > PAGE_SIZE && (
-            <nav className="review-pagination" aria-label="Review branch pages">
-              <span>
-                {currentPage * PAGE_SIZE + 1}–
-                {Math.min(filtered.length, (currentPage + 1) * PAGE_SIZE)} of {filtered.length}
-              </span>
-              <button
-                className="secondary-button"
-                disabled={currentPage === 0}
-                onClick={() => setPage(currentPage - 1)}
-              >
-                Previous
-              </button>
-              <button
-                className="secondary-button"
-                disabled={(currentPage + 1) * PAGE_SIZE >= filtered.length}
-                onClick={() => setPage(currentPage + 1)}
-              >
-                Next
-              </button>
-            </nav>
+            <CompactPager
+              page={current.page}
+              pageSize={PAGE_SIZE}
+              count={filtered.length}
+              label="Review branch pages"
+              className="review-pagination"
+              onPage={current.setPage}
+            />
           )}
         </>
       )}

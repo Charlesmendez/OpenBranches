@@ -2469,22 +2469,11 @@ code {
   scroll-margin-top: 18px;
 }
 .review-pagination {
-  display: flex;
-  gap: 9px;
-  align-items: center;
   margin-top: 22px;
 }
 .review-pagination > span {
   flex: 1;
   font-size: 11px;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-}
-.review-pagination.compact {
-  margin: 0;
-}
-.review-pagination.compact > span {
-  margin-right: 6px;
 }
 .monitored-heading {
   display: flex;
