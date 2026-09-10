@@ -1432,6 +1432,23 @@ code {
   border-top-style: solid;
   border-top-color: var(--accent);
 }
+.legend-work-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border: 1px solid #8aabff;
+  border-radius: 50%;
+  background: #668cff;
+  box-shadow: 0 0 9px #668cffee;
+}
+.legend-work-dot.live {
+  animation: live-work-glow 1.8s ease-in-out infinite;
+}
+.legend-work-dot.changes {
+  border-color: #d8b85e;
+  background: #e2c47d;
+  box-shadow: 0 0 8px #d8b85e66;
+}
 .map-legend-note {
   margin-left: auto;
   color: var(--muted);

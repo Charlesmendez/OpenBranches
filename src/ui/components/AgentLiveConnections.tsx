@@ -101,7 +101,7 @@ export function AgentLiveConnections({
                     ? `Last signal ${relativeTime(status.receivedAt).toLowerCase()}.`
                     : status.tool === 'codex'
                       ? 'Hook installed. Codex may ask you to review it; then start a new turn in the checkout.'
-                      : `Ready. Start work in ${name} to see the branch appear in Happening now.`
+                      : `Ready. Start work in ${name} to see the exact branch glow in Current work and on its map.`
                   : `Add a private local hook to ${name}. Existing hook settings are preserved.`}
               </p>
               <div className="agent-live-card-action">

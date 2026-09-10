@@ -571,21 +571,31 @@ export function BranchMap({
           </button>
         </div>
       )}
-      {!!targets.length && (
-        <div className="map-legend">
-          <span>
-            <i className="legend-line solid" />
-            {source === 'github'
-              ? 'Published commit included'
-              : 'Commit included in target history'}
-          </span>
-          <span>
-            <i className="legend-line" />
-            Open PR destination
-          </span>
-          <span className="map-legend-note">No line = no verified connection</span>
-        </div>
-      )}
+      <div className="map-legend">
+        <span>
+          <i className="legend-work-dot live" />
+          Live agent
+        </span>
+        <span>
+          <i className="legend-work-dot changes" />
+          Local changes
+        </span>
+        {!!targets.length && (
+          <>
+            <span>
+              <i className="legend-line solid" />
+              {source === 'github'
+                ? 'Published commit included'
+                : 'Commit included in target history'}
+            </span>
+            <span>
+              <i className="legend-line" />
+              Open PR destination
+            </span>
+            <span className="map-legend-note">No line = no verified connection</span>
+          </>
+        )}
+      </div>
     </div>
   );
 }
