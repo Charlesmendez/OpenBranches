@@ -14,7 +14,7 @@
   <img src="https://img.shields.io/badge/platform-macOS-d9dce7.svg" alt="macOS">
 </p>
 
-> **Development preview:** the application works locally, but the first signed and notarized public DMG has not been released yet. The source is ready for public review and contribution.
+> **Download v0.1.0:** [Apple silicon (M1 and newer)](https://github.com/Charlesmendez/OpenBranches/releases/download/v0.1.0/OpenBranches-0.1.0-mac-arm64.dmg) · [Intel](https://github.com/Charlesmendez/OpenBranches/releases/download/v0.1.0/OpenBranches-0.1.0-mac-x64.dmg). Both installers are signed with Developer ID and notarized by Apple.
 
 ![OpenBranches workspace control panel](docs/images/workspace-overview.png)
 
@@ -54,14 +54,14 @@ Local changes update while the app is open. GitHub requests use per-repository f
 
 The intended installation is the normal Mac flow:
 
-1. Download the Apple silicon (`arm64`) or Intel (`x64`) DMG from GitHub Releases.
+1. Download the [Apple silicon (`arm64`)](https://github.com/Charlesmendez/OpenBranches/releases/download/v0.1.0/OpenBranches-0.1.0-mac-arm64.dmg) or [Intel (`x64`)](https://github.com/Charlesmendez/OpenBranches/releases/download/v0.1.0/OpenBranches-0.1.0-mac-x64.dmg) DMG from the [latest GitHub Release](https://github.com/Charlesmendez/OpenBranches/releases/latest).
 2. Open the DMG and drag OpenBranches into Applications.
 3. Launch the app and follow automatically discovered projects, or choose a repository folder.
 4. Optionally connect GitHub and local coding-agent history in Settings.
 
 End users will not need Node.js, npm, Xcode, or an Apple Developer account. Git 2.36 or newer is required for local inspection; OpenBranches detects common Apple and Homebrew installations and guides the user through Apple's Command Line Tools installer when Git is missing.
 
-The first official download will be signed with the project's Developer ID and notarized by Apple. Until that release exists, files ending in `-unsigned.dmg` are development previews. See the detailed [Mac installation guide](docs/INSTALLATION.md).
+The public downloads are signed with the project's Developer ID, notarized by Apple, and accompanied by SHA-256 checksums. Files ending in `-unsigned.dmg` are local development builds. See the detailed [Mac installation guide](docs/INSTALLATION.md).
 
 ### Run from source
 
@@ -123,12 +123,9 @@ The service and Mac companion are implemented as an isolated fictional preview. 
 
 ## Project status
 
-The local desktop application, Git evidence model, workspace control panel, project maps, review handoffs, source health, and unsigned Mac packaging are implemented and tested. The remaining public-release work is operational:
+OpenBranches v0.1.0 is publicly available for Apple silicon and Intel Macs. The desktop application, Git evidence model, workspace control panel, project maps, review handoffs, source health, GitHub connection, and signed release pipeline are implemented. The release workflow built and verified each installer on its matching native Mac architecture, including its signature, stapled notarization ticket, mounted bundle, architecture, and checksum.
 
-- configure the public GitHub App used for private-repository sign-in;
-- add Apple Developer signing and notarization credentials;
-- verify signed Apple silicon and Intel installers on clean Macs;
-- publish the first GitHub Release and document the update path.
+The optional self-hosted team workspace remains a preview. Broader clean-machine, macOS-version, and assistive-technology testing continues after the initial desktop release.
 
 The [roadmap](docs/ROADMAP.md) tracks the full release scope and known limits.
 
