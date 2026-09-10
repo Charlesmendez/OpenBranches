@@ -14,7 +14,7 @@ Electron checks the registered protocol handler before dispatching the link. It 
 
 | Situation                                         | Behavior                                                              |
 | ------------------------------------------------- | --------------------------------------------------------------------- |
-| macOS accepts the request                         | “Sent to Codex”; this does not prove the destination task loaded      |
+| macOS accepts the request                         | “Open request sent to Codex”; this does not claim the task loaded     |
 | Association no longer exists or connection is off | Ask the user to refresh and check the connection                      |
 | Saved ID is unsupported                           | Suggest finding the task in Codex by title                            |
 | No desktop protocol handler                       | Explain that the desktop app is needed; the CLI alone is insufficient |
@@ -27,7 +27,7 @@ Electron checks the registered protocol handler before dispatching the link. It 
 - `tests/codex-open-task.test.ts` checks the exact fixed destination, reserved routes, injection and malformed payloads, stale/disconnected associations, changes during protocol lookup, and missing/failed handler outcomes.
 - `tests/codex.test.ts` checks current repository/branch/task evidence, possible and archived associations, removed projects, and disconnection.
 - `tests/ui/tasks.html` is a development-only fictional fixture with controlled deferred desktop responses. Browser checks covered pending/disabled state, submitted IDs, keyboard activation, every inline result message, expanded history, wrapped titles, and demo/preview actions that do not dispatch requests. Browser diagnostics reported no warnings or errors. The rebuilt native app showed the actions and fictional-task explanation in its real inspector; scrolling kept the task history and controls readable and reachable.
-- A separate temporary Electron window used the same `getApplicationInfoForProtocol` and `shell.openExternal` calls for this existing planning task. macOS identified its registered handler as ChatGPT and accepted the request. The official documentation describes retention of the Codex scheme. No new task or model turn was requested.
-- Destination-screen verification remains pending: Computer Use does not permit inspecting the Codex app in this environment. The real OpenBranches desktop connection found no saved task associations for the currently selected projects, so that check does not prove the entire inspector-to-existing-task flow. Real archived-task destination behavior and wider desktop versions also remain unverified. Do not describe the launch as fully verified until those checks have direct evidence.
+- The rebuilt packaged app loaded the real local Codex index, associated saved sessions with their current repository and branch evidence, and exercised the inspector action for both a current verified association and an archived possible association. macOS accepted both open requests, and each action returned its inline status without exposing an ID or path. The same exact-link path is covered by the main-process tests above.
+- Destination-screen verification remains pending because Computer Use does not permit inspecting the Codex app in this environment. Wider desktop versions also remain unverified. Do not describe the launch as fully verified until the destination screen has direct evidence.
 
 Task metadata can become stale between index refreshes. Opening a link does not establish current task activity, reclassify a possible association as verified, or verify that archived or missing tasks remain accessible in the destination app.

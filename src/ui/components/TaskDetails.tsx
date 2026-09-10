@@ -11,7 +11,7 @@ interface TaskContext {
   demo: boolean;
 }
 const messages: Record<OpenTaskResult, string> = {
-  sent: 'Sent to Codex. Check the desktop app to continue.',
+  sent: 'Open request sent to Codex. Check the desktop app for the task.',
   'not-linked':
     'This task is no longer linked here. Refresh the workspace and check Codex tasks in Settings.',
   'invalid-link': 'This saved task has an unsupported link. Find it in Codex by its title.',
