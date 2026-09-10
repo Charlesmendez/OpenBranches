@@ -1,92 +1,160 @@
-# OpenBranches
+<p align="center">
+  <img src="assets/icon.png" width="96" height="96" alt="OpenBranches app icon">
+</p>
 
-A local Mac app for understanding branches, worktrees, and the work behind them.
+<h1 align="center">OpenBranches</h1>
 
-OpenBranches brings local Git and GitHub into one workspace: a grouped branch map, searchable inventory, branch details, recent activity, and an evidence-backed review inbox. It is being built for people who have accumulated more coding-agent branches than they can comfortably remember.
+<p align="center">
+  See what is being worked on, where every branch lives, and whether the work reached <code>develop</code> or <code>main</code>.
+</p>
 
-**Development preview.** The full first release is still in progress. Signed public downloads and remaining release hardening are not available yet. See [the roadmap](docs/ROADMAP.md) for the complete scope and outstanding work.
+<p align="center">
+  <a href="https://github.com/Charlesmendez/OpenBranches/actions/workflows/checks.yml"><img src="https://github.com/Charlesmendez/OpenBranches/actions/workflows/checks.yml/badge.svg" alt="Checks"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-8ba8ff.svg" alt="MIT license"></a>
+  <img src="https://img.shields.io/badge/platform-macOS-d9dce7.svg" alt="macOS">
+</p>
 
-## What works now
+> **Development preview:** the application works locally, but the first signed and notarized public DMG has not been released yet. The source is ready for public review and contribution.
 
-- Add local Git repositories through a native folder picker. Shared worktrees are inspected together.
-- Follow saved Codex projects on this Mac with one setting. Search projects from the sidebar, manage monitored folders in Settings, and keep removed projects excluded from automatic additions. See [discovery and compatibility limits](docs/PROJECT_DISCOVERY.md).
-- Detect Apple and Homebrew Git installations automatically. If Git needs setup, follow the in-app guide, open Apple’s installer explicitly, and explore the demo while it finishes.
-- Browse hundreds of branches in collapsed groups; expand a group into readable pages or press ⌘K to put verified live work first and open the exact branch on its map.
-- Use the workspace control panel to see only verified live branches and open PRs across every project. Project lanes connect each branch to its PR, keep `develop`/`main` status on live work, de-duplicate shared PRs across clones, and page dense workspaces without drawing a hundreds-node canvas.
-- Reopen your last project, selected branch, map position, and inventory filters after a restart. Demo and real workspaces keep separate view histories.
-- See local and remote copies, uncommitted work, integration history, and the evidence behind each result.
-- Watch local changes while the app is running; check live pull requests frequently and rotate expensive GitHub branch and history reads within strict request budgets. The title bar summarizes source health and opens current, refreshing, partial, delayed, and disabled details without leaving the current view.
-- Read public GitHub branches and pull requests without signing in. Private-repository sign-in is implemented using GitHub App device authorization but requires the release app registration.
-- Browse People & PRs across connected GitHub projects. Search authors, requested reviewers, PRs, and recorded tools; filter open work, review requests, quiet drafts, and recent history. Filters survive branch inspection and restarts. See [collaboration scope and evidence](docs/COLLABORATION.md).
-- Review one row per branch, grouped by the decision to make. Send one branch or a multi-selection to Codex, Claude, or Cursor for a read-only investigation and concrete proposal. Selections spanning projects become one task per repository. Snooze for seven days or dismiss; choices survive restarts and new evidence brings the finding back.
-- Stop monitoring projects from Settings without changing their files, branches, or worktrees. Their valid cached connection metadata and review choices are removed together.
-- Connect local Codex task history, including archived tasks. The same connection watches recent local task activity so the exact checkout used by Codex can glow automatically, even when a task runs tools outside its original workspace. Commands, prompts, responses, and tool input are discarded.
-- Connect Claude Code local session history for monitored folders. Opt in to live Claude Code or Cursor hooks so the exact checked-out branch glows from fresh runtime evidence; explicitly reported Grok models stay paired with Cursor. See [attribution, privacy, and source limits](docs/AGENT_ATTRIBUTION.md).
-- Send a saved task to the desktop app with **Open in Codex**, with feedback for outdated associations and missing handlers. [Destination verification limits](docs/TASK_LINKS.md) remain explicit.
-- See the existing Codex account’s shared usage allowance. OpenBranches does not run a separate recommendation model; it routes selected evidence to an installed coding agent through the [review handoff](docs/HANDOFFS.md).
-- Open the versioned production dependency notices or Electron/Chromium license collection from Privacy settings. Release builds verify that all legal resources are present inside the mounted installer.
-- Explore a fictional demo with 403 branch entries, independent of your real repositories.
+![OpenBranches workspace control panel](docs/images/workspace-overview.png)
 
-Repository inspection is read-only. OpenBranches does not fetch into your repositories, push, merge, delete branches, or remove worktrees. An absent commit in a target's ancestry is not presented as proof that a squash-equivalent change is missing.
+Coding agents can create dozens or hundreds of branches across repositories and worktrees. Git has the facts, but it does not give you a control panel. OpenBranches turns that evidence into one searchable workspace without changing your repositories.
 
-## Installation
+## What you can see
 
-The intended release experience is **download the DMG, drag OpenBranches into Applications, open it, follow discovered projects or choose a folder**. End users will not need Node.js or a terminal. Git 2.36 or newer is required for local inspection. The app detects it and provides a guided setup when needed; see [Mac setup](docs/INSTALLATION.md).
+- **What is happening now.** A workspace control panel puts active agent sessions and open pull requests across every project in one view.
+- **Where the work lives.** See the repository, branch, local checkout, worktree, remote copy, pull request, and last activity behind each item.
+- **What reached `develop` or `main`.** The map checks commit ancestry against each integration target independently and labels the result on the branch.
+- **Who or what is working.** OpenBranches can attribute fresh local activity to Codex, Claude Code, Cursor, or a model reported by the connected tool.
+- **What needs a decision.** A bounded review inbox groups forgotten, unpublished, and unintegrated work. Select one branch or many and send the evidence to Codex, Claude, or Cursor for investigation.
 
-Official binaries will be distributed directly through GitHub Releases. This does not require a Mac App Store listing, but it does require the release maintainer to sign with an Apple Developer ID and notarize the DMG so Gatekeeper recognizes it. Open-source licensing does not remove that macOS requirement; see the [one-time Apple release setup](docs/RELEASING.md#apple-account-decision).
+Large workspaces stay readable by collapsing inactive branches into groups, paging dense results, and promoting verified live work. Search remains available across every monitored project.
 
-Multi-agent attribution and team workspaces are part of the planned first release. Team mode combines GitHub activity with local work that each member explicitly chooses to share through the Mac app and an optional open-source shared service. Codex runtime, Claude Code history/runtime, and Cursor runtime attribution are implemented locally. The optional [team service preview](docs/TEAM_SERVICE.md) includes grouped branch reports, permission-aware search, a small company priority queue, people/project permissions, device pairing and revocation, plus owner-reviewed GitHub repository selection and bounded background refresh. Fresh local-only and possibly forgotten findings open the exact shared branch. Connected team dashboards appear beside Personal in the desktop workspace switcher. Try the isolated fictional team with `npm run team:preview` after installing team dependencies and starting Docker. The [Mac companion preview](docs/TEAM_COMPANION.md) adds pairing, selected metadata approval, background updates, upload status, Stop sharing, and disconnection; run `npm run team:preview:mac` in a second terminal for its isolated native fixture. Native publication, automatic commit updates, process restarts, and offline withdrawal were verified with fictional data. Real multi-device verification remains unfinished; see [team scope and privacy](docs/TEAM_WORKSPACES.md).
+## Follow one project without losing the workspace
 
-Current installers are **unsigned developer previews**, not normal public releases. The reproducible [Mac release workflow](docs/RELEASING.md) now builds, signs, notarizes, and verifies separate Apple silicon and Intel DMGs, then attaches them to a draft release for clean-machine review. Public downloads still require the release credentials and final installation checks. We do not recommend changing macOS security settings to install a preview.
+![OpenBranches project map](docs/images/project-map.png)
 
-## Develop locally
+The project map keeps current work visible above the graph and makes active branches easy to find. Lines represent verified Git relationships: a solid line means the commit is included in the target history, and a dashed line represents an open pull request destination. No line means OpenBranches has not verified a connection. It does not guess that a squash merge happened from a similar branch name.
 
-Use Node.js 24 LTS, npm, Git, and macOS. Then:
+## Connections
+
+| Source      | What OpenBranches uses                                | Connection                                                        |
+| ----------- | ----------------------------------------------------- | ----------------------------------------------------------------- |
+| Local Git   | Branches, worktrees, changes, commits, remotes        | Automatic after you choose or follow a repository                 |
+| GitHub      | Published branches, pull requests, reviews, checks    | Public data works without sign-in; private data uses a GitHub App |
+| Codex       | Recent task-to-checkout activity                      | Optional local connection in Settings                             |
+| Claude Code | Session-to-project activity                           | Optional local history and live hook                              |
+| Cursor      | Live checkout activity and explicitly reported models | Optional live hook                                                |
+
+Local changes update while the app is open. GitHub requests use per-repository freshness windows, conditional responses, and rotating budgets so a large workspace does not repeatedly download unchanged data. The title bar shows when a source is refreshing, delayed, partial, disabled, or rate limited.
+
+## Install
+
+### Public release
+
+The intended installation is the normal Mac flow:
+
+1. Download the Apple silicon (`arm64`) or Intel (`x64`) DMG from GitHub Releases.
+2. Open the DMG and drag OpenBranches into Applications.
+3. Launch the app and follow automatically discovered projects, or choose a repository folder.
+4. Optionally connect GitHub and local coding-agent history in Settings.
+
+End users will not need Node.js, npm, Xcode, or an Apple Developer account. Git 2.36 or newer is required for local inspection; OpenBranches detects common Apple and Homebrew installations and guides the user through Apple's Command Line Tools installer when Git is missing.
+
+The first official download will be signed with the project's Developer ID and notarized by Apple. Until that release exists, files ending in `-unsigned.dmg` are development previews. See the detailed [Mac installation guide](docs/INSTALLATION.md).
+
+### Run from source
+
+Contributors need macOS, Git, and Node.js 24:
 
 ```sh
+git clone https://github.com/Charlesmendez/OpenBranches.git
+cd OpenBranches
 npm ci
 npm run dev
 ```
 
-The browser-only preview uses fictional data:
+To open the fictional browser preview without scanning local repositories:
 
 ```sh
 npm run dev:web
 ```
 
-Verify changes:
+To create an unsigned installer for the current Mac:
+
+```sh
+npm run make
+npm run verify:macos -- --arch=arm64 # use x64 on an Intel Mac
+```
+
+Artifacts are written under `out/`. Packaging does not upload them.
+
+## How it works
+
+```mermaid
+flowchart LR
+    G[Local Git and worktrees] --> E[Evidence index]
+    H[GitHub branches and PRs] --> E
+    A[Codex, Claude Code, and Cursor activity] --> E
+    E --> W[Workspace now]
+    E --> M[Project maps]
+    E --> R[Needs attention]
+    R --> S[Send evidence to an agent]
+```
+
+The desktop app reads local Git state and combines it with bounded GitHub snapshots and optional agent-runtime evidence. Integration labels come from commit ancestry checks. Live indicators require fresh evidence that a task or hook is using the exact checkout; an old commit timestamp alone does not make a branch appear active.
+
+## Local first and read-only
+
+Repository inspection is read-only. OpenBranches does not fetch into your repositories, commit, push, merge, rebase, delete branches, or remove worktrees.
+
+- Repository paths and Git evidence stay on the Mac in a personal workspace.
+- Agent connections discard prompts, responses, commands, and tool input; they retain the minimum checkout and activity metadata needed for attribution.
+- Sending a review creates an explicit handoff to the selected local coding agent. OpenBranches does not run a hidden recommendation model.
+- Removing a project stops monitoring and clears its cached connection metadata without touching the repository.
+
+Read more about the [architecture](docs/ARCHITECTURE.md), [agent attribution](docs/AGENT_ATTRIBUTION.md), and [review handoffs](docs/HANDOFFS.md).
+
+## Team workspaces
+
+The optional team preview combines GitHub activity with local work that each teammate chooses to share. It includes people and project permissions, device pairing and revocation, permission-aware search, grouped branch reports, and a small company priority queue. Personal repository paths and unpublished work are not shared unless the user opts in.
+
+The service and Mac companion are implemented as an isolated fictional preview. Real multi-device validation and production deployment remain before a team release. See [team scope and privacy](docs/TEAM_WORKSPACES.md), the [service preview](docs/TEAM_SERVICE.md), and the [Mac companion](docs/TEAM_COMPANION.md).
+
+## Project status
+
+The local desktop application, Git evidence model, workspace control panel, project maps, review handoffs, source health, and unsigned Mac packaging are implemented and tested. The remaining public-release work is operational:
+
+- configure the public GitHub App used for private-repository sign-in;
+- add Apple Developer signing and notarization credentials;
+- verify signed Apple silicon and Intel installers on clean Macs;
+- publish the first GitHub Release and document the update path.
+
+The [roadmap](docs/ROADMAP.md) tracks the full release scope and known limits.
+
+## Contributing
+
+Issues and pull requests are welcome. The integration branch is `develop`: update it, create one focused branch, and open the pull request back to `develop`.
+
+Before submitting code, run:
 
 ```sh
 npm run typecheck
 npm test
 npm run format:check
-npm audit
-```
-
-`THIRD_PARTY_NOTICES.md` is generated from the locked production graph. When runtime dependencies change, run `npm run notices:generate`; tests fail if the checked-in notice is stale.
-
-Build a production renderer and desktop bundle:
-
-```sh
 npm run build
 ```
 
-Create an **unsigned, local-only** app and installer for the current Mac:
+Changes that affect Git classification, credentials, privacy, or agent attribution should include meaningful tests and explicit evidence. See the [contributor workflow](docs/WORKFLOW.md) and [architecture guide](docs/ARCHITECTURE.md).
 
-```sh
-npm run make
-```
+## Releasing
 
-Artifacts are written under `out/`. Preview DMGs include the version, architecture, and `-unsigned` in the file name. `npm run make:arm64` and `npm run make:x64` build a specific architecture. These commands disable signing and notarization and never upload a release. The distinct `make:release` command enables Apple signing/notarization; it requires release credentials and explicit release authorization. See [the complete release process](docs/RELEASING.md).
+The release workflow builds separate native Apple silicon and Intel DMGs, signs the app with Developer ID, submits it for Apple notarization, verifies the mounted bundle and stapled tickets, and generates SHA-256 checksums. It leaves the GitHub release in draft form for clean-machine review.
 
-Set `GITHUB_APP_CLIENT_ID` when building to enable GitHub App device sign-in. The client ID is public; no GitHub client secret is bundled. See [connection setup](docs/CONNECTIONS.md).
+A direct GitHub DMG does not require a Mac App Store listing or App Store review. The project maintainer needs the Apple Developer membership and release credentials; contributors and users do not. See the [release guide](docs/RELEASING.md).
 
-PR cards now include expandable check results and submitted reviews, with a filter for recently reported failures. These are observed results rather than merge-readiness decisions; [coverage, refresh limits, and verification](docs/PR_SIGNALS.md) are documented.
+## License
 
-## Contributing
+[MIT](LICENSE) © Carlos Mendez.
 
-The integration branch is `develop`. Start one focused branch from the updated integration branch and open a pull request back to it. Keep Git inspection read-only, separate local and remote evidence, and test changes that could misclassify work or expose credentials.
-
-The application is organized by domain, UI, Git inspection, and external providers. See [architecture](docs/ARCHITECTURE.md). The ZIP extraction workspace under `vendor/` is a small CommonJS adapter to Electron's maintained extractor; it replaces an outdated packaging dependency rather than copying an archive parser.
-
-MIT licensed. OpenBranches is an independent project and is not an official OpenAI or GitHub product.
+OpenBranches is an independent project and is not affiliated with Apple, Anthropic, Cursor, GitHub, OpenAI, or xAI.
