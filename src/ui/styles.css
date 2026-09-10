@@ -826,6 +826,63 @@ code {
   padding: 2px 5px;
   background: var(--hover);
 }
+.project-directory {
+  margin: 22px 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  overflow: hidden;
+}
+.project-directory-toggle {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 13px 15px;
+  color: var(--text-soft);
+  text-align: left;
+}
+.project-directory-toggle:hover,
+.project-directory-toggle:focus-visible {
+  background: var(--raised);
+}
+.project-directory-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  color: #a9beff;
+  background: #708ef50d;
+}
+.project-directory-toggle > span:nth-child(2) {
+  display: grid;
+  gap: 3px;
+}
+.project-directory-toggle strong {
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 620;
+}
+.project-directory-toggle small,
+.project-directory-toggle > span:nth-child(3) {
+  color: var(--muted);
+  font-size: 8px;
+}
+.project-directory-toggle > svg {
+  color: var(--muted);
+  transition: transform 0.16s ease;
+}
+.project-directory.open .project-directory-toggle > svg {
+  transform: rotate(180deg);
+}
+.project-directory .project-cards {
+  padding: 16px;
+  border-top: 1px solid var(--line);
+  background: var(--bg);
+}
 .project-cards {
   display: grid;
   grid-template-columns: 1fr 1fr;

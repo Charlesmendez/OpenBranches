@@ -271,7 +271,7 @@ export function App() {
               ? view === 'inventory'
                 ? 'Find your thread.'
                 : 'Follow the work.'
-              : 'A pulse on every project.';
+              : 'Workspace control panel.';
   const subtitle =
     view === 'people'
       ? 'Pull requests and review requests across your connected projects.'
@@ -283,7 +283,7 @@ export function App() {
             ? 'A running history of what changed across your projects.'
             : repository
               ? `${repository.name}  /  ${repository.branches.length} branch copies`
-              : 'One place to see what’s happening, and what happens next.';
+              : 'Verified live branches and open pull requests across every project.';
   return (
     <div className={`app ${selected && isProjectView ? 'has-inspector' : ''}`}>
       <button type="button" className="skip-link" onClick={focusWorkspace}>
@@ -600,11 +600,13 @@ export function App() {
             <Overview
               repositories={snapshot.repositories}
               events={snapshot.events}
+              demo={mode === 'demo'}
               onProject={(id) => {
                 selectProject(id);
                 setView('map');
               }}
               onActivity={() => setView('activity')}
+              onPulls={() => setView('people')}
               onSelect={navigateBranch}
               onFocus={focusRepositoryBranch}
               onAdd={() => void addRepository()}

@@ -191,8 +191,10 @@ function Fixture() {
         <Overview
           repositories={snapshot.repositories}
           events={snapshot.events}
+          demo
           onProject={() => {}}
           onActivity={() => {}}
+          onPulls={() => {}}
           onSelect={() => {}}
           onFocus={() => setView('map')}
           onAdd={() => {}}

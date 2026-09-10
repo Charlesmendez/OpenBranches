@@ -179,67 +179,6 @@
   gap: 5px;
   white-space: nowrap;
 }
-.workspace-work-spotlight {
-  position: relative;
-  margin-bottom: 22px;
-  padding: 14px;
-  border: 1px solid #6177ad;
-  border-radius: 11px;
-  background: radial-gradient(circle at 8% 0%, #668cff1b, transparent 38%), var(--surface);
-  box-shadow:
-    inset 3px 0 #8aabff,
-    0 0 28px #668cff17;
-}
-.workspace-work-spotlight.waiting {
-  border-color: #6f6596;
-  box-shadow: inset 3px 0 #a39be9;
-}
-.workspace-work-heading {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  min-width: 0;
-  margin-bottom: 11px;
-}
-.workspace-work-spotlight.live .project-work-kicker svg {
-  animation: live-work-glow 1.8s ease-in-out infinite;
-}
-.workspace-work-spotlight.waiting .project-work-kicker {
-  color: #c3b9f1;
-}
-.workspace-work-title {
-  display: flex;
-  align-items: baseline;
-  gap: 9px;
-  min-width: 0;
-}
-.workspace-work-title strong {
-  color: var(--text);
-  font-size: 12px;
-  font-weight: 600;
-}
-.workspace-work-title small {
-  color: var(--muted);
-  font-size: 9px;
-}
-.workspace-work-toggle {
-  margin-left: auto;
-  white-space: nowrap;
-}
-.workspace-work-items {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  min-width: 0;
-}
-.workspace-work-items .project-work-item.live {
-  box-shadow:
-    0 0 0 1px #8aabff24,
-    0 0 18px #668cff16;
-}
-.workspace-work-items .project-work-item.live .project-work-icon {
-  animation: live-work-glow 1.8s ease-in-out infinite;
-}
 .compact-pager {
   display: flex;
   align-items: center;
@@ -270,10 +209,6 @@
 .compact-pager button[aria-disabled='true'] {
   cursor: default;
   opacity: 0.35;
-}
-.workspace-work-pagination {
-  justify-content: flex-end;
-  margin-top: 10px;
 }
 .project-work-spotlight {
   display: grid;
@@ -1231,9 +1166,6 @@
   color: var(--text);
 }
 @media (max-width: 1050px) {
-  .workspace-work-items {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
   .project-work-spotlight {
     grid-template-columns: 170px minmax(0, 1fr);
   }
@@ -1261,20 +1193,6 @@
   }
 }
 @media (max-width: 780px) {
-  .workspace-work-heading {
-    align-items: flex-start;
-    flex-wrap: wrap;
-  }
-  .workspace-work-title {
-    flex-direction: column;
-    gap: 3px;
-  }
-  .workspace-work-toggle {
-    margin-left: 0;
-  }
-  .workspace-work-items {
-    grid-template-columns: 1fr;
-  }
   .project-work-spotlight {
     grid-template-columns: 1fr;
   }
