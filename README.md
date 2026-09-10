@@ -23,6 +23,7 @@ OpenBranches brings local Git and GitHub into one workspace: a grouped branch ma
 - Connect Claude Code local session history for monitored folders. Opt in to live Claude Code or Cursor hooks so the exact checked-out branch glows from fresh runtime evidence; explicitly reported Grok models stay paired with Cursor. See [attribution, privacy, and source limits](docs/AGENT_ATTRIBUTION.md).
 - Send a saved task to the desktop app with **Open in Codex**, with feedback for outdated associations and missing handlers. [Destination verification limits](docs/TASK_LINKS.md) remain explicit.
 - See the existing Codex account’s shared usage allowance. OpenBranches does not run a separate recommendation model; it routes selected evidence to an installed coding agent through the [review handoff](docs/HANDOFFS.md).
+- Open the versioned production dependency notices or Electron/Chromium license collection from Privacy settings. Release builds verify that all legal resources are present inside the mounted installer.
 - Explore a fictional demo with 403 branch entries, independent of your real repositories.
 
 Repository inspection is read-only. OpenBranches does not fetch into your repositories, push, merge, delete branches, or remove worktrees. An absent commit in a target's ancestry is not presented as proof that a squash-equivalent change is missing.
@@ -58,6 +59,8 @@ npm test
 npm run format:check
 npm audit
 ```
+
+`THIRD_PARTY_NOTICES.md` is generated from the locked production graph. When runtime dependencies change, run `npm run notices:generate`; tests fail if the checked-in notice is stale.
 
 Build a production renderer and desktop bundle:
 

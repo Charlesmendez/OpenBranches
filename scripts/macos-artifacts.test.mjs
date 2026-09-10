@@ -8,6 +8,7 @@ import {
   macArguments,
   macArtifactPaths,
   sha256File,
+  validateLegalResources,
 } from './macos-artifacts.mjs';
 
 describe('Mac release artifacts', () => {
@@ -67,6 +68,31 @@ describe('Mac release artifacts', () => {
       assert.equal(
         await sha256File(installer),
         'f99fe37236921978b1cf7f8cabbbffaa6719bb7b087d3a8cf7b8561af1be6328',
+      );
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('requires complete legal resources in the packaged application', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'openbranches-artifacts-test-'));
+    const resources = join(root, 'OpenBranches.app', 'Contents', 'Resources');
+    try {
+      await mkdir(resources, { recursive: true });
+      await writeFile(
+        join(resources, 'OPENBRANCHES_LICENSE.txt'),
+        'Copyright (c) 2026 Carlos Mendez',
+      );
+      await writeFile(
+        join(resources, 'THIRD_PARTY_NOTICES.txt'),
+        '# OpenBranches third-party notices\n',
+      );
+      await writeFile(join(resources, 'LICENSES.chromium.html'), Buffer.alloc(1_000_000));
+      await validateLegalResources(join(root, 'OpenBranches.app'));
+      await writeFile(join(resources, 'LICENSES.chromium.html'), 'incomplete');
+      await assert.rejects(
+        validateLegalResources(join(root, 'OpenBranches.app')),
+        /missing or incomplete/,
       );
     } finally {
       await rm(root, { recursive: true, force: true });

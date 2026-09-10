@@ -9,6 +9,7 @@ import {
   macArtifactPaths,
   releaseMetadata,
   sha256File,
+  validateLegalResources,
 } from './macos-artifacts.mjs';
 
 if (process.platform !== 'darwin') throw new Error('DMG creation requires macOS.');
@@ -20,6 +21,7 @@ if (release !== options.release)
 const metadata = await releaseMetadata(root);
 const artifact = macArtifactPaths({ root, ...metadata, ...options });
 await Promise.all([access(artifact.application), access(artifact.executable)]);
+await validateLegalResources(artifact.application);
 await mkdir(dirname(artifact.diskImage), { recursive: true });
 
 execFileSync('/usr/bin/lipo', [artifact.executable, '-verify_arch', options.architecture], {
@@ -39,6 +41,7 @@ try {
   const invalidSymlinks = await absoluteBundleSymlinks(stagedApplication);
   if (invalidSymlinks.length)
     throw new Error('The staged application contains an absolute bundle symlink.');
+  await validateLegalResources(stagedApplication);
   if (release)
     execFileSync(
       '/usr/bin/codesign',

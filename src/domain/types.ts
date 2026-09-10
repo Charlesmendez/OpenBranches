@@ -350,6 +350,7 @@ export interface DesktopApi {
   refresh(): Promise<void>;
   revealWorktree(repositoryId: string, branchId?: string, worktreePath?: string): Promise<void>;
   openExternal(url: string): Promise<void>;
+  openLegalDocument(kind: 'notices' | 'chromium'): Promise<void>;
   getProviderStatus(): Promise<ProviderStatus>;
   connectGitHub(): Promise<GitHubStatus>;
   pollGitHub(): Promise<GitHubStatus>;

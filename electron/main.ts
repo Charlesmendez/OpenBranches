@@ -11,9 +11,9 @@ import {
   shell,
   Tray,
 } from 'electron';
-import { join, resolve, sep } from 'node:path';
+import { dirname, join, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { access } from 'node:fs/promises';
+import { access, copyFile, mkdir } from 'node:fs/promises';
 import { z } from 'zod';
 import { AppStore } from './services/store';
 import { RepositoryService } from './services/repositories';
@@ -35,6 +35,7 @@ import { createSecretVault } from './services/secretVault';
 import { TeamConnections } from './team/connections';
 import { registerTeamHandlers } from './team/ipc';
 import { TeamPublisher } from './team/publisher';
+import { legalDocumentCopyPath, legalDocumentKinds, legalDocumentPath } from './legal/documents';
 declare const __GITHUB_APP_CLIENT_ID__: string;
 
 protocol.registerSchemesAsPrivileged([
@@ -304,6 +305,19 @@ app.whenReady().then(() => {
     )
       throw new Error('Unsupported external link');
     return shell.openExternal(url.toString());
+  });
+  handle('legal:open', async (input: unknown) => {
+    const kind = z.enum(legalDocumentKinds).parse(input);
+    const source = legalDocumentPath(kind, {
+      packaged: app.isPackaged,
+      resourcesPath: process.resourcesPath,
+      appPath: app.getAppPath(),
+    });
+    const copy = legalDocumentCopyPath(kind, app.getPath('temp'));
+    await mkdir(dirname(copy), { recursive: true });
+    await copyFile(source, copy);
+    const error = await shell.openPath(copy);
+    if (error) throw new Error('The license document could not be opened.');
   });
   handle('providers:status', async () => {
     await Promise.all([codex!.detect(), liveAgents!.start()]);

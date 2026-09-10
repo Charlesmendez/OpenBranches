@@ -21,7 +21,7 @@ The workflow imports the certificate into a temporary keychain and deletes both 
 1. Update `package.json` to the release version and merge the tested release commit.
 2. Create a tag with the exact form `v<package version>`, such as `v0.1.0`, and push it.
 3. The **Mac release** workflow checks that the tag and package version match, creates a draft GitHub release, and builds both architectures.
-4. Each runner runs the desktop tests, signs the application, notarizes the application and DMG, verifies the executable architecture, validates both notarization tickets, verifies the disk image and its mounted bundle structure, and checks its generated SHA-256 file.
+4. Each runner runs the desktop tests, checks the generated dependency notices, signs the application, notarizes the application and DMG, verifies the executable architecture, validates both notarization tickets, verifies the disk image and its mounted bundle structure, confirms the app and third-party legal files, and checks its generated SHA-256 file.
 5. Download both workflow artifacts. Install each on a clean matching Mac, verify first-run Git setup and project discovery, and confirm GitHub device authorization with the registered app.
 6. Review the generated release notes and the two artifacts in the draft release. Publish the draft only after the clean-machine checks pass.
 
@@ -46,3 +46,9 @@ npm run verify:macos -- --arch=arm64
 ```
 
 `npm run make:release -- --arch=arm64` uses the same pipeline with signing and notarization enabled. It requires the Apple environment variables, an installed Developer ID identity, and `GITHUB_APP_CLIENT_ID`. Use it only from a controlled release environment. Packaging never uploads an artifact by itself.
+
+## License resources
+
+`npm run notices:generate` walks the production dependency graph in `package-lock.json` and records the exact installed license texts in `THIRD_PARTY_NOTICES.md`. `npm test` checks that this generated file is current. The one package that omits its license file from the npm archive has a version-specific copy from its matching source tag under `legal/overrides/`.
+
+Every production build copies the OpenBranches license, the generated third-party notices, and Electron’s complete Chromium/Node notice collection into the app resources. Privacy settings opens a disposable copy so viewing a notice cannot alter the signed application. Both the DMG builder and the independent mounted-image verifier reject an app with missing or truncated legal resources.

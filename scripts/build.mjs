@@ -1,6 +1,7 @@
 import { build as bundle } from 'esbuild';
 import { build } from 'vite';
 import { buildIcons } from './icons.mjs';
+import { prepareLegalResources } from './notices.mjs';
 export async function buildElectron() {
   await bundle({
     entryPoints: {
@@ -19,6 +20,7 @@ export async function buildElectron() {
   });
 }
 if (process.argv[1]?.endsWith('build.mjs')) {
+  await prepareLegalResources();
   await buildIcons();
   await buildElectron();
   await build();

@@ -9,6 +9,7 @@ import {
   macArtifactPaths,
   releaseMetadata,
   sha256File,
+  validateLegalResources,
 } from './macos-artifacts.mjs';
 
 if (process.platform !== 'darwin') throw new Error('Mac artifact verification requires macOS.');
@@ -51,6 +52,7 @@ try {
   attached = true;
   const mountedApplication = join(mount, `${metadata.productName}.app`);
   await access(mountedApplication);
+  await validateLegalResources(mountedApplication);
   const applicationsLink = join(mount, 'Applications');
   if (!(await lstat(applicationsLink)).isSymbolicLink())
     throw new Error('The DMG is missing its Applications shortcut.');

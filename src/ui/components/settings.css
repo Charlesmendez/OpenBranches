@@ -260,6 +260,26 @@
   line-height: 1.7;
 }
 
+.settings-license-card {
+  grid-column: 1 / -1;
+}
+
+.settings-legal-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-top: 15px;
+}
+
+.settings-legal-actions button {
+  min-height: 34px;
+}
+
+.settings-license-card .connection-error {
+  margin-bottom: 0;
+}
+
 @media (max-width: 1050px) {
   .settings-content {
     display: block;

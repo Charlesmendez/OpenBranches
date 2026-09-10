@@ -7,6 +7,7 @@ import {
   Check,
   Cloud,
   Copy,
+  FileText,
   Laptop,
   LoaderCircle,
   ShieldCheck,
@@ -51,6 +52,8 @@ export function Settings({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
+  const [legalBusy, setLegalBusy] = useState<'notices' | 'chromium'>();
+  const [legalError, setLegalError] = useState('');
   const [section, setSection] = useState<SettingsSection>(() => sectionForFocus(focusSection));
   useEffect(() => setGitHub(providers.github), [providers.github]);
   useEffect(() => {
@@ -80,6 +83,18 @@ export function Settings({
         setCopied(true);
       }
     });
+  const openLegalDocument = async (kind: 'notices' | 'chromium') => {
+    if (!window.openbranches) return;
+    setLegalBusy(kind);
+    setLegalError('');
+    try {
+      await window.openbranches.openLegalDocument(kind);
+    } catch {
+      setLegalError('The license document could not be opened. Try again from the installed app.');
+    } finally {
+      setLegalBusy(undefined);
+    }
+  };
   return (
     <div className="settings-content">
       <SettingsNavigation
@@ -308,6 +323,37 @@ export function Settings({
                   Live activity appears only from a recent, verified runtime signal tied to the
                   exact checkout. Saved task history never proves that someone is working now.
                 </p>
+              </article>
+              <article className="settings-privacy-card settings-license-card">
+                <FileText size={21} />
+                <h3>Open-source licenses</h3>
+                <p>
+                  Versioned notices ship with every Mac build, including the complete Electron and
+                  Chromium license set.
+                </p>
+                <div className="settings-legal-actions">
+                  <button
+                    className="secondary-button"
+                    disabled={!window.openbranches || !!legalBusy}
+                    onClick={() => void openLegalDocument('notices')}
+                  >
+                    {legalBusy === 'notices' && <LoaderCircle size={13} className="spin" />}
+                    Third-party notices
+                  </button>
+                  <button
+                    className="text-button"
+                    disabled={!window.openbranches || !!legalBusy}
+                    onClick={() => void openLegalDocument('chromium')}
+                  >
+                    {legalBusy === 'chromium' && <LoaderCircle size={13} className="spin" />}
+                    Chromium notices
+                  </button>
+                </div>
+                {legalError && (
+                  <p className="connection-error" role="alert">
+                    {legalError}
+                  </p>
+                )}
               </article>
             </div>
             <p className="settings-development">OpenBranches is in active development.</p>

@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
-import { readdir, readFile, readlink } from 'node:fs/promises';
+import { readdir, readFile, readlink, stat } from 'node:fs/promises';
 import { isAbsolute, join } from 'node:path';
 
 const architectures = new Set(['arm64', 'x64']);
@@ -89,4 +89,19 @@ export function sha256File(path) {
       .on('data', (chunk) => hash.update(chunk))
       .on('end', () => resolve(hash.digest('hex')));
   });
+}
+
+export async function validateLegalResources(application) {
+  const resources = join(application, 'Contents', 'Resources');
+  const [license, notices, chromium] = await Promise.all([
+    readFile(join(resources, 'OPENBRANCHES_LICENSE.txt'), 'utf8'),
+    readFile(join(resources, 'THIRD_PARTY_NOTICES.txt'), 'utf8'),
+    stat(join(resources, 'LICENSES.chromium.html')),
+  ]);
+  if (!license.includes('Copyright (c) 2026 Carlos Mendez'))
+    throw new Error('The application license is missing or unexpected.');
+  if (!notices.startsWith('# OpenBranches third-party notices\n'))
+    throw new Error('The third-party notices are missing or unexpected.');
+  if (chromium.size < 1_000_000)
+    throw new Error('The Chromium license collection is missing or incomplete.');
 }

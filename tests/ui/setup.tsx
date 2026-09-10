@@ -248,6 +248,7 @@ window.openbranches = {
   refresh: async () => {},
   revealWorktree: async () => {},
   openExternal: async () => {},
+  openLegalDocument: async () => {},
   getProviderStatus: async () => ({
     agents,
     liveAgents,

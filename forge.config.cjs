@@ -1,5 +1,6 @@
 const { FusesPlugin } = require('@electron-forge/plugin-fuses');
 const { FuseV1Options, FuseVersion } = require('@electron/fuses');
+const { join } = require('node:path');
 const signRelease = process.env.OPENBRANCHES_SIGN_RELEASE === '1';
 if (
   signRelease &&
@@ -15,6 +16,11 @@ module.exports = {
   packagerConfig: {
     asar: true,
     appBundleId: 'com.openbranches.desktop',
+    extraResource: [
+      join(__dirname, 'dist-legal', 'OPENBRANCHES_LICENSE.txt'),
+      join(__dirname, 'dist-legal', 'THIRD_PARTY_NOTICES.txt'),
+      join(__dirname, 'dist-legal', 'LICENSES.chromium.html'),
+    ],
     ignore: (path) =>
       path !== '' &&
       !/^\/(dist|dist-electron|assets|package\.json|README\.md|LICENSE)(\/|$)/.test(path),
