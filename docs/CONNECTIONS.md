@@ -51,7 +51,13 @@ Connect **Claude Code sessions** in Settings to read local saved metadata associ
 
 Only explicit custom titles, selected folder/branch metadata, timestamps, session IDs, and reported model IDs are retained. Transcript bytes are read in bounded chunks; prompts and tool output are discarded. Current activity, ownership, and model provider are not inferred. Claude folder/branch matches are possible associations because this source does not provide a saved commit. Settings labels partial history and the last checked time.
 
-The current reader supports the observed local main-session JSONL layout and an absolute inherited `CLAUDE_CONFIG_DIR`. It does not claim all Claude Desktop, Cowork, remote, subagent, or historical file formats. See [source documentation, bounds, tests, and limitations](AGENT_ATTRIBUTION.md). Cursor/Grok examples demonstrate the common UI; their live adapters remain unfinished.
+The current reader supports the observed local main-session JSONL layout and an absolute inherited `CLAUDE_CONFIG_DIR`. It does not claim all Claude Desktop, Cowork, remote, subagent, or historical file formats. See [source documentation, bounds, tests, and limitations](AGENT_ATTRIBUTION.md).
+
+## Live Claude Code and Cursor
+
+Settings offers separate **Enable Claude Code** and **Enable Cursor** live controls. Each adds a private user-level lifecycle hook. A fresh signal lights only the exact currently checked-out branch whose worktree folder and head match the latest local Git scan. Stop and response-complete signals remove the working state immediately; any missing follow-up expires after 90 seconds. Claude can report an explicit waiting-for-input state. Cursor's reported model ID is shown separately, including a Grok icon when Cursor explicitly reports a Grok model.
+
+The loopback receiver is authenticated, bounded, memory-only, and active only while OpenBranches is running. Prompt text, commands, responses, file names, tool input/output, transcript paths, and account identity are discarded. Disconnect removes only the OpenBranches hook entries and reporter script. See [live hook configuration, exact matching, and privacy](AGENT_ATTRIBUTION.md).
 
 ## Apple release signing
 

@@ -26,6 +26,7 @@ import { ProjectDiscoveryService } from './discovery/service';
 import { LocalHistoryService } from './agents/history';
 import { HandoffService } from './agents/handoffService';
 import { createClaudeHistorySource } from './claude/reader';
+import { LiveAgentService } from './agents/liveService';
 import { GitInstallation, GIT_SETUP_GUIDE } from './git/installation';
 import { ReviewService } from './services/reviews';
 import { stopMonitoring } from './services/monitoring';
@@ -54,6 +55,7 @@ let discovery: ProjectDiscoveryService | undefined;
 let teams: TeamConnections | undefined;
 let teamPublisher: TeamPublisher | undefined;
 let handoffs: HandoffService | undefined;
+let liveAgents: LiveAgentService | undefined;
 const localHistories = new Map<string, LocalHistoryService>();
 const refreshHistories = () =>
   Promise.all([...localHistories.values()].map((history) => history.refresh()));
@@ -142,7 +144,8 @@ app.whenReady().then(() => {
       (snapshot, history) => history.enrich(snapshot),
       codex?.enrich(source) ?? source,
     );
-    return handoffs?.enrich(linked) ?? linked;
+    const live = liveAgents?.enrich(linked) ?? linked;
+    return handoffs?.enrich(live) ?? live;
   };
   const publish = () => {
     window?.webContents.send('snapshot:updated', snapshot());
@@ -151,6 +154,7 @@ app.whenReady().then(() => {
       'agents:updated',
       [...localHistories.values()].map((history) => history.status()),
     );
+    if (liveAgents) window?.webContents.send('agents:live-updated', liveAgents.statuses());
   };
   const git = new GitInstallation((status) => window?.webContents.send('git:updated', status));
   service = new RepositoryService(store, publish, git);
@@ -171,6 +175,7 @@ app.whenReady().then(() => {
       createClaudeHistorySource(),
     ),
   );
+  liveAgents = new LiveAgentService(store, publish);
   handoffs = new HandoffService(store, snapshot, (state) => {
     window?.webContents.send('handoffs:updated', state);
     publish();
@@ -214,6 +219,12 @@ app.whenReady().then(() => {
     localHistories
       .get(z.literal('claude-code').parse(tool))!
       .setEnabled(z.boolean().parse(enabled)),
+  );
+  handle('agents:live-enable', (tool: unknown, enabled: unknown) =>
+    liveAgents!.setEnabled(
+      z.enum(['claude-code', 'cursor']).parse(tool),
+      z.boolean().parse(enabled),
+    ),
   );
   handle('discovery:get', () => discovery!.state());
   handle('discovery:follow', (enabled: unknown) =>
@@ -294,11 +305,12 @@ app.whenReady().then(() => {
     return shell.openExternal(url.toString());
   });
   handle('providers:status', async () => {
-    await codex!.detect();
+    await Promise.all([codex!.detect(), liveAgents!.start()]);
     return {
       codex: codex!.status(),
       github: githubStatus(),
       agents: [...localHistories.values()].map((history) => history.status()),
+      liveAgents: liveAgents!.statuses(),
     };
   });
   handle('codex:connect', () => codex!.connect());
@@ -329,6 +341,7 @@ app.whenReady().then(() => {
   teams.start();
   teamPublisher.start();
   void handoffs.start();
+  void liveAgents.start();
   void discovery.refresh();
   void refreshHistories();
   // A monochrome template icon adapts to the system menu bar appearance.
@@ -388,6 +401,7 @@ app.on('before-quit', () => {
   teams?.close();
   teamPublisher?.close();
   handoffs?.close();
+  void liveAgents?.close();
   for (const history of localHistories.values()) history.close();
   service?.close();
   store?.close();

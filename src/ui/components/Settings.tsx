@@ -1,4 +1,5 @@
 import { AgentHistoryConnection } from './AgentHistoryConnection';
+import { AgentLiveConnections } from './AgentLiveConnections';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { ArrowUpRight, Check, Cloud, Copy, Laptop, LoaderCircle, ShieldCheck } from 'lucide-react';
 import type { GitHubStatus, Repository } from '../../domain/types';
@@ -198,6 +199,7 @@ export function Settings({
           </p>
         )}
         <CodexConnection status={providers.codex} />
+        <AgentLiveConnections statuses={providers.liveAgents} />
         {(
           providers.agents ?? [
             { tool: 'claude-code' as const, enabled: false, state: 'not-connected' as const },
@@ -235,7 +237,8 @@ export function Settings({
         </div>
       </section>
       <p className="settings-development">
-        OpenBranches is in active development. AI analysis is the next connection being built.
+        OpenBranches is in active development. Live activity appears only from a fresh, verified
+        local runtime signal.
       </p>
     </div>
   );

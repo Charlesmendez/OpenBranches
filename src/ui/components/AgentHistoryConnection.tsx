@@ -63,7 +63,8 @@ export function AgentHistoryConnection({ status }: { status: AgentHistoryStatus 
         <p className="muted-note">
           Reads local session files for your monitored folders. Only titles, branch and folder
           metadata, timestamps, and reported model IDs are saved. Prompts and tool output are
-          discarded. No AI runs, and no data is uploaded.
+          discarded. No AI runs. Team sharing separately follows the projects and metadata choices
+          you approve.
         </p>
         <p className="muted-note">
           Saved folder and branch matches are possible associations. Current activity and branch

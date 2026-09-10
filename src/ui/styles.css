@@ -3282,3 +3282,120 @@ code {
   color: var(--text-soft);
   font-size: 12px;
 }
+.agent-live-connections {
+  border-top: 1px solid var(--line);
+  padding-bottom: 22px;
+}
+.agent-live-heading {
+  border-top: 0;
+  padding-bottom: 16px;
+}
+.live-listener-icon {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line-strong));
+  box-shadow: 0 0 22px color-mix(in srgb, var(--accent) 15%, transparent);
+}
+.agent-live-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding-left: 54px;
+}
+.agent-live-card {
+  position: relative;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--background);
+}
+.agent-live-card.connected {
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--line));
+  background: color-mix(in srgb, var(--accent) 4%, var(--background));
+}
+.agent-live-card-title {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-bottom: 11px;
+}
+.agent-live-tool-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--raised);
+}
+.agent-live-tool-icon .tool-icon {
+  width: 20px;
+  height: 20px;
+}
+.agent-live-card h4 {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 620;
+}
+.agent-live-card > p,
+.agent-live-privacy {
+  color: var(--muted);
+  font-size: 10.5px;
+  line-height: 1.65;
+}
+.agent-live-card > p {
+  min-height: 35px;
+  margin-bottom: 13px;
+}
+.agent-live-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 9.5px;
+  margin-top: 4px;
+}
+.agent-live-state i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+.agent-live-state.listening {
+  color: var(--accent);
+}
+.agent-live-state.listening i {
+  background: var(--accent);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 70%, transparent);
+}
+.agent-live-state.error,
+.agent-live-error {
+  color: var(--amber);
+}
+.agent-live-state.error i {
+  background: var(--amber);
+}
+.agent-hook-installed {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 10px;
+  color: var(--muted);
+  font-size: 9.5px;
+}
+.agent-live-card .agent-live-error {
+  min-height: 0;
+  margin: 10px 0 0;
+}
+.agent-live-privacy {
+  margin: 13px 0 0 54px;
+  max-width: 720px;
+}
+.agent-live-global-error {
+  margin: 13px 0 0 54px;
+}
+@media (max-width: 1180px) {
+  .agent-live-grid {
+    grid-template-columns: 1fr;
+  }
+}

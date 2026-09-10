@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
-import { ToolIcon } from '../../src/ui/components/AgentBadges';
+import { isGrokModel } from '../../src/domain/agents';
+import { GrokIcon, ToolIcon } from '../../src/ui/components/AgentBadges';
 import { sharedBranchRows, type SharedBranchRow } from '../../src/team/activity';
 import type { TeamPage } from '../../src/team/responses';
 
@@ -54,6 +55,7 @@ export function LiveActivitySummary({
               {[...new Set(row.activity.tasks.map((task) => task.tool))].map((tool) => (
                 <ToolIcon key={tool} tool={tool} />
               ))}
+              {row.activity.tasks.some((task) => isGrokModel(task.model)) && <GrokIcon />}
             </span>
             <span>
               <strong>{row.branch.name}</strong>

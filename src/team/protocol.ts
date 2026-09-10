@@ -22,7 +22,7 @@ const task = z
       .optional(),
     association: z.enum(['verified', 'possible']),
     status: z.enum(['active', 'idle', 'unknown']).optional(),
-    activitySource: z.literal('codex-runtime').optional(),
+    activitySource: z.enum(['codex-runtime', 'claude-hook', 'cursor-hook']).optional(),
     waiting: z.boolean().optional(),
     title: z.string().max(512).optional(),
     summary: z.string().max(1024).optional(),
@@ -31,7 +31,9 @@ const task = z
   .superRefine((value, context) => {
     if (
       value.activitySource &&
-      (value.tool !== 'codex' ||
+      ((value.activitySource === 'codex-runtime' && value.tool !== 'codex') ||
+        (value.activitySource === 'claude-hook' && value.tool !== 'claude-code') ||
+        (value.activitySource === 'cursor-hook' && value.tool !== 'cursor') ||
         value.association !== 'verified' ||
         value.status === undefined ||
         value.checkedAt === undefined)
@@ -39,7 +41,7 @@ const task = z
       context.addIssue({
         code: 'custom',
         path: ['activitySource'],
-        message: 'Runtime activity must be a checked, verified Codex association.',
+        message: 'Runtime activity must match its tool and be a checked, verified association.',
       });
     if (value.waiting !== undefined && !value.activitySource)
       context.addIssue({

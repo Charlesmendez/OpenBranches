@@ -9,6 +9,7 @@ import type {
   ReviewState,
   ProjectDiscoveryState,
   AgentHistoryStatus,
+  AgentLiveStatus,
   HandoffState,
 } from '../src/domain/types';
 
@@ -20,6 +21,13 @@ const api: DesktopApi = {
       callback(statuses);
     ipcRenderer.on('agents:updated', listener);
     return () => ipcRenderer.removeListener('agents:updated', listener);
+  },
+  setAgentLiveEnabled: (tool, enabled) => ipcRenderer.invoke('agents:live-enable', tool, enabled),
+  onAgentLive: (callback) => {
+    const listener = (_event: Electron.IpcRendererEvent, statuses: AgentLiveStatus[]) =>
+      callback(statuses);
+    ipcRenderer.on('agents:live-updated', listener);
+    return () => ipcRenderer.removeListener('agents:live-updated', listener);
   },
   getDiscoveredProjects: () => ipcRenderer.invoke('discovery:get'),
   followDiscoveredProjects: (enabled) => ipcRenderer.invoke('discovery:follow', enabled),

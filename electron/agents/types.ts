@@ -1,4 +1,4 @@
-import type { CodingTool, ModelIdentity } from '../../src/domain/types';
+import type { CodingTool, ModelIdentity, RuntimeActivitySource } from '../../src/domain/types';
 
 export interface SavedAgentTask {
   id: string;
@@ -9,6 +9,10 @@ export interface SavedAgentTask {
   checkedAt?: string;
   archived?: boolean;
   model?: ModelIdentity;
-  runtime?: { state: 'active' | 'idle' | 'waiting'; checkedAt: string };
+  runtime?: {
+    state: 'active' | 'idle' | 'waiting';
+    checkedAt: string;
+    source: RuntimeActivitySource;
+  };
   gitInfo?: { branch?: string | null; sha?: string | null; originUrl?: string | null } | null;
 }

@@ -31,7 +31,11 @@ export const threadSchema = z.object({
 });
 export type CodexTask = z.infer<typeof threadSchema> & {
   archived: boolean;
-  runtime?: { state: 'active' | 'idle' | 'waiting'; checkedAt: string };
+  runtime?: {
+    state: 'active' | 'idle' | 'waiting';
+    checkedAt: string;
+    source: 'codex-runtime';
+  };
 };
 const pageSchema = z.object({
   data: z.array(z.unknown()).max(100),
@@ -150,6 +154,7 @@ export async function readLiveTasks(
                   ? ('waiting' as const)
                   : ('active' as const),
             checkedAt: new Date().toISOString(),
+            source: 'codex-runtime' as const,
           },
         };
       }),

@@ -8,6 +8,7 @@ import type {
   Snapshot,
   ProjectDiscoveryState,
   AgentHistoryStatus,
+  AgentLiveStatus,
 } from '../../src/domain/types';
 import { createDemoSnapshot } from '../../src/data/demo';
 import '../../src/ui/styles.css';
@@ -34,6 +35,23 @@ let agents: AgentHistoryStatus[] = [
   { tool: 'claude-code', enabled: false, state: 'not-connected' },
 ];
 const agentListeners = new Set<(statuses: AgentHistoryStatus[]) => void>();
+let liveAgents: AgentLiveStatus[] = [
+  {
+    tool: 'claude-code',
+    enabled: false,
+    installed: false,
+    state: 'not-connected',
+    activeCount: 0,
+  },
+  {
+    tool: 'cursor',
+    enabled: false,
+    installed: false,
+    state: 'not-connected',
+    activeCount: 0,
+  },
+];
+const liveAgentListeners = new Set<(statuses: AgentLiveStatus[]) => void>();
 const excluded = new Set<string>();
 const names = [
   'Atlas API',
@@ -106,6 +124,21 @@ window.openbranches = {
     agentListeners.forEach((listener) => listener(agents));
   },
   onAgentHistory: (listener) => subscribe(agentListeners, listener),
+  setAgentLiveEnabled: async (tool, enabled) => {
+    liveAgents = liveAgents.map((status) =>
+      status.tool === tool
+        ? {
+            ...status,
+            enabled,
+            installed: enabled,
+            state: enabled ? 'listening' : 'not-connected',
+          }
+        : status,
+    );
+    liveAgentListeners.forEach((listener) => listener(liveAgents));
+    return liveAgents;
+  },
+  onAgentLive: (listener) => subscribe(liveAgentListeners, listener),
   getDiscoveredProjects: async () => discovery,
   followDiscoveredProjects: async (enabled) => {
     discovery = { ...discovery, enabled };
@@ -179,6 +212,7 @@ window.openbranches = {
   openExternal: async () => {},
   getProviderStatus: async () => ({
     agents,
+    liveAgents,
     codex: { installed: false, enabled: false, state: 'not-connected' },
     github: { connected: false, configured: false },
   }),

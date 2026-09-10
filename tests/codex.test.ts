@@ -273,7 +273,7 @@ describe('task association evidence', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(checkedAt));
     const repo = repository();
-    const live = task({ runtime: { state: 'active', checkedAt } });
+    const live = task({ runtime: { state: 'active', checkedAt, source: 'codex-runtime' } });
     expect(associateTask(repo, repo.branches[0], live, checkedAt)).toMatchObject({
       status: 'active',
       activitySource: 'codex-runtime',
@@ -288,6 +288,7 @@ describe('task association evidence', () => {
       runtime: {
         state: 'active',
         checkedAt: new Date(Date.parse(checkedAt) - 100000).toISOString(),
+        source: 'codex-runtime',
       },
     });
     expect(associateTask(repo, repo.branches[0], stale, checkedAt)?.status).toBe('unknown');
@@ -310,7 +311,7 @@ describe('task association evidence', () => {
     repo.worktrees = current.worktrees;
     const linked = linkRepository(
       repo,
-      [task({ runtime: { state: 'active', checkedAt } })],
+      [task({ runtime: { state: 'active', checkedAt, source: 'codex-runtime' } })],
       checkedAt,
     );
     expect(linked.branches.map((b) => b.tasks?.[0]?.status)).toEqual(['unknown', 'active']);

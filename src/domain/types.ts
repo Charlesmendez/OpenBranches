@@ -65,6 +65,8 @@ export interface GitHubPullRequest extends PullRequest {
 }
 export type CodingTool = 'codex' | 'claude-code' | 'cursor' | 'other' | 'unknown';
 export type HandoffProvider = Extract<CodingTool, 'codex' | 'claude-code' | 'cursor'>;
+export type LiveAgentTool = Extract<CodingTool, 'claude-code' | 'cursor'>;
+export type RuntimeActivitySource = 'codex-runtime' | 'claude-hook' | 'cursor-hook';
 export interface ModelIdentity {
   id: string;
   provider?: 'openai' | 'anthropic' | 'xai' | 'other';
@@ -81,7 +83,7 @@ export interface TaskLink {
   updatedAt?: string;
   checkedAt?: string;
   evidence?: string[];
-  activitySource?: 'codex-runtime';
+  activitySource?: RuntimeActivitySource;
   waiting?: boolean;
 }
 export interface OpenTaskCommand {
@@ -286,6 +288,7 @@ export interface ProviderStatus {
   codex: CodexStatus;
   github: GitHubStatus;
   agents?: AgentHistoryStatus[];
+  liveAgents?: AgentLiveStatus[];
 }
 export interface AgentHistoryStatus {
   tool: CodingTool;
@@ -294,6 +297,15 @@ export interface AgentHistoryStatus {
   checkedAt?: string;
   partial?: boolean;
   taskCount?: number;
+  error?: string;
+}
+export interface AgentLiveStatus {
+  tool: LiveAgentTool;
+  enabled: boolean;
+  installed: boolean;
+  state: 'not-connected' | 'listening' | 'error';
+  receivedAt?: string;
+  activeCount: number;
   error?: string;
 }
 export interface GitStatus {
@@ -306,6 +318,8 @@ export interface DesktopApi {
   teams?: import('../team/device').TeamDesktopApi;
   setAgentHistoryEnabled(tool: CodingTool, enabled: boolean): Promise<void>;
   onAgentHistory(callback: (statuses: AgentHistoryStatus[]) => void): () => void;
+  setAgentLiveEnabled(tool: LiveAgentTool, enabled: boolean): Promise<AgentLiveStatus[]>;
+  onAgentLive(callback: (statuses: AgentLiveStatus[]) => void): () => void;
   getDiscoveredProjects(): Promise<ProjectDiscoveryState>;
   followDiscoveredProjects(enabled: boolean): Promise<void>;
   refreshDiscoveredProjects(): Promise<void>;

@@ -21,11 +21,15 @@ export function useProviders() {
     const offAgents = api.onAgentHistory((agents) =>
       setStatus((previous) => ({ ...previous, agents })),
     );
+    const offLiveAgents = api.onAgentLive((liveAgents) =>
+      setStatus((previous) => ({ ...previous, liveAgents })),
+    );
     return () => {
       mounted = false;
       off();
       offCodex();
       offAgents();
+      offLiveAgents();
     };
   }, []);
   return status;

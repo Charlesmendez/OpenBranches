@@ -40,6 +40,13 @@ describe('shared live task evidence', () => {
       kind: 'live',
       label: 'Codex working',
     });
+    branch.tasks[0].tool = 'cursor';
+    branch.tasks[0].activitySource = 'cursor-hook';
+    branch.tasks[0].model = { id: 'grok-code-fast-1', provider: 'xai' };
+    expect(sharedTaskActivity(work, branch, now)).toMatchObject({
+      kind: 'live',
+      label: 'Cursor · Grok working',
+    });
     branch.tasks[0].association = 'possible';
     expect(sharedTaskActivity(work, branch, now)).toBeUndefined();
   });

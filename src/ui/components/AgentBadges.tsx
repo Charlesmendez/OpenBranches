@@ -7,7 +7,7 @@ import cursor from '../../../assets/providers/cursor.svg';
 import grok from '../../../assets/providers/grok.svg';
 
 const icons: Partial<Record<CodingTool, string>> = { codex, 'claude-code': claude, cursor };
-function GrokIcon() {
+export function GrokIcon() {
   return (
     <span
       className="tool-icon"

@@ -103,9 +103,11 @@ for (let index = 0; index < names.length; index++) {
       omittedBranches: 0,
       branches: Array.from({ length: projectIndex === 0 ? 32 : 18 }, (_, branchIndex) => {
         const id = serial++,
-          tool = (['codex', 'claude-code', 'cursor'] as const)[(id + index) % 3],
-          live = tool === 'codex' && branchIndex < 3,
-          waiting = live && index % 3 === 1,
+          tool = (['codex', 'claude-code', 'cursor'] as const)[
+            (branchIndex + projectIndex + index) % 3
+          ],
+          live = branchIndex === 0,
+          waiting = live && tool === 'claude-code',
           localOnly = index === 0 && projectIndex === 0 && branchIndex === 3,
           forgotten = index === 2 && projectIndex === 0 && branchIndex === 9;
         return {
@@ -145,7 +147,16 @@ for (let index = 0; index < names.length; index++) {
               tool,
               association: 'verified' as const,
               status: live && !waiting ? ('active' as const) : ('idle' as const),
-              ...(live ? { activitySource: 'codex-runtime' as const } : {}),
+              ...(live
+                ? {
+                    activitySource:
+                      tool === 'codex'
+                        ? ('codex-runtime' as const)
+                        : tool === 'claude-code'
+                          ? ('claude-hook' as const)
+                          : ('cursor-hook' as const),
+                  }
+                : {}),
               ...(waiting ? { waiting: true } : {}),
               model: {
                 id: tool === 'codex' ? 'gpt-6' : tool === 'claude-code' ? 'claude-opus' : 'grok',

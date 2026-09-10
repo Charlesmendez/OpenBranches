@@ -52,7 +52,7 @@ Actual Electron/Chrome checks with isolated fictional data verified:
 
 - Code approval under the expected team/member/device, followed by a 229-branch preview and publication. The browser gained those reports automatically.
 - Branch details under the reporting Mac, separate tools/models, task text absent by default, and titles present with summaries off when selected.
-- Fresh verified Codex runtime evidence appears as working or waiting, expires after 90 seconds, and never derives from dirty files or commit recency.
+- Fresh verified Codex, Claude Code, or Cursor runtime evidence appears as working or waiting, expires after 90 seconds, and never derives from dirty files or commit recency.
 - Stop sharing changed the Mac to Stopped and removed both the searched branch and its open browser details.
 - A simulated commit updated the browser without manually refreshing publication.
 - A real Electron-process restart preserved the project, credential, choices, opaque branch identity, and upload status. Another simulated commit was published after restart.

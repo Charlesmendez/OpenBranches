@@ -50,7 +50,6 @@ function matchTask(
     branch.detached && sameCommit && branch.worktrees.some((w) => resolve(w.path) === cwd);
   const liveCheckout =
     repository.checkoutFresh &&
-    task.tool === 'codex' &&
     task.runtime &&
     Date.parse(task.runtime.checkedAt) >= Date.now() - LIVE_ACTIVITY_TTL &&
     Date.parse(task.runtime.checkedAt) <= Date.now() + 60_000 &&
@@ -81,7 +80,7 @@ function matchTask(
           : 'idle'
         : 'unknown',
     ...(liveCheckout && task.runtime
-      ? { activitySource: 'codex-runtime' as const, waiting: task.runtime.state === 'waiting' }
+      ? { activitySource: task.runtime.source, waiting: task.runtime.state === 'waiting' }
       : {}),
     association: verified ? 'verified' : 'possible',
     archived: task.archived,
@@ -89,7 +88,9 @@ function matchTask(
     checkedAt: task.runtime?.checkedAt ?? task.checkedAt ?? checkedAt,
     evidence: liveCheckout
       ? [
-          'Codex runtime status read from the running local daemon.',
+          task.runtime?.source === 'codex-runtime'
+            ? 'Codex runtime status read from the running local daemon.'
+            : `${toolNames[task.tool]} activity received from its opted-in local hook.`,
           'Task folder matches this branch’s current checkout.',
         ]
       : verified
@@ -127,13 +128,14 @@ export function linkRepository(
   tasks: SavedAgentTask[],
   checkedAt: string,
   tool: SavedAgentTask['tool'],
+  options: { merge?: boolean } = {},
 ): Repository {
   const evidence = context(repository);
   const byBranch = new Map<string, SavedAgentTask[]>();
   const byCommit = new Map<string, SavedAgentTask[]>();
   const liveByCwd = new Map<string, SavedAgentTask[]>();
   for (const task of tasks) {
-    if (task.tool === 'codex' && task.runtime) {
+    if (task.runtime) {
       const group = liveByCwd.get(resolve(task.cwd)) ?? [];
       group.push(task);
       liveByCwd.set(resolve(task.cwd), group);
@@ -152,11 +154,10 @@ export function linkRepository(
   }
   return {
     ...repository,
-    branches: repository.branches.map((branch) => ({
-      ...branch,
-      tasks: [
-        ...(branch.tasks ?? []).filter((task) => task.tool !== tool),
-        ...(branch.detached
+    branches: repository.branches.map((branch) => {
+      const existing = branch.tasks ?? [];
+      const linked = (
+        branch.detached
           ? [
               ...new Map(
                 commitIds(branch)
@@ -172,17 +173,38 @@ export function linkRepository(
                 ].map((task) => [task.id, task]),
               ).values(),
             ]
-        )
-          .flatMap((task) => {
-            const link = matchTask(evidence, branch, task, checkedAt);
-            return link ? [link] : [];
-          })
-          .sort(
-            (a, b) =>
-              (a.association === 'verified' ? 0 : 1) - (b.association === 'verified' ? 0 : 1) ||
-              Date.parse(b.updatedAt!) - Date.parse(a.updatedAt!),
+      ).flatMap((task) => {
+        const link = matchTask(evidence, branch, task, checkedAt);
+        if (!link) return [];
+        const prior = existing.find(
+          (candidate) => candidate.tool === link.tool && candidate.id === link.id,
+        );
+        return [
+          prior && options.merge
+            ? {
+                ...prior,
+                ...link,
+                title: task.name?.trim() ? link.title : prior.title,
+                model: link.model ?? prior.model,
+              }
+            : link,
+        ];
+      });
+      const linkedKeys = new Set(linked.map((task) => `${task.tool}:${task.id}`));
+      return {
+        ...branch,
+        tasks: [
+          ...existing.filter(
+            (task) =>
+              (options.merge || task.tool !== tool) && !linkedKeys.has(`${task.tool}:${task.id}`),
           ),
-      ],
-    })),
+          ...linked,
+        ].sort(
+          (a, b) =>
+            (a.association === 'verified' ? 0 : 1) - (b.association === 'verified' ? 0 : 1) ||
+            Date.parse(b.updatedAt ?? '') - Date.parse(a.updatedAt ?? ''),
+        ),
+      };
+    }),
   };
 }

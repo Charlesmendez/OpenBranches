@@ -1,4 +1,4 @@
-import { toolNames } from '../domain/agents';
+import { isGrokModel, toolNames } from '../domain/agents';
 import type { SharedSnapshot } from './protocol';
 import { sharedWorkStale } from './protocol';
 import type { SharedWork, TeamPage } from './responses';
@@ -24,7 +24,7 @@ export interface SharedBranchRow {
   activity?: SharedTaskActivity;
 }
 
-/** A fresh device report may carry a verified Codex runtime observation. Saved
+/** A fresh device report may carry a verified local runtime observation. Saved
  * task links, dirty worktrees, and recent commits never become live presence. */
 export function sharedTaskActivity(
   work: Pick<SharedWork, 'receivedAt' | 'deviceExpiresAt' | 'snapshot'>,
@@ -35,7 +35,7 @@ export function sharedTaskActivity(
   const runtime = branch.tasks.filter(
       (task) =>
         task.association === 'verified' &&
-        task.activitySource === 'codex-runtime' &&
+        task.activitySource !== undefined &&
         fresh(task.checkedAt, now),
     ),
     waiting = runtime.filter((task) => task.waiting),
@@ -77,7 +77,11 @@ export function sharedBranchRows(data: TeamPage, now = Date.now()): SharedBranch
 }
 
 function activity(kind: SharedTaskActivity['kind'], tasks: SharedTask[]): SharedTaskActivity {
-  const names = [...new Set(tasks.map((task) => toolNames[task.tool]))].join(' + ');
+  const names = [
+    ...new Set(
+      tasks.map((task) => toolNames[task.tool] + (isGrokModel(task.model) ? ' · Grok' : '')),
+    ),
+  ].join(' + ');
   return {
     kind,
     tasks,
