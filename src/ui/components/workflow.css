@@ -183,12 +183,111 @@
   color: var(--text-soft);
   font-size: 9px;
 }
+.branch-target-summary {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  margin-top: 5px;
+  overflow: hidden;
+}
+.branch-target-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  padding: 2px 4px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--muted);
+  background: var(--surface);
+  font-size: 8px;
+  white-space: nowrap;
+}
+.branch-target-status.integrated {
+  color: #b6c7ff;
+  border-color: #526387;
+}
+.branch-target-status.pending {
+  color: #d7c18f;
+  border-color: #6d6246;
+}
+.branch-target-summary.empty {
+  color: var(--muted);
+  font-size: 8px;
+}
+.branch-target-more {
+  color: var(--muted);
+  font-size: 8px;
+  white-space: nowrap;
+}
 .project-work-item > svg {
   color: var(--muted);
 }
 .project-work-more {
   align-self: center;
   padding: 0 5px;
+  color: var(--muted);
+  font-size: 9px;
+  white-space: nowrap;
+}
+.route-task.work-live {
+  border-color: #526387;
+  box-shadow: inset 2px 0 #8aabff;
+}
+.route-task.work-waiting {
+  border-color: #625982;
+  box-shadow: inset 2px 0 #a39be9;
+}
+.route-task.work-changes {
+  border-color: #6d6246;
+  box-shadow: inset 2px 0 #b99b5c;
+}
+.route-task.work-recent,
+.route-task.work-checkout {
+  border-color: #465473;
+}
+.route-task.work-live > span:first-child {
+  animation: live-work-glow 1.8s ease-in-out infinite;
+}
+.route-task-status {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  margin-left: auto;
+  color: var(--text-soft);
+}
+.route-task-status .tool-icon {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 auto;
+}
+.route-task-status > svg {
+  flex: 0 0 auto;
+  color: currentColor;
+}
+.route-task-status small {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-soft);
+  text-overflow: ellipsis;
+}
+.route-connector {
+  justify-content: center;
+  width: 88px;
+  color: var(--muted);
+  font-size: 8px;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.route-connector span {
+  flex: 0 0 auto;
+  border: 0;
+}
+.route-target-more {
   color: var(--muted);
   font-size: 9px;
   white-space: nowrap;

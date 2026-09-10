@@ -11,8 +11,14 @@ import { mapHasVisibleCard } from '../src/ui/mapViewport';
 import { recommendationsFor } from '../src/domain/branches';
 import { groupReviews } from '../src/domain/reviews';
 import { triageFindings, triageHighlights } from '../src/domain/triage';
-import { prioritizeWork, workSignal, workSpotlights } from '../src/domain/workSpotlight';
+import {
+  prioritizeWork,
+  workPreviews,
+  workSignal,
+  workSpotlights,
+} from '../src/domain/workSpotlight';
 import { liveCoverage } from '../src/domain/liveCoverage';
+import { primaryIntegrationTargets } from '../src/domain/integrationTargets';
 const now = Date.parse('2026-09-09T20:00:00Z');
 const at = new Date(now).toISOString();
 const old = new Date(now - 30 * 86400000).toISOString();
@@ -68,6 +74,21 @@ function task(extra: Partial<TaskLink> = {}): TaskLink {
   };
 }
 describe('map evidence', () => {
+  it('keeps development and stable targets visible in compact summaries', () => {
+    const targets = ['develop', 'dev', 'main', 'master'].map((name) => ({
+      name,
+      sha,
+      source: 'local' as const,
+    }));
+    expect(primaryIntegrationTargets(targets).map((target) => target.name)).toEqual([
+      'develop',
+      'main',
+    ]);
+    expect(primaryIntegrationTargets([{ ...targets[0], name: 'trunk', role: 'default' }])).toEqual([
+      { ...targets[0], name: 'trunk', role: 'default' },
+    ]);
+  });
+
   it('checks both integration targets independently rather than selecting the first match', () => {
     const b = branch();
     b.integration.main = 'integrated';
@@ -237,6 +258,31 @@ describe('source-backed branch activity', () => {
   });
 });
 describe('current work spotlight', () => {
+  it('keeps current work first and fills the remaining project preview with open review work', () => {
+    const running = branch();
+    running.id = 'running';
+    running.tasks = [task()];
+    const pull = branch();
+    pull.id = 'pull';
+    pull.updatedAt = old;
+    pull.pullRequest = {
+      number: 12,
+      title: 'Review work',
+      url: 'https://github.com/fixture/project/pull/12',
+      state: 'open',
+      base: 'main',
+      headSha: sha,
+      updatedAt: old,
+    };
+    const recent = branch();
+    recent.id = 'recent';
+    recent.updatedAt = new Date(now - 20 * 60_000).toISOString();
+    const previews = workPreviews([recent, pull, running], '/fixture/project', now);
+    expect(previews.map(({ branch }) => branch.id)).toEqual(['running', 'pull']);
+    expect(previews[0].signal?.kind).toBe('live');
+    expect(previews[1].signal).toBeUndefined();
+  });
+
   it('puts fresh verified agent runtime first and names the coding tool', () => {
     const ordinary = branch();
     ordinary.id = 'ordinary';

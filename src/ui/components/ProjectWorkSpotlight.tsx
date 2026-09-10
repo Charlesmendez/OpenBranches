@@ -1,24 +1,9 @@
-import {
-  ArrowUpRight,
-  CircleDot,
-  FilePenLine,
-  GitCommitHorizontal,
-  Laptop,
-  MessageCircleQuestion,
-  Radio,
-} from 'lucide-react';
+import { ArrowUpRight, CircleDot } from 'lucide-react';
 import type { Branch, Repository } from '../../domain/types';
-import { workSpotlights, type WorkSignalKind } from '../../domain/workSpotlight';
+import { workSpotlights } from '../../domain/workSpotlight';
 import { useClock } from '../hooks/useClock';
-import { ToolIcon } from './AgentBadges';
-
-const icons = {
-  live: Radio,
-  waiting: MessageCircleQuestion,
-  changes: FilePenLine,
-  recent: GitCommitHorizontal,
-  checkout: Laptop,
-} satisfies Record<WorkSignalKind, typeof Radio>;
+import { BranchTargetSummary } from './BranchTargetSummary';
+import { WorkSignalIcon } from './WorkSignalIcon';
 
 export function ProjectWorkSpotlight({
   repository,
@@ -59,7 +44,6 @@ export function ProjectWorkSpotlight({
       </div>
       <div className="project-work-items">
         {shown.map(({ branch, signal }) => {
-          const Icon = icons[signal.kind];
           return (
             <button
               key={branch.id}
@@ -68,16 +52,13 @@ export function ProjectWorkSpotlight({
               onClick={() => onFocus(branch)}
             >
               <span className="project-work-icon">
-                {signal.tools.length ? (
-                  signal.tools.slice(0, 2).map((tool) => <ToolIcon key={tool} tool={tool} />)
-                ) : (
-                  <Icon size={15} />
-                )}
+                <WorkSignalIcon signal={signal} />
               </span>
               <span className="project-work-copy">
                 <strong>{branch.title}</strong>
                 <code>{branch.name}</code>
                 <small>{signal.label}</small>
+                <BranchTargetSummary branch={branch} targets={repository.targets} />
               </span>
               <ArrowUpRight size={14} />
             </button>

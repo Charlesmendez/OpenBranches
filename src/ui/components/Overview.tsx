@@ -1,5 +1,4 @@
 import {
-  ArrowRight,
   ArrowUpRight,
   Check,
   ChevronRight,
@@ -7,11 +6,16 @@ import {
   GitBranch,
   GitCommitHorizontal,
   GitMerge,
+  GitPullRequest,
   Laptop,
   Plus,
 } from 'lucide-react';
 import type { ActivityEvent, Repository } from '../../domain/types';
 import { featureBranches, groupCounts, relativeTime } from '../../domain/branches';
+import { primaryIntegrationTargets } from '../../domain/integrationTargets';
+import { workPreviews } from '../../domain/workSpotlight';
+import { useClock } from '../hooks/useClock';
+import { WorkSignalIcon } from './WorkSignalIcon';
 
 export function ActivityList({
   events,
@@ -77,6 +81,7 @@ export function Overview({
   onSelect: (repositoryId: string, branchId?: string) => void;
   onAdd: () => void;
 }) {
+  const now = useClock();
   return (
     <div className="overview-content">
       <div className="section-kicker">
@@ -88,11 +93,9 @@ export function Overview({
       <div className="project-cards">
         {repositories.map((repo, index) => {
           const branches = featureBranches(repo);
-          const counts = groupCounts(branches);
-          const active = branches
-            .filter((b) => b.pullRequest?.state === 'open' || b.worktrees.some((w) => w.dirty))
-            .slice(0, 2);
-          const previews = active.length ? active : branches.slice(0, 2);
+          const counts = groupCounts(branches, now);
+          const previews = workPreviews(branches, repo.path, now);
+          const previewTargets = primaryIntegrationTargets(repo.targets);
           return (
             <button
               key={repo.id}
@@ -115,28 +118,51 @@ export function Overview({
               </div>
               <div className="project-route">
                 <div className="route-tasks">
-                  {previews.map((branch) => (
-                    <div key={branch.id} className="route-task">
+                  {previews.map(({ branch, signal }) => (
+                    <div
+                      key={branch.id}
+                      className={`route-task ${signal ? `work-${signal.kind}` : ''}`}
+                    >
                       <span className={branch.pullRequest ? 'violet-dot' : 'blue-dot'} />
                       <span>{branch.title}</span>
-                      {branch.pullRequest && <small>PR #{branch.pullRequest.number}</small>}
+                      {(signal || branch.pullRequest) && (
+                        <span
+                          className="route-task-status"
+                          title={signal?.detail}
+                          aria-label={signal?.label ?? `Pull request ${branch.pullRequest!.number}`}
+                        >
+                          {signal ? (
+                            <WorkSignalIcon signal={signal} size={13} />
+                          ) : (
+                            <GitPullRequest size={13} aria-hidden="true" />
+                          )}
+                          <small>{signal?.label ?? `PR #${branch.pullRequest!.number}`}</small>
+                        </span>
+                      )}
                     </div>
                   ))}
                 </div>
                 <div className="route-connector">
-                  <span />
-                  <ArrowRight size={15} />
+                  <span>Compared with</span>
                 </div>
                 <div className="route-targets">
-                  {repo.targets.slice(0, 2).map((target) => (
+                  {previewTargets.map((target) => (
                     <span
                       key={target.name}
-                      className={`route-target ${target.name === 'master' || target.name === 'main' ? 'stable' : ''}`}
+                      className={`route-target ${target.role === 'default' || target.name === 'master' || target.name === 'main' ? 'stable' : ''}`}
                     >
                       <GitBranch size={14} />
                       {target.name}
                     </span>
                   ))}
+                  {repo.targets.length > previewTargets.length && (
+                    <span
+                      className="route-target-more"
+                      title={`${repo.targets.length - previewTargets.length} more integration targets`}
+                    >
+                      +{repo.targets.length - previewTargets.length}
+                    </span>
+                  )}
                   {!repo.targets.length && <span className="muted-note">No targets detected</span>}
                 </div>
               </div>

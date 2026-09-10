@@ -28,13 +28,25 @@
   gap: 10px;
 }
 .target-fixture .history-sources {
-  width: 260px;
+  width: 330px;
   margin: 0;
 }
 .target-fixture .fixture-controls .history-sources:first-child {
-  width: 180px;
+  width: 245px;
 }
 .target-fixture .map-panel,
 .target-fixture .inventory {
   height: 100%;
+}
+.target-map-view {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.target-map-view .map-panel {
+  min-height: 0;
+}
+.target-fixture > .overview-content {
+  min-height: 0;
+  overflow: auto;
 }

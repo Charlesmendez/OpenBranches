@@ -19,6 +19,10 @@ export interface BranchSpotlight {
   branch: Branch;
   signal: WorkSignal;
 }
+export interface WorkPreview {
+  branch: Branch;
+  signal?: WorkSignal;
+}
 
 const pathKey = (value: string) => value.replace(/\/+$/, '');
 const isFresh = (value: string | undefined, now: number, ttl: number) => {
@@ -129,6 +133,32 @@ export function workSpotlights(
         (Date.parse(b.branch.updatedAt) || 0) - (Date.parse(a.branch.updatedAt) || 0) ||
         a.branch.name.localeCompare(b.branch.name),
     );
+}
+
+/** Fill compact project previews after current work, preserving useful PR and
+ * recency context without allowing it to displace a verified work signal. */
+export function workPreviews(
+  branches: Branch[],
+  repositoryPath: string,
+  now = Date.now(),
+  limit = 2,
+): WorkPreview[] {
+  if (limit <= 0) return [];
+  const current = workSpotlights(branches, repositoryPath, now).slice(0, limit);
+  const selected = new Set(current.map(({ branch }) => branch.id));
+  const remaining = branches
+    .map((branch, index) => ({ branch, index }))
+    .filter(({ branch }) => !selected.has(branch.id))
+    .sort(
+      (left, right) =>
+        Number(right.branch.pullRequest?.state === 'open') -
+          Number(left.branch.pullRequest?.state === 'open') ||
+        (Date.parse(right.branch.updatedAt) || 0) - (Date.parse(left.branch.updatedAt) || 0) ||
+        left.index - right.index,
+    )
+    .slice(0, limit - current.length)
+    .map(({ branch }) => ({ branch }));
+  return [...current, ...remaining];
 }
 
 export function prioritizeWork(

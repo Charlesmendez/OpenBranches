@@ -16,6 +16,26 @@ export function defaultTarget(targets: readonly Target[]): Target | undefined {
   return targets.find((target) => target.role === 'default');
 }
 
+/** Keep compact summaries useful when a repository exposes every conventional
+ * target: show one development target and one stable target before aliases. */
+export function primaryIntegrationTargets(targets: readonly Target[], limit = 2): Target[] {
+  if (limit <= 0) return [];
+  if (targets.length <= limit) return [...targets];
+  const selected: Target[] = [];
+  for (const names of [
+    ['develop', 'dev'],
+    ['main', 'master'],
+  ]) {
+    const target = targets.find((candidate) => names.includes(candidate.name));
+    if (target && !selected.includes(target)) selected.push(target);
+  }
+  for (const target of targets) {
+    if (selected.length >= limit) break;
+    if (!selected.includes(target)) selected.push(target);
+  }
+  return selected.slice(0, limit);
+}
+
 export function targetHistoryLabel(target: Target): string {
   const source =
     target.source === 'local'
