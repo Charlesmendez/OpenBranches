@@ -6,6 +6,7 @@ import { isAbsolute, join } from 'node:path';
 const architectures = new Set(['arm64', 'x64']);
 const productPattern = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const versionPattern = /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/;
+const bundleIdentifierPattern = /^(?:[A-Za-z0-9-]+\.)+[A-Za-z0-9-]+$/;
 
 export function macArguments(args, hostArchitecture = process.arch) {
   let architecture = hostArchitecture;
@@ -38,7 +39,13 @@ export async function releaseMetadata(root) {
     throw new Error('package.json needs a file-safe productName.');
   if (!versionPattern.test(value.version ?? ''))
     throw new Error('package.json needs a valid release version.');
-  return { productName: value.productName, version: value.version };
+  if (!bundleIdentifierPattern.test(value.openbranches?.bundleIdentifier ?? ''))
+    throw new Error('package.json needs a reverse-DNS OpenBranches bundle identifier.');
+  return {
+    productName: value.productName,
+    version: value.version,
+    bundleIdentifier: value.openbranches.bundleIdentifier,
+  };
 }
 
 export function macArtifactPaths({ root, productName, version, architecture, release }) {

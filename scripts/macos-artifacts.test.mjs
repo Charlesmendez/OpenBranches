@@ -7,6 +7,7 @@ import {
   absoluteBundleSymlinks,
   macArguments,
   macArtifactPaths,
+  releaseMetadata,
   sha256File,
   validateLegalResources,
 } from './macos-artifacts.mjs';
@@ -44,6 +45,36 @@ describe('Mac release artifacts', () => {
       macArtifactPaths({ ...input, release: false }).diskImage,
       '/project/out/make/OpenBranches-0.1.0-mac-arm64-unsigned.dmg',
     );
+  });
+
+  it('uses one valid, stable bundle identifier for packaging and verification', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'openbranches-artifacts-test-'));
+    try {
+      await writeFile(
+        join(root, 'package.json'),
+        JSON.stringify({
+          productName: 'OpenBranches',
+          version: '0.1.0',
+          openbranches: { bundleIdentifier: 'com.openbranches.desktop' },
+        }),
+      );
+      assert.deepEqual(await releaseMetadata(root), {
+        productName: 'OpenBranches',
+        version: '0.1.0',
+        bundleIdentifier: 'com.openbranches.desktop',
+      });
+      await writeFile(
+        join(root, 'package.json'),
+        JSON.stringify({
+          productName: 'OpenBranches',
+          version: '0.1.0',
+          openbranches: { bundleIdentifier: 'OpenBranches' },
+        }),
+      );
+      await assert.rejects(releaseMetadata(root), /reverse-DNS/);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 
   it('finds absolute symlinks that would break after distributing an app bundle', async () => {

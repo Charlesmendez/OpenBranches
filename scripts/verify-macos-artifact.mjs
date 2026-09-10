@@ -17,11 +17,23 @@ const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const options = macArguments(process.argv.slice(2));
 const metadata = await releaseMetadata(root);
 const artifact = macArtifactPaths({ root, ...metadata, ...options });
+const verifyBundleIdentifier = (application) => {
+  const identifier = execFileSync(
+    '/usr/libexec/PlistBuddy',
+    ['-c', 'Print :CFBundleIdentifier', join(application, 'Contents', 'Info.plist')],
+    { encoding: 'utf8' },
+  ).trim();
+  if (identifier !== metadata.bundleIdentifier)
+    throw new Error(
+      `The packaged bundle identifier is ${identifier || 'missing'}, expected ${metadata.bundleIdentifier}.`,
+    );
+};
 await Promise.all([
   access(artifact.application),
   access(artifact.executable),
   access(artifact.diskImage),
 ]);
+verifyBundleIdentifier(artifact.application);
 
 execFileSync('/usr/bin/lipo', [artifact.executable, '-verify_arch', options.architecture], {
   stdio: 'inherit',
@@ -52,6 +64,7 @@ try {
   attached = true;
   const mountedApplication = join(mount, `${metadata.productName}.app`);
   await access(mountedApplication);
+  verifyBundleIdentifier(mountedApplication);
   await validateLegalResources(mountedApplication);
   const applicationsLink = join(mount, 'Applications');
   if (!(await lstat(applicationsLink)).isSymbolicLink())

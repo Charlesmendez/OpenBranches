@@ -11,6 +11,8 @@ OpenBranches is still a development preview. The public release format is a sign
 
 End users do not need Node.js, npm, or a source-code build. Contributors currently use the development commands in the README.
 
+The official downloads will be signed with the project's Developer ID and notarized by Apple, so first launch uses the normal macOS identified-developer prompt. The project does not need to be listed in the Mac App Store. Unsigned preview DMGs are intentionally labeled `-unsigned` and are not the public installation path.
+
 ## Git setup in the app
 
 OpenBranches uses Git to read branch history and worktrees. It checks common Homebrew locations and Apple’s selected developer tools, so a Finder launch does not depend on terminal PATH configuration. The detected absolute executable is used by the scanner. Inherited `GIT_*` repository and configuration overrides are cleared before inspection.

@@ -8,6 +8,9 @@
   "author": "Carlos Mendez",
   "main": "dist-electron/main.js",
   "repository": "https://github.com/Charlesmendez/OpenBranches",
+  "openbranches": {
+    "bundleIdentifier": "com.openbranches.desktop"
+  },
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "dev:web": "vite --host 127.0.0.1",

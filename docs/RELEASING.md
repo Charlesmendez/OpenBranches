@@ -2,7 +2,21 @@
 
 OpenBranches has one release path for both supported Mac architectures. It produces a signed, notarized DMG and a SHA-256 checksum on a native Apple silicon or Intel runner. The workflow leaves every GitHub release as a draft so a maintainer can install and review both artifacts before making them public.
 
+## Apple account decision
+
+The public DMG is distributed directly from GitHub Releases. It does **not** need a Mac App Store product page, App Store review, or an App Store Connect app record. Open-source licensing does not bypass Gatekeeper, so a normal double-click installation still needs:
+
+- An active [Apple Developer Program membership](https://developer.apple.com/programs/enroll/). Apple currently lists it at 99 USD per membership year; eligible nonprofits, educational institutions, and government entities can request a fee waiver.
+- One [Developer ID Application certificate](https://developer.apple.com/help/account/certificates/create-developer-id-certificates) owned by the release team. A Developer ID Installer certificate is unnecessary because OpenBranches ships a DMG rather than a signed `.pkg` installer.
+- Apple notarization credentials. This workflow uses the member's Apple Account, an app-specific password, and team ID with `notarytool`.
+
+Notarization is an automated malware and signing check, not App Review. The release remains open source and hosted by the project; Apple supplies the identity and notarization ticket that Gatekeeper verifies. Contributors and end users need no Apple account. Only the maintainer producing official binaries needs this setup.
+
+The bundle identifier is `com.openbranches.desktop`. Packaging and artifact verification read that value from `package.json`, and verification fails before release if the generated app uses another identity.
+
 ## One-time repository setup
+
+Complete the Apple Developer enrollment and create the Developer ID Application certificate described above. No App Store listing is involved.
 
 Create the public GitHub App used for device authorization and set its client ID as the repository variable `GITHUB_APP_CLIENT_ID`. The desktop bundle never contains a GitHub client secret.
 
