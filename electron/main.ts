@@ -1,6 +1,7 @@
 import {
   app,
   BrowserWindow,
+  clipboard,
   dialog,
   ipcMain,
   Menu,
@@ -326,6 +327,9 @@ app.whenReady().then(() => {
     await copyFile(source, copy);
     const error = await shell.openPath(copy);
     if (error) throw new Error('The license document could not be opened.');
+  });
+  handle('clipboard:write', (input: unknown) => {
+    clipboard.writeText(z.string().min(1).max(4096).parse(input));
   });
   handle('providers:status', async () => {
     await Promise.all([codex!.detect(), liveAgents!.start()]);

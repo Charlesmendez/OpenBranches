@@ -14,7 +14,7 @@
   <img src="https://img.shields.io/badge/platform-macOS-d9dce7.svg" alt="macOS">
 </p>
 
-> **Download v0.1.0:** [Apple silicon (M1 and newer)](https://github.com/Charlesmendez/OpenBranches/releases/download/v0.1.0/OpenBranches-0.1.0-mac-arm64.dmg) · [Intel](https://github.com/Charlesmendez/OpenBranches/releases/download/v0.1.0/OpenBranches-0.1.0-mac-x64.dmg). Both installers are signed with Developer ID and notarized by Apple.
+> **Download v0.1.1:** [Apple silicon (M1 and newer)](https://github.com/Charlesmendez/OpenBranches/releases/download/v0.1.1/OpenBranches-0.1.1-mac-arm64.dmg) · [Intel](https://github.com/Charlesmendez/OpenBranches/releases/download/v0.1.1/OpenBranches-0.1.1-mac-x64.dmg). Both installers are signed with Developer ID and notarized by Apple.
 
 ![OpenBranches workspace control panel](docs/images/workspace-overview.png)
 
@@ -54,7 +54,7 @@ Local changes update while the app is open. GitHub requests use per-repository f
 
 The intended installation is the normal Mac flow:
 
-1. Download the [Apple silicon (`arm64`)](https://github.com/Charlesmendez/OpenBranches/releases/download/v0.1.0/OpenBranches-0.1.0-mac-arm64.dmg) or [Intel (`x64`)](https://github.com/Charlesmendez/OpenBranches/releases/download/v0.1.0/OpenBranches-0.1.0-mac-x64.dmg) DMG from the [latest GitHub Release](https://github.com/Charlesmendez/OpenBranches/releases/latest).
+1. Download the [Apple silicon (`arm64`)](https://github.com/Charlesmendez/OpenBranches/releases/download/v0.1.1/OpenBranches-0.1.1-mac-arm64.dmg) or [Intel (`x64`)](https://github.com/Charlesmendez/OpenBranches/releases/download/v0.1.1/OpenBranches-0.1.1-mac-x64.dmg) DMG from the [latest GitHub Release](https://github.com/Charlesmendez/OpenBranches/releases/latest).
 2. Open the DMG and drag OpenBranches into Applications.
 3. Launch the app and follow automatically discovered projects, or choose a repository folder.
 4. Optionally connect GitHub and local coding-agent history in Settings.
@@ -123,7 +123,7 @@ The service and Mac companion are implemented as an isolated fictional preview. 
 
 ## Project status
 
-OpenBranches v0.1.0 is publicly available for Apple silicon and Intel Macs. The desktop application, Git evidence model, workspace control panel, project maps, review handoffs, source health, GitHub connection, and signed release pipeline are implemented. The release workflow built and verified each installer on its matching native Mac architecture, including its signature, stapled notarization ticket, mounted bundle, architecture, and checksum.
+OpenBranches v0.1.1 is publicly available for Apple silicon and Intel Macs. The desktop application, Git evidence model, workspace control panel, project maps, review handoffs, source health, GitHub connection, and signed release pipeline are implemented. The release workflow builds and verifies each installer on its matching native Mac architecture, including its signature, stapled notarization ticket, mounted bundle, architecture, and checksum.
 
 The optional self-hosted team workspace remains a preview. Broader clean-machine, macOS-version, and assistive-technology testing continues after the initial desktop release.
 

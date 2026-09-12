@@ -10,6 +10,7 @@ import {
   RefreshCw,
   ShieldCheck,
 } from 'lucide-react';
+import { copyText } from '../copyText';
 import type { Repository } from '../../domain/types';
 import type { TeamConnectionStatus, TeamDesktopApi } from '../../team/device';
 import { useTeams, useTeamSharing } from '../hooks/useTeams';
@@ -236,7 +237,7 @@ function ConnectionCard({
               aria-label="Copy team connection code"
               onClick={() =>
                 void action.run(async () => {
-                  await navigator.clipboard.writeText(connection.pairing!.code);
+                  await copyText(connection.pairing!.code);
                   setCopied(true);
                 })
               }
