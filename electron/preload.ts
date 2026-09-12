@@ -63,6 +63,7 @@ const api: DesktopApi = {
     ipcRenderer.invoke('worktree:reveal', id, branchId, worktreePath),
   openExternal: (url) => ipcRenderer.invoke('external:open', url),
   openLegalDocument: (kind) => ipcRenderer.invoke('legal:open', kind),
+  copyText: (value) => ipcRenderer.invoke('clipboard:write', value),
   getProviderStatus: () => ipcRenderer.invoke('providers:status'),
   connectGitHub: () => ipcRenderer.invoke('github:connect'),
   pollGitHub: () => ipcRenderer.invoke('github:poll'),
