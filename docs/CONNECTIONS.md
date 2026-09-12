@@ -6,7 +6,7 @@ Settings is divided into Projects, Connections, Team sharing, and Privacy instea
 
 ## GitHub
 
-Public GitHub reading is available in Settings without sign-in. It only reads remotes of repositories you selected; GitHub's unauthenticated rate limits apply. Private repositories require GitHub App authorization.
+Public GitHub reading is available in Settings without sign-in. It only reads remotes of repositories you selected; GitHub's unauthenticated rate limits apply. Private repositories require two GitHub steps. Device sign-in authorizes the user's identity. The OpenBranches Desktop GitHub App must then be installed separately on each personal account or organization whose repositories should be visible; the user chooses all repositories or selected repositories. Settings shows both steps independently, links to the public installation page, lists monitored projects that still need access, and lets the user recheck after changing access.
 
 People & PRs reads authors and requested reviewers/teams from the same selected GitHub repositories. Open PRs and recent closed history are listed separately, with bounded coverage and retained-state labels. No company membership or new write permission is inferred; see [collaboration behavior](COLLABORATION.md).
 
@@ -19,7 +19,7 @@ Maintainers must register a public GitHub App before distributing sign-in-enable
 - Keep expiring user tokens enabled.
 - A webhook server is not needed for periodic desktop refresh; disable webhook delivery if none is configured.
 - Users choose the repositories that the app installation can access.
-- Build with the public `GITHUB_APP_CLIENT_ID`. Do not embed a client secret, private key, access token, or refresh token.
+- Build with the public `GITHUB_APP_CLIENT_ID` and `GITHUB_APP_INSTALL_URL`. Do not embed a client secret, private key, access token, or refresh token.
 
 Device-flow tokens can be refreshed without a client secret. The application polls at the provider's minimum interval, respects slow-down responses, and discards authorization that completes after disconnect. Tokens never cross the renderer bridge.
 

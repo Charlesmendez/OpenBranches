@@ -38,6 +38,7 @@ import { registerTeamHandlers } from './team/ipc';
 import { TeamPublisher } from './team/publisher';
 import { legalDocumentCopyPath, legalDocumentKinds, legalDocumentPath } from './legal/documents';
 declare const __GITHUB_APP_CLIENT_ID__: string;
+declare const __GITHUB_APP_INSTALL_URL__: string;
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -197,7 +198,11 @@ app.whenReady().then(() => {
   discovery = new ProjectDiscoveryService(store, service, (state) =>
     window?.webContents.send('discovery:updated', state),
   );
-  const githubStatus = () => ({ ...githubAuth.status(), enabled: github!.isEnabled() });
+  const githubStatus = () => ({
+    ...githubAuth.status(),
+    enabled: github!.isEnabled(),
+    installUrl: __GITHUB_APP_INSTALL_URL__ || undefined,
+  });
   const pollGitHub = async () => {
     const wasConnected = githubAuth.status().connected;
     await githubAuth.poll();

@@ -73,4 +73,15 @@ describe('settings connection summary', () => {
       ['2 tools enabled', 'ready'],
     ]);
   });
+
+  it('does not show GitHub as ready while repositories still need installation access', () => {
+    const status = providers();
+    status.github = { configured: true, connected: true, login: 'fixture-user' };
+    expect(connectionSummaries(undefined, status, false, 4)[1]).toEqual({
+      id: 'github',
+      label: 'GitHub',
+      value: '4 need access',
+      tone: 'waiting',
+    });
+  });
 });

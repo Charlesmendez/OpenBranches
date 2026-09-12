@@ -147,6 +147,31 @@ describe('workspace source health', () => {
     expect(github?.checkedAt).toBeUndefined();
   });
 
+  it('turns missing GitHub App installation access into a specific action', () => {
+    const repository = createDemoSnapshot(now).repositories[0];
+    repository.scannedAt = at;
+    repository.github = {
+      checkedAt: at,
+      partial: true,
+      error: "Repository unavailable on GitHub. Check the app's repository access.",
+    };
+    const health = workspaceSourceHealth(
+      [repository],
+      providers({
+        github: { connected: true, configured: true, enabled: true, login: 'fixture-user' },
+      }),
+      'ready',
+      false,
+      now,
+    );
+    expect(health.rows.find((row) => row.id === 'github')).toMatchObject({
+      state: 'delayed',
+      value: '1 need access',
+      detail:
+        'Signed in as @fixture-user. OpenBranches Desktop still needs repository access for 1 project. Open Settings to grant access for each GitHub user or organization.',
+    });
+  });
+
   it('surfaces partial history and live listeners that need repair', () => {
     const repository = createDemoSnapshot(now).repositories[0];
     repository.scannedAt = at;

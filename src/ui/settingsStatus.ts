@@ -12,6 +12,7 @@ export function connectionSummaries(
   git: GitStatus | undefined,
   providers: ProviderStatus,
   demo: boolean,
+  githubAccessNeeded = 0,
 ): ConnectionSummaryItem[] {
   if (demo)
     return [
@@ -55,17 +56,21 @@ export function connectionSummaries(
       value: providers.github.device
         ? 'Sign-in pending'
         : providers.github.connected
-          ? providers.github.login
-            ? `@${providers.github.login}`
-            : 'Connected'
+          ? githubAccessNeeded
+            ? `${githubAccessNeeded} need access`
+            : providers.github.login
+              ? `@${providers.github.login}`
+              : 'Connected'
           : providers.github.enabled
             ? 'Public projects'
             : 'Not connected',
       tone: providers.github.device
         ? 'waiting'
-        : providers.github.connected || providers.github.enabled
-          ? 'ready'
-          : 'off',
+        : githubAccessNeeded
+          ? 'waiting'
+          : providers.github.connected || providers.github.enabled
+            ? 'ready'
+            : 'off',
     },
     {
       id: 'history',
