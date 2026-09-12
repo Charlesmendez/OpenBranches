@@ -322,6 +322,88 @@
   color: #c8ae77;
 }
 
+.github-owner-list {
+  display: grid;
+  gap: 7px;
+  margin-top: 14px;
+}
+
+.github-owner-row {
+  display: grid;
+  grid-template-columns: 34px minmax(150px, 1fr) auto auto;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+  padding: 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #11141a70;
+}
+
+.github-owner-row.not-installed,
+.github-owner-row.selected {
+  border-color: #74613d;
+  background: #7d62260d;
+}
+
+.github-owner-avatar {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid #596888;
+  border-radius: 8px;
+  color: #adbbe3;
+  background: #7184bd12;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.github-owner-copy {
+  min-width: 0;
+}
+
+.github-owner-copy strong,
+.github-owner-copy small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.github-owner-copy strong {
+  color: var(--text-soft);
+  font-size: 11px;
+  font-weight: 590;
+}
+
+.github-owner-copy small {
+  margin-top: 4px;
+  color: var(--faint);
+  font-size: 8.5px;
+}
+
+.github-owner-state {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  color: #9eafe0;
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+.github-owner-row.not-installed .github-owner-state,
+.github-owner-row.selected .github-owner-state {
+  color: #d0ad68;
+}
+
+.github-owner-row .compact-button {
+  min-height: 30px;
+  padding: 7px 10px;
+  font-size: 9.5px;
+}
+
 .github-access-actions {
   display: flex;
   flex-wrap: wrap;
@@ -336,6 +418,15 @@
 
   .github-access-steps {
     grid-template-columns: 1fr;
+  }
+
+  .github-owner-row {
+    grid-template-columns: 34px minmax(0, 1fr) auto;
+  }
+
+  .github-owner-row .compact-button {
+    grid-column: 2 / -1;
+    justify-self: start;
   }
 }
 

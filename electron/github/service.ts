@@ -11,10 +11,13 @@ import { enrichRepository } from './enrich';
 import { readOpenPulls, reconcileOpenPulls, retainPartialPulls } from '../../src/github/pulls';
 import { limitSignalCache } from '../../src/github/signals';
 import { GitHubError, type GitHubReader } from '../../src/github/transport';
+import { readInstallations, type InstallationSnapshot } from '../../src/github/installations';
+import type { GitHubStatus } from '../../src/domain/types';
 
 const PULL_REFRESH_MS = 120_000;
 const PUBLIC_PULL_REFRESH_MS = 5 * 60_000;
 const FULL_REFRESH_MS = 10 * 60_000;
+const INSTALLATION_REFRESH_MS = 2 * 60_000;
 
 class RefreshBudgetExhausted extends Error {}
 
@@ -29,6 +32,11 @@ export class GitHubService {
   private lastPullRefreshAt = 0;
   private pullTimer: ReturnType<typeof setInterval>;
   private fullTimer: ReturnType<typeof setInterval>;
+  private installation?: InstallationSnapshot;
+  private installationError?: string;
+  private installationJob?: Promise<boolean>;
+  private lastInstallationAttemptAt = 0;
+  private installationGeneration = 0;
 
   constructor(
     private store: Pick<AppStore, 'read' | 'write'>,
@@ -55,6 +63,64 @@ export class GitHubService {
   }
   isEnabled() {
     return this.enabled;
+  }
+  installationStatus(): Pick<
+    GitHubStatus,
+    'installations' | 'installationsCheckedAt' | 'installationsPartial' | 'installationsError'
+  > {
+    return {
+      ...(this.installation
+        ? {
+            installations: this.installation.installations,
+            installationsCheckedAt: this.installation.checkedAt,
+            installationsPartial: this.installation.partial,
+          }
+        : {}),
+      ...(this.installationError ? { installationsError: this.installationError } : {}),
+    };
+  }
+  clearInstallations() {
+    ++this.installationGeneration;
+    this.installation = undefined;
+    this.installationError = undefined;
+    this.lastInstallationAttemptAt = 0;
+    this.installationJob = undefined;
+  }
+  refreshInstallations(force = false): Promise<boolean> {
+    if (this.closed || this.auth.status?.().connected !== true) {
+      const changed = Boolean(this.installation);
+      this.clearInstallations();
+      return Promise.resolve(changed);
+    }
+    if (this.installationJob) return this.installationJob;
+    if (!force && Date.now() - this.lastInstallationAttemptAt < INSTALLATION_REFRESH_MS)
+      return Promise.resolve(false);
+    this.lastInstallationAttemptAt = Date.now();
+    const previous = this.installation;
+    const generation = this.installationGeneration;
+    const job = readInstallations(this.auth.http, previous)
+      .then((installation) => {
+        if (this.closed || generation !== this.installationGeneration) return false;
+        const changed =
+          !previous ||
+          JSON.stringify(previous.installations) !== JSON.stringify(installation.installations);
+        this.installation = installation;
+        this.installationError = installation.partial
+          ? 'More than 100 GitHub installations were found. This list is partial.'
+          : undefined;
+        return changed;
+      })
+      .catch((error) => {
+        if (this.closed || generation !== this.installationGeneration) return false;
+        this.installationError =
+          error instanceof Error ? error.message : 'GitHub account access could not be checked.';
+        return false;
+      })
+      .finally(() => {
+        if (this.installationJob === job) this.installationJob = undefined;
+      });
+    this.installationJob = job;
+    return job;
   }
   private selectedKeys(snapshot = this.current()): Set<string> {
     return new Set(

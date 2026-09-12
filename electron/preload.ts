@@ -67,6 +67,7 @@ const api: DesktopApi = {
   getProviderStatus: () => ipcRenderer.invoke('providers:status'),
   connectGitHub: () => ipcRenderer.invoke('github:connect'),
   pollGitHub: () => ipcRenderer.invoke('github:poll'),
+  refreshGitHubAccess: () => ipcRenderer.invoke('github:access-refresh'),
   disconnectGitHub: () => ipcRenderer.invoke('github:disconnect'),
   enablePublicGitHub: () => ipcRenderer.invoke('github:public'),
   connectCodex: () => ipcRenderer.invoke('codex:connect'),
