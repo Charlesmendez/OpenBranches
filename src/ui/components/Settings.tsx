@@ -14,7 +14,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import type { GitHubStatus, Repository } from '../../domain/types';
-import { githubRepositoryAccess } from '../../domain/githubAccess';
+import { githubOwnerAccess, githubRepositoryAccess } from '../../domain/githubAccess';
 import { useProviders } from '../hooks/useProviders';
 import { CodexConnection } from './CodexConnection';
 import { GitSetup } from './GitSetup';
@@ -59,6 +59,14 @@ export function Settings({
   const [legalError, setLegalError] = useState('');
   const [section, setSection] = useState<SettingsSection>(() => sectionForFocus(focusSection));
   const githubAccess = githubRepositoryAccess(repositories);
+  const githubOwners = githubOwnerAccess(
+    repositories,
+    github.installations,
+    github.installationsPartial,
+  );
+  const githubOwnersNeedingAccess = githubOwners.filter(
+    ({ state }) => state === 'not-installed' || state === 'selected',
+  );
   useEffect(() => setGitHub(providers.github), [providers.github]);
   useEffect(() => {
     if (focusSection) setSection(sectionForFocus(focusSection));
@@ -145,7 +153,7 @@ export function Settings({
               git={git.status}
               providers={{ ...providers, github }}
               demo={demo}
-              githubAccessNeeded={githubAccess.unavailableCount}
+              githubAccessNeeded={githubOwnersNeedingAccess.length || githubAccess.unavailableCount}
             />
             <section className="settings-section">
               <div className="settings-group-label">Repositories</div>
@@ -207,12 +215,16 @@ export function Settings({
               </div>
               {github.connected && (
                 <div
-                  className={`github-access-card ${githubAccess.unavailableCount ? 'needs-access' : ''}`}
-                  role={githubAccess.unavailableCount ? 'alert' : 'status'}
+                  className={`github-access-card ${githubOwnersNeedingAccess.length || github.installationsError ? 'needs-access' : ''}`}
+                  role={
+                    githubOwnersNeedingAccess.length || github.installationsError
+                      ? 'alert'
+                      : 'status'
+                  }
                 >
                   <div className="github-access-heading">
                     <span className="github-access-icon">
-                      {githubAccess.unavailableCount ? (
+                      {githubOwnersNeedingAccess.length || github.installationsError ? (
                         <CircleAlert size={18} />
                       ) : (
                         <ShieldCheck size={18} />
@@ -221,9 +233,13 @@ export function Settings({
                     <div>
                       <span className="section-kicker">GITHUB SETUP</span>
                       <h4>
-                        {githubAccess.unavailableCount
-                          ? 'One more step: grant repository access'
-                          : 'Identity and repository access are separate'}
+                        {github.installationsError
+                          ? 'Choose which GitHub accounts OpenBranches can read'
+                          : github.installations === undefined
+                            ? 'Checking the accounts behind your projects'
+                            : githubOwnersNeedingAccess.length
+                              ? 'Choose which GitHub accounts OpenBranches can read'
+                              : 'Every monitored GitHub owner is connected'}
                       </h4>
                     </div>
                   </div>
@@ -238,21 +254,37 @@ export function Settings({
                       </div>
                       <Check size={15} />
                     </div>
-                    <div className={githubAccess.unavailableCount ? 'needed' : 'complete'}>
+                    <div
+                      className={
+                        github.installationsError
+                          ? 'needed'
+                          : github.installations === undefined
+                            ? 'checking'
+                            : githubOwnersNeedingAccess.length
+                              ? 'needed'
+                              : 'complete'
+                      }
+                    >
                       <span>2</span>
                       <div>
-                        <small>Repository access</small>
+                        <small>Account access</small>
                         <strong>
-                          {githubAccess.unavailableCount
-                            ? `${githubAccess.unavailableCount} monitored ${githubAccess.unavailableCount === 1 ? 'project needs' : 'projects need'} access`
-                            : githubAccess.projectCount === 0
-                              ? 'No GitHub projects to check yet'
-                              : githubAccess.observedCount < githubAccess.projectCount
-                                ? 'Checking monitored projects'
-                                : `No access blocks across ${githubAccess.projectCount} ${githubAccess.projectCount === 1 ? 'project' : 'projects'}`}
+                          {github.installationsError
+                            ? 'Installation status unavailable'
+                            : github.installations === undefined
+                              ? 'Checking installations'
+                              : githubOwners.length === 0
+                                ? 'No GitHub projects to check yet'
+                                : githubOwnersNeedingAccess.length
+                                  ? `${githubOwnersNeedingAccess.length} ${githubOwnersNeedingAccess.length === 1 ? 'owner needs' : 'owners need'} a choice`
+                                  : `${githubOwners.length} ${githubOwners.length === 1 ? 'owner' : 'owners'} covered`}
                         </strong>
                       </div>
-                      {githubAccess.unavailableCount ? (
+                      {github.installationsError ? (
+                        <CircleAlert size={15} />
+                      ) : github.installations === undefined ? (
+                        <LoaderCircle size={15} className="spin" />
+                      ) : githubOwnersNeedingAccess.length ? (
                         <CircleAlert size={15} />
                       ) : (
                         <Check size={15} />
@@ -260,21 +292,84 @@ export function Settings({
                     </div>
                   </div>
                   <p>
-                    Install OpenBranches Desktop on each GitHub user or organization you want to
-                    monitor. GitHub lets you grant all repositories or only selected ones. The app
-                    receives read-only access.
+                    GitHub requires one OpenBranches installation per personal account or
+                    organization. For complete automatic coverage, open each row below and choose
+                    <strong> All repositories</strong>. Access stays read-only.
                   </p>
-                  {githubAccess.unavailableCount > 0 && (
-                    <p className="github-access-projects">
-                      Currently blocked: {githubAccess.unavailableNames.slice(0, 4).join(', ')}
-                      {githubAccess.unavailableNames.length > 4
-                        ? ` and ${githubAccess.unavailableNames.length - 4} more`
-                        : ''}
-                      .
-                    </p>
+                  {githubOwners.length > 0 && (
+                    <div className="github-owner-list" aria-label="GitHub account access">
+                      {githubOwners.map((owner) => (
+                        <div className={`github-owner-row ${owner.state}`} key={owner.owner}>
+                          <span className="github-owner-avatar" aria-hidden="true">
+                            {owner.owner.slice(0, 1).toUpperCase()}
+                          </span>
+                          <div className="github-owner-copy">
+                            <strong>{owner.owner}</strong>
+                            <small>
+                              {owner.accountType === 'User'
+                                ? 'Personal account'
+                                : owner.accountType === 'Organization'
+                                  ? 'Organization'
+                                  : 'GitHub owner'}
+                              {' · '}
+                              {owner.projectCount}{' '}
+                              {owner.projectCount === 1
+                                ? 'monitored project'
+                                : 'monitored projects'}
+                            </small>
+                          </div>
+                          <span className="github-owner-state">
+                            {owner.state === 'checking' && github.installationsError ? (
+                              <>
+                                <CircleAlert size={12} /> Status unavailable
+                              </>
+                            ) : owner.state === 'checking' ? (
+                              <>
+                                <LoaderCircle size={12} className="spin" /> Checking
+                              </>
+                            ) : owner.state === 'connected' ? (
+                              <>
+                                <Check size={12} /> All repositories
+                              </>
+                            ) : owner.state === 'selected' ? (
+                              <>
+                                <CircleAlert size={12} /> Selected repositories
+                              </>
+                            ) : (
+                              <>
+                                <CircleAlert size={12} /> Not connected
+                              </>
+                            )}
+                          </span>
+                          {github.installUrl && owner.state !== 'connected' && (
+                            <button
+                              className={
+                                owner.state === 'not-installed'
+                                  ? 'primary-button compact-button'
+                                  : 'secondary-button compact-button'
+                              }
+                              disabled={
+                                busy || (owner.state === 'checking' && !github.installationsError)
+                              }
+                              onClick={() =>
+                                void action(() =>
+                                  window.openbranches!.openExternal(github.installUrl!),
+                                )
+                              }
+                            >
+                              {owner.state === 'selected' ? 'Change access' : 'Open GitHub setup'}
+                              <ArrowUpRight size={13} />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {github.installationsError && (
+                    <p className="github-access-projects">{github.installationsError}</p>
                   )}
                   <div className="github-access-actions">
-                    {github.installUrl && (
+                    {github.installUrl && githubOwners.length === 0 && (
                       <button
                         className="primary-button"
                         disabled={busy}
@@ -282,18 +377,21 @@ export function Settings({
                           void action(() => window.openbranches!.openExternal(github.installUrl!))
                         }
                       >
-                        {githubAccess.unavailableCount
-                          ? 'Grant repository access'
-                          : 'Manage repository access'}
+                        Add a GitHub account
                         <ArrowUpRight size={14} />
                       </button>
                     )}
                     <button
                       className="secondary-button"
                       disabled={busy}
-                      onClick={() => void action(() => window.openbranches!.refresh())}
+                      onClick={() =>
+                        void action(async () => {
+                          const status = await window.openbranches!.refreshGitHubAccess();
+                          setGitHub(status);
+                        })
+                      }
                     >
-                      Check access again
+                      Recheck account access
                     </button>
                   </div>
                 </div>
