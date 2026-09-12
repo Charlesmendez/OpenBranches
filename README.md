@@ -14,7 +14,7 @@
   <img src="https://img.shields.io/badge/platform-macOS-d9dce7.svg" alt="macOS">
 </p>
 
-> **Download v0.1.1:** [Apple silicon (M1 and newer)](https://github.com/Charlesmendez/OpenBranches/releases/download/v0.1.1/OpenBranches-0.1.1-mac-arm64.dmg) · [Intel](https://github.com/Charlesmendez/OpenBranches/releases/download/v0.1.1/OpenBranches-0.1.1-mac-x64.dmg). Both installers are signed with Developer ID and notarized by Apple.
+> **Download v0.1.2:** [Apple silicon (M1 and newer)](https://github.com/Charlesmendez/OpenBranches/releases/download/v0.1.2/OpenBranches-0.1.2-mac-arm64.dmg) · [Intel](https://github.com/Charlesmendez/OpenBranches/releases/download/v0.1.2/OpenBranches-0.1.2-mac-x64.dmg). Both installers are signed with Developer ID and notarized by Apple.
 
 ![OpenBranches workspace control panel](docs/images/workspace-overview.png)
 
@@ -38,13 +38,13 @@ The project map keeps current work visible above the graph and makes active bran
 
 ## Connections
 
-| Source      | What OpenBranches uses                                | Connection                                                        |
-| ----------- | ----------------------------------------------------- | ----------------------------------------------------------------- |
-| Local Git   | Branches, worktrees, changes, commits, remotes        | Automatic after you choose or follow a repository                 |
-| GitHub      | Published branches, pull requests, reviews, checks    | Public data works without sign-in; private data uses a GitHub App |
-| Codex       | Recent task-to-checkout activity                      | Optional local connection in Settings                             |
-| Claude Code | Session-to-project activity                           | Optional local history and live hook                              |
-| Cursor      | Live checkout activity and explicitly reported models | Optional live hook                                                |
+| Source      | What OpenBranches uses                                | Connection                                                 |
+| ----------- | ----------------------------------------------------- | ---------------------------------------------------------- |
+| Local Git   | Branches, worktrees, changes, commits, remotes        | Automatic after you choose or follow a repository          |
+| GitHub      | Published branches, pull requests, reviews, checks    | Private data needs identity sign-in plus repository access |
+| Codex       | Recent task-to-checkout activity                      | Optional local connection in Settings                      |
+| Claude Code | Session-to-project activity                           | Optional local history and live hook                       |
+| Cursor      | Live checkout activity and explicitly reported models | Optional live hook                                         |
 
 Local changes update while the app is open. GitHub requests use per-repository freshness windows, conditional responses, and rotating budgets so a large workspace does not repeatedly download unchanged data. The title bar shows when a source is refreshing, delayed, partial, disabled, or rate limited.
 
@@ -54,10 +54,10 @@ Local changes update while the app is open. GitHub requests use per-repository f
 
 The intended installation is the normal Mac flow:
 
-1. Download the [Apple silicon (`arm64`)](https://github.com/Charlesmendez/OpenBranches/releases/download/v0.1.1/OpenBranches-0.1.1-mac-arm64.dmg) or [Intel (`x64`)](https://github.com/Charlesmendez/OpenBranches/releases/download/v0.1.1/OpenBranches-0.1.1-mac-x64.dmg) DMG from the [latest GitHub Release](https://github.com/Charlesmendez/OpenBranches/releases/latest).
+1. Download the [Apple silicon (`arm64`)](https://github.com/Charlesmendez/OpenBranches/releases/download/v0.1.2/OpenBranches-0.1.2-mac-arm64.dmg) or [Intel (`x64`)](https://github.com/Charlesmendez/OpenBranches/releases/download/v0.1.2/OpenBranches-0.1.2-mac-x64.dmg) DMG from the [latest GitHub Release](https://github.com/Charlesmendez/OpenBranches/releases/latest).
 2. Open the DMG and drag OpenBranches into Applications.
 3. Launch the app and follow automatically discovered projects, or choose a repository folder.
-4. Optionally connect GitHub and local coding-agent history in Settings.
+4. Optionally connect GitHub and local coding-agent history in Settings. For private repositories, sign in and then grant OpenBranches Desktop read-only access to each GitHub user or organization you want to monitor.
 
 End users will not need Node.js, npm, Xcode, or an Apple Developer account. Git 2.36 or newer is required for local inspection; OpenBranches detects common Apple and Homebrew installations and guides the user through Apple's Command Line Tools installer when Git is missing.
 
@@ -123,7 +123,7 @@ The service and Mac companion are implemented as an isolated fictional preview. 
 
 ## Project status
 
-OpenBranches v0.1.1 is publicly available for Apple silicon and Intel Macs. The desktop application, Git evidence model, workspace control panel, project maps, review handoffs, source health, GitHub connection, and signed release pipeline are implemented. The release workflow builds and verifies each installer on its matching native Mac architecture, including its signature, stapled notarization ticket, mounted bundle, architecture, and checksum.
+OpenBranches v0.1.2 is publicly available for Apple silicon and Intel Macs. The desktop application, Git evidence model, workspace control panel, project maps, review handoffs, source health, GitHub connection, and signed release pipeline are implemented. The release workflow builds and verifies each installer on its matching native Mac architecture, including its signature, stapled notarization ticket, mounted bundle, architecture, and checksum.
 
 The optional self-hosted team workspace remains a preview. Broader clean-machine, macOS-version, and assistive-technology testing continues after the initial desktop release.
 

@@ -18,7 +18,7 @@ The bundle identifier is `com.openbranches.desktop`. Packaging and artifact veri
 
 Complete the Apple Developer enrollment and create the Developer ID Application certificate described above. No App Store listing is involved.
 
-Create the public GitHub App used for device authorization and set its client ID as the repository variable `OPENBRANCHES_GITHUB_APP_CLIENT_ID`. The release workflow maps that value to the build-time `GITHUB_APP_CLIENT_ID` environment variable. The desktop bundle never contains a GitHub client secret.
+Create the public GitHub App used for device authorization. Set its client ID as the repository variable `OPENBRANCHES_GITHUB_APP_CLIENT_ID` and its public installation URL as `OPENBRANCHES_GITHUB_APP_INSTALL_URL` (for example, `https://github.com/apps/your-app/installations/new`). The release workflow maps those values to build-time settings. The installation URL lets the app distinguish identity sign-in from repository access and send users to the correct GitHub App installation. The desktop bundle never contains a GitHub client secret.
 
 Add these GitHub Actions secrets:
 
@@ -59,7 +59,7 @@ Run the corresponding integrity check after packaging:
 npm run verify:macos -- --arch=arm64
 ```
 
-`npm run make:release -- --arch=arm64` uses the same pipeline with signing and notarization enabled. It requires the Apple environment variables, an installed Developer ID identity, and `GITHUB_APP_CLIENT_ID`. Use it only from a controlled release environment. Packaging never uploads an artifact by itself.
+`npm run make:release -- --arch=arm64` uses the same pipeline with signing and notarization enabled. It requires the Apple environment variables, an installed Developer ID identity, `GITHUB_APP_CLIENT_ID`, and `GITHUB_APP_INSTALL_URL`. Use it only from a controlled release environment. Packaging never uploads an artifact by itself.
 
 ## License resources
 

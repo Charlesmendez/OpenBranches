@@ -1,7 +1,7 @@
 {
   "name": "openbranches",
   "productName": "OpenBranches",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "description": "A local map of branches, worktrees, and the work behind them.",
   "license": "MIT",

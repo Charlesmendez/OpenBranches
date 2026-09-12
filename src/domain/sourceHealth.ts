@@ -1,4 +1,5 @@
 import { toolNames } from './agents';
+import { githubRepositoryAccess, hasGitHubRemote } from './githubAccess';
 import { observationStale, validObservationTime } from './sourceFreshness';
 import type { GitStatus, ProviderStatus, Repository } from './types';
 
@@ -24,7 +25,6 @@ export interface WorkspaceSourceHealth {
 const LOCAL_STALE_AFTER = 2 * 60_000;
 const REMOTE_STALE_AFTER = 10 * 60_000;
 const HISTORY_STALE_AFTER = 5 * 60_000;
-const githubRemote = /github\.com[/:]/i;
 
 const oldest = (values: Array<string | undefined>, now: number) => {
   const times = values.flatMap((value) => {
@@ -116,9 +116,7 @@ function githubHealth(
   providers: ProviderStatus,
   now: number,
 ): SourceHealthRow {
-  const projects = repositories.filter((repository) =>
-    repository.remotes.some((remote) => githubRemote.test(remote.url)),
-  );
+  const projects = repositories.filter(hasGitHubRemote);
   if (!providers.github.enabled)
     return {
       id: 'github',
@@ -145,6 +143,7 @@ function githubHealth(
   const failed = observed.filter((repository) => repository.github?.error).length;
   const partial = observed.filter((repository) => repository.github?.partial).length;
   const missing = projects.length - observed.length;
+  const repositoryAccess = githubRepositoryAccess(repositories);
   const rateLimited = observed.some((repository) =>
     repository.github?.error?.toLocaleLowerCase().includes('rate limited'),
   );
@@ -173,13 +172,16 @@ function githubHealth(
     return {
       id: 'github',
       label: 'GitHub',
-      value: rateLimited
-        ? 'Rate limited'
-        : failed || providers.github.error
-          ? 'Update delayed'
-          : 'Partial results',
-      detail:
-        rateLimited && !providers.github.connected
+      value: repositoryAccess.unavailableCount
+        ? `${repositoryAccess.unavailableCount} need access`
+        : rateLimited
+          ? 'Rate limited'
+          : failed || providers.github.error
+            ? 'Update delayed'
+            : 'Partial results',
+      detail: repositoryAccess.unavailableCount
+        ? `${access} OpenBranches Desktop still needs repository access for ${repositoryAccess.unavailableCount} ${repositoryAccess.unavailableCount === 1 ? 'project' : 'projects'}. Open Settings to grant access for each GitHub user or organization.`
+        : rateLimited && !providers.github.connected
           ? `${access} Sign in to keep ${projects.length} projects current. Saved PR states are excluded from “right now” until GitHub verifies them.`
           : `${access} ${failed ? `${failed} failed. ` : ''}${partial ? `${partial} partial. ` : ''}${missing ? `${missing} awaiting data. ` : ''}Saved results remain available outside the live view.`,
       state: 'delayed',

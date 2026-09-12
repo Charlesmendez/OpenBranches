@@ -1,13 +1,13 @@
 # Mac installation and first-run setup
 
-OpenBranches v0.1.1 is available as a signed, notarized DMG for Apple silicon and Intel Macs. Choose the installer that matches your Mac; no Apple Developer account or source-code build is required.
+OpenBranches v0.1.2 is available as a signed, notarized DMG for Apple silicon and Intel Macs. Choose the installer that matches your Mac; no Apple Developer account or source-code build is required.
 
 ## Install the public release
 
-1. Download [Apple silicon (`arm64`)](https://github.com/Charlesmendez/OpenBranches/releases/download/v0.1.1/OpenBranches-0.1.1-mac-arm64.dmg) for M1 and newer Apple-chip Macs, or [Intel (`x64`)](https://github.com/Charlesmendez/OpenBranches/releases/download/v0.1.1/OpenBranches-0.1.1-mac-x64.dmg) for an Intel Mac. The [latest release page](https://github.com/Charlesmendez/OpenBranches/releases/latest) includes both downloads and their checksums.
+1. Download [Apple silicon (`arm64`)](https://github.com/Charlesmendez/OpenBranches/releases/download/v0.1.2/OpenBranches-0.1.2-mac-arm64.dmg) for M1 and newer Apple-chip Macs, or [Intel (`x64`)](https://github.com/Charlesmendez/OpenBranches/releases/download/v0.1.2/OpenBranches-0.1.2-mac-x64.dmg) for an Intel Mac. The [latest release page](https://github.com/Charlesmendez/OpenBranches/releases/latest) includes both downloads and their checksums.
 2. Drag OpenBranches into Applications and open it.
 3. Choose a local project folder. No account is required for local Git inspection.
-4. Optionally connect GitHub or existing Codex task history in Settings.
+4. Optionally connect GitHub or existing Codex task history in Settings. Private GitHub projects require identity sign-in and read-only repository access for each personal account or organization you want to monitor.
 
 End users do not need Node.js, npm, Xcode, an Apple Developer account, or a source-code build. Contributors use the development commands in the README.
 

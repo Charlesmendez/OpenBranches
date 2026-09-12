@@ -16,7 +16,10 @@ export async function buildElectron() {
     target: 'node24',
     external: ['electron'],
     sourcemap: true,
-    define: { __GITHUB_APP_CLIENT_ID__: JSON.stringify(process.env.GITHUB_APP_CLIENT_ID ?? '') },
+    define: {
+      __GITHUB_APP_CLIENT_ID__: JSON.stringify(process.env.GITHUB_APP_CLIENT_ID ?? ''),
+      __GITHUB_APP_INSTALL_URL__: JSON.stringify(process.env.GITHUB_APP_INSTALL_URL ?? ''),
+    },
   });
 }
 if (process.argv[1]?.endsWith('build.mjs')) {
