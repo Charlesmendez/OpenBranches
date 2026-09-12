@@ -9,6 +9,7 @@ import {
 } from '../src/github/reader';
 import { enrichRepository } from '../electron/github/enrich';
 import { createDemoSnapshot } from '../src/data/demo';
+import { readInstallations } from '../src/github/installations';
 
 const response = (body: unknown, init: ResponseInit = {}) =>
   new Response(JSON.stringify(body), { status: 200, ...init });
@@ -122,6 +123,44 @@ describe('GitHub device sign-in', () => {
     expect(storage.read()).toContain('rotated');
     auth.disconnect();
     expect(storage.read()).toBeUndefined();
+  });
+});
+
+describe('GitHub App installations', () => {
+  it('reads account coverage in one bounded request and reuses its etag', async () => {
+    const get = vi
+      .fn()
+      .mockResolvedValueOnce({
+        body: {
+          total_count: 1,
+          installations: [
+            {
+              id: 42,
+              account: { login: 'datagran-auth', type: 'Organization' },
+              repository_selection: 'all',
+            },
+          ],
+        },
+        hasNext: false,
+        etag: 'fixture-etag',
+      })
+      .mockResolvedValueOnce({ body: undefined, hasNext: false, notModified: true });
+    const first = await readInstallations({ get });
+    expect(first.installations).toEqual([
+      {
+        account: 'datagran-auth',
+        accountType: 'Organization',
+        repositorySelection: 'all',
+      },
+    ]);
+    const second = await readInstallations({ get }, first);
+    expect(second.installations).toEqual(first.installations);
+    expect(get).toHaveBeenNthCalledWith(1, '/user/installations?per_page=100', {
+      etag: undefined,
+    });
+    expect(get).toHaveBeenNthCalledWith(2, '/user/installations?per_page=100', {
+      etag: 'fixture-etag',
+    });
   });
 });
 

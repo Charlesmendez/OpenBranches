@@ -65,14 +65,25 @@ const refreshHistories = () =>
   Promise.all([...localHistories.values()].map((history) => history.refresh()));
 let reviews: ReviewService;
 let githubAuth: GitHubAuth;
+let githubStatusForWindow: (() => import('../src/domain/types').GitHubStatus) | undefined;
 let authTimer: ReturnType<typeof setInterval> | undefined;
 let lastForegroundGitHubRefresh = 0;
 const devUrl = !app.isPackaged ? process.env.OPENBRANCHES_DEV_URL : undefined;
 function refreshGitHubInForeground() {
   const now = Date.now();
-  if (now - lastForegroundGitHubRefresh < 30_000) return;
-  lastForegroundGitHubRefresh = now;
-  void github?.refreshPullRequests();
+  const refreshPulls = now - lastForegroundGitHubRefresh >= 30_000;
+  if (refreshPulls) lastForegroundGitHubRefresh = now;
+  void github
+    ?.refreshInstallations(true)
+    .then((changed) => {
+      if (githubStatusForWindow)
+        window?.webContents.send('github:updated', githubStatusForWindow());
+      return changed ? github?.refresh() : refreshPulls ? github?.refreshPullRequests() : undefined;
+    })
+    .finally(() => {
+      if (githubStatusForWindow)
+        window?.webContents.send('github:updated', githubStatusForWindow());
+    });
 }
 function showWindow() {
   window?.show();
@@ -202,12 +213,17 @@ app.whenReady().then(() => {
     ...githubAuth.status(),
     enabled: github!.isEnabled(),
     installUrl: __GITHUB_APP_INSTALL_URL__ || undefined,
+    ...github!.installationStatus(),
   });
+  githubStatusForWindow = githubStatus;
   const pollGitHub = async () => {
     const wasConnected = githubAuth.status().connected;
     await githubAuth.poll();
     if (!wasConnected && githubAuth.status().connected) {
       github!.setEnabled(true);
+      void github!
+        .refreshInstallations(true)
+        .finally(() => window?.webContents.send('github:updated', githubStatus()));
       void github!.refresh();
     }
     const status = githubStatus();
@@ -267,7 +283,13 @@ app.whenReady().then(() => {
   handle('git:guide', () => shell.openExternal(GIT_SETUP_GUIDE));
   handle('snapshot:refresh', async () => {
     await service.refresh();
-    await Promise.all([github!.refresh(), codex!.refresh(), refreshHistories()]);
+    await Promise.all([
+      github!.refresh(),
+      github!.refreshInstallations(true),
+      codex!.refresh(),
+      refreshHistories(),
+    ]);
+    window?.webContents.send('github:updated', githubStatus());
   });
   handle('repository:add', async () => {
     await git.executable();
@@ -337,7 +359,7 @@ app.whenReady().then(() => {
     clipboard.writeText(z.string().min(1).max(4096).parse(input));
   });
   handle('providers:status', async () => {
-    await Promise.all([codex!.detect(), liveAgents!.start()]);
+    await Promise.all([codex!.detect(), liveAgents!.start(), github!.refreshInstallations()]);
     return {
       codex: codex!.status(),
       github: githubStatus(),
@@ -359,8 +381,17 @@ app.whenReady().then(() => {
     return githubStatus();
   });
   handle('github:poll', pollGitHub);
+  handle('github:access-refresh', async () => {
+    await github!.refreshInstallations(true);
+    window?.webContents.send('github:updated', githubStatus());
+    await github!.refresh();
+    const status = githubStatus();
+    window?.webContents.send('github:updated', status);
+    return status;
+  });
   handle('github:disconnect', () => {
     githubAuth.disconnect();
+    github!.clearInstallations();
     github!.setEnabled(false);
     window?.webContents.send('github:updated', githubStatus());
   });
@@ -417,6 +448,9 @@ app.whenReady().then(() => {
   );
   void service.refresh();
   void github.refresh();
+  void github
+    .refreshInstallations()
+    .finally(() => window?.webContents.send('github:updated', githubStatus()));
   void codex.refresh();
 });
 app.on('activate', () => {

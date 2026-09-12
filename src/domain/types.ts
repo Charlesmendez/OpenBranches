@@ -269,7 +269,16 @@ export interface GitHubStatus {
   installUrl?: string;
   login?: string;
   error?: string;
+  installations?: GitHubAppInstallation[];
+  installationsCheckedAt?: string;
+  installationsPartial?: boolean;
+  installationsError?: string;
   device?: { code: string; verificationUrl: string; expiresAt: number };
+}
+export interface GitHubAppInstallation {
+  account: string;
+  accountType: 'User' | 'Organization';
+  repositorySelection: 'all' | 'selected';
 }
 export interface CodexUsageBucket {
   id: string;
@@ -357,6 +366,7 @@ export interface DesktopApi {
   getProviderStatus(): Promise<ProviderStatus>;
   connectGitHub(): Promise<GitHubStatus>;
   pollGitHub(): Promise<GitHubStatus>;
+  refreshGitHubAccess(): Promise<GitHubStatus>;
   disconnectGitHub(): Promise<void>;
   enablePublicGitHub(): Promise<void>;
   connectCodex(): Promise<void>;

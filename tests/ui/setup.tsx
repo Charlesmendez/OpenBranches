@@ -268,11 +268,34 @@ window.openbranches = {
           configured: true,
           enabled: true,
           login: 'fixture-user',
+          installUrl: 'https://github.com/apps/openbranches-desktop/installations/new',
+          installations: [
+            { account: 'example', accountType: 'Organization', repositorySelection: 'selected' },
+          ],
+          installationsCheckedAt: fixtureNow,
         }
       : { connected: false, configured: false },
   }),
   connectGitHub: async () => ({ connected: false, configured: false }),
   pollGitHub: async () => ({ connected: false, configured: false }),
+  refreshGitHubAccess: async () =>
+    sourceFixture
+      ? {
+          connected: true,
+          configured: true,
+          enabled: true,
+          login: 'fixture-user',
+          installUrl: 'https://github.com/apps/openbranches-desktop/installations/new',
+          installations: [
+            {
+              account: 'example',
+              accountType: 'Organization' as const,
+              repositorySelection: 'all' as const,
+            },
+          ],
+          installationsCheckedAt: fixtureNow,
+        }
+      : { connected: false, configured: false },
   disconnectGitHub: async () => {},
   enablePublicGitHub: async () => {},
   connectCodex: async () => {},
