@@ -249,6 +249,7 @@ window.openbranches = {
   revealWorktree: async () => {},
   openExternal: async () => {},
   openLegalDocument: async () => {},
+  copyText: async (value) => navigator.clipboard.writeText(value),
   getProviderStatus: async () => ({
     agents,
     liveAgents,

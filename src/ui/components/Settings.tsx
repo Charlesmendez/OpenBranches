@@ -21,6 +21,7 @@ import { MonitoredProjects } from './MonitoredProjects';
 import { ProjectDiscovery } from './ProjectDiscovery';
 import { ConnectionSummary } from './ConnectionSummary';
 import { SettingsNavigation, type SettingsSection } from './SettingsNavigation';
+import { copyText } from '../copyText';
 import './settings.css';
 const TeamConnectionsPanel = lazy(() =>
   import('./TeamConnections').then((module) => ({ default: module.TeamConnectionsPanel })),
@@ -79,7 +80,7 @@ export function Settings({
   const copyCode = () =>
     action(async () => {
       if (github.device) {
-        await navigator.clipboard.writeText(github.device.code);
+        await copyText(github.device.code);
         setCopied(true);
       }
     });

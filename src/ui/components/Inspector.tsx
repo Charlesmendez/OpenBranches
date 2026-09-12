@@ -11,6 +11,7 @@ import { pullSourceStale } from '../../domain/sourceFreshness';
 import { BranchActivity } from './BranchActivity';
 import { PullRequestEvidence } from './PullRequestEvidence';
 import { WorktreeLocations } from './WorktreeLocations';
+import { copyText } from '../copyText';
 const PullSignals = lazy(() =>
   import('./PullSignals').then((module) => ({ default: module.PullSignals })),
 );
@@ -41,7 +42,7 @@ export function Inspector({
   };
   const copyName = async () => {
     try {
-      await navigator.clipboard.writeText(branch.name);
+      await copyText(branch.name);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
