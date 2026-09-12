@@ -5,6 +5,7 @@ import {
   ArrowUpRight,
   Cable,
   Check,
+  CircleAlert,
   Cloud,
   Copy,
   FileText,
@@ -13,6 +14,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import type { GitHubStatus, Repository } from '../../domain/types';
+import { githubRepositoryAccess } from '../../domain/githubAccess';
 import { useProviders } from '../hooks/useProviders';
 import { CodexConnection } from './CodexConnection';
 import { GitSetup } from './GitSetup';
@@ -56,6 +58,7 @@ export function Settings({
   const [legalBusy, setLegalBusy] = useState<'notices' | 'chromium'>();
   const [legalError, setLegalError] = useState('');
   const [section, setSection] = useState<SettingsSection>(() => sectionForFocus(focusSection));
+  const githubAccess = githubRepositoryAccess(repositories);
   useEffect(() => setGitHub(providers.github), [providers.github]);
   useEffect(() => {
     if (focusSection) setSection(sectionForFocus(focusSection));
@@ -138,7 +141,12 @@ export function Settings({
                 coding tools you want OpenBranches to recognize.
               </p>
             </div>
-            <ConnectionSummary git={git.status} providers={{ ...providers, github }} demo={demo} />
+            <ConnectionSummary
+              git={git.status}
+              providers={{ ...providers, github }}
+              demo={demo}
+              githubAccessNeeded={githubAccess.unavailableCount}
+            />
             <section className="settings-section">
               <div className="settings-group-label">Repositories</div>
               <div className="settings-row">
@@ -171,7 +179,7 @@ export function Settings({
                   <h3>GitHub</h3>
                   <p>
                     {github.connected
-                      ? `Connected as ${github.login}. Reading branches, PRs, reviews, and checks from your selected projects.`
+                      ? `Signed in as ${github.login ? `@${github.login}` : 'a GitHub user'}. This connects your identity; repository access is checked separately below.`
                       : github.enabled
                         ? 'Reading public branches, PRs, reviews, and checks. Public GitHub limits can delay updates across many projects; sign in for reliable two-minute refreshes.'
                         : 'See published branches and pull requests alongside work on your Mac.'}
@@ -197,6 +205,99 @@ export function Settings({
                   </button>
                 )}
               </div>
+              {github.connected && (
+                <div
+                  className={`github-access-card ${githubAccess.unavailableCount ? 'needs-access' : ''}`}
+                  role={githubAccess.unavailableCount ? 'alert' : 'status'}
+                >
+                  <div className="github-access-heading">
+                    <span className="github-access-icon">
+                      {githubAccess.unavailableCount ? (
+                        <CircleAlert size={18} />
+                      ) : (
+                        <ShieldCheck size={18} />
+                      )}
+                    </span>
+                    <div>
+                      <span className="section-kicker">GITHUB SETUP</span>
+                      <h4>
+                        {githubAccess.unavailableCount
+                          ? 'One more step: grant repository access'
+                          : 'Identity and repository access are separate'}
+                      </h4>
+                    </div>
+                  </div>
+                  <div className="github-access-steps" aria-label="GitHub connection steps">
+                    <div className="complete">
+                      <span>1</span>
+                      <div>
+                        <small>Identity</small>
+                        <strong>
+                          Signed in as {github.login ? `@${github.login}` : 'a GitHub user'}
+                        </strong>
+                      </div>
+                      <Check size={15} />
+                    </div>
+                    <div className={githubAccess.unavailableCount ? 'needed' : 'complete'}>
+                      <span>2</span>
+                      <div>
+                        <small>Repository access</small>
+                        <strong>
+                          {githubAccess.unavailableCount
+                            ? `${githubAccess.unavailableCount} monitored ${githubAccess.unavailableCount === 1 ? 'project needs' : 'projects need'} access`
+                            : githubAccess.projectCount === 0
+                              ? 'No GitHub projects to check yet'
+                              : githubAccess.observedCount < githubAccess.projectCount
+                                ? 'Checking monitored projects'
+                                : `No access blocks across ${githubAccess.projectCount} ${githubAccess.projectCount === 1 ? 'project' : 'projects'}`}
+                        </strong>
+                      </div>
+                      {githubAccess.unavailableCount ? (
+                        <CircleAlert size={15} />
+                      ) : (
+                        <Check size={15} />
+                      )}
+                    </div>
+                  </div>
+                  <p>
+                    Install OpenBranches Desktop on each GitHub user or organization you want to
+                    monitor. GitHub lets you grant all repositories or only selected ones. The app
+                    receives read-only access.
+                  </p>
+                  {githubAccess.unavailableCount > 0 && (
+                    <p className="github-access-projects">
+                      Currently blocked: {githubAccess.unavailableNames.slice(0, 4).join(', ')}
+                      {githubAccess.unavailableNames.length > 4
+                        ? ` and ${githubAccess.unavailableNames.length - 4} more`
+                        : ''}
+                      .
+                    </p>
+                  )}
+                  <div className="github-access-actions">
+                    {github.installUrl && (
+                      <button
+                        className="primary-button"
+                        disabled={busy}
+                        onClick={() =>
+                          void action(() => window.openbranches!.openExternal(github.installUrl!))
+                        }
+                      >
+                        {githubAccess.unavailableCount
+                          ? 'Grant repository access'
+                          : 'Manage repository access'}
+                        <ArrowUpRight size={14} />
+                      </button>
+                    )}
+                    <button
+                      className="secondary-button"
+                      disabled={busy}
+                      onClick={() => void action(() => window.openbranches!.refresh())}
+                    >
+                      Check access again
+                    </button>
+                  </div>
+                </div>
+              )}
               {!github.connected && !github.device && window.openbranches && (
                 <div className="connection-options">
                   {github.configured && github.enabled && (

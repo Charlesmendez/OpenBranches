@@ -13,12 +13,14 @@ export function ConnectionSummary({
   git,
   providers,
   demo,
+  githubAccessNeeded = 0,
 }: {
   git?: GitStatus;
   providers: ProviderStatus;
   demo: boolean;
+  githubAccessNeeded?: number;
 }) {
-  const sources = connectionSummaries(git, providers, demo);
+  const sources = connectionSummaries(git, providers, demo, githubAccessNeeded);
   return (
     <div className="connection-summary" aria-label="Connection status">
       {sources.map((source) => {

@@ -266,6 +266,7 @@ export interface GitHubStatus {
   connected: boolean;
   configured: boolean;
   enabled?: boolean;
+  installUrl?: string;
   login?: string;
   error?: string;
   device?: { code: string; verificationUrl: string; expiresAt: number };
