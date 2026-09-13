@@ -24,6 +24,8 @@ import { ProjectDiscovery } from './ProjectDiscovery';
 import { ConnectionSummary } from './ConnectionSummary';
 import { SettingsNavigation, type SettingsSection } from './SettingsNavigation';
 import { copyText } from '../copyText';
+import type { UpdateController } from '../hooks/useUpdates';
+import { UpdateSettings } from './UpdateSettings';
 import './settings.css';
 const TeamConnectionsPanel = lazy(() =>
   import('./TeamConnections').then((module) => ({ default: module.TeamConnectionsPanel })),
@@ -41,6 +43,7 @@ export function Settings({
   onAdd,
   onLive,
   focusSection,
+  updates,
 }: {
   git: GitSetupController;
   repositories: Repository[];
@@ -49,6 +52,7 @@ export function Settings({
   onAdd: () => void;
   onLive: () => void;
   focusSection?: SettingsFocus;
+  updates: UpdateController;
 }) {
   const providers = useProviders();
   const [github, setGitHub] = useState<GitHubStatus>(providers.github);
@@ -113,6 +117,7 @@ export function Settings({
         selected={section}
         projectCount={repositories.length}
         demo={demo}
+        updateStatus={updates.status}
         onSelect={setSection}
       />
       <div className="settings-panel">
@@ -139,6 +144,7 @@ export function Settings({
             <TeamConnectionsPanel demo={false} repositories={repositories} />
           </Suspense>
         )}
+        {section === 'updates' && <UpdateSettings updates={updates} />}
         {section === 'connections' && (
           <>
             <div className="settings-panel-intro">

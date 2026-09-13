@@ -112,7 +112,7 @@ jobs:
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: npm run make:release -- --arch=${{ matrix.arch }}
-      - name: Verify application, notarization, DMG, and checksum
+      - name: Verify application, notarization, installers, and checksums
         run: npm run verify:macos -- --release --arch=${{ matrix.arch }}
       - name: Keep verified installers with the workflow
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -121,13 +121,15 @@ jobs:
           path: |
             out/make/OpenBranches-*-mac-${{ matrix.arch }}.dmg
             out/make/OpenBranches-*-mac-${{ matrix.arch }}.dmg.sha256
+            out/make/OpenBranches-*-mac-${{ matrix.arch }}.zip
+            out/make/OpenBranches-*-mac-${{ matrix.arch }}.zip.sha256
           if-no-files-found: error
           retention-days: 14
       - name: Attach installers to the draft release
         if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "$GITHUB_REF_NAME" out/make/OpenBranches-*-mac-${{ matrix.arch }}.dmg out/make/OpenBranches-*-mac-${{ matrix.arch }}.dmg.sha256 --clobber
+        run: gh release upload "$GITHUB_REF_NAME" out/make/OpenBranches-*-mac-${{ matrix.arch }}.dmg out/make/OpenBranches-*-mac-${{ matrix.arch }}.dmg.sha256 out/make/OpenBranches-*-mac-${{ matrix.arch }}.zip out/make/OpenBranches-*-mac-${{ matrix.arch }}.zip.sha256 --clobber
       - name: Remove temporary signing material
         if: always()
         run: |

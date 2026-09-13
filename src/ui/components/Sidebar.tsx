@@ -10,7 +10,7 @@ import {
   Sparkles,
   Users,
 } from 'lucide-react';
-import type { Repository, View } from '../../domain/types';
+import type { Repository, UpdateStatus, View } from '../../domain/types';
 import { useEffect, useState } from 'react';
 import { projectMatches } from '../../domain/projects';
 import { ProjectSearch } from './ProjectSearch';
@@ -28,6 +28,8 @@ interface Props {
   onView: (view: View) => void;
   onAdd: () => void;
   onMode: () => void;
+  onUpdates: () => void;
+  updateStatus?: UpdateStatus;
   teamApi?: WorkspaceTeamApi;
   onError: (message: string) => void;
 }
@@ -151,11 +153,18 @@ export function Sidebar(p: Props) {
           <ArrowUpRight size={13} />
         </button>
         <button
-          className={`settings-nav ${p.view === 'settings' ? 'selected' : ''}`}
-          onClick={() => p.onView('settings')}
+          className={`settings-nav ${p.view === 'settings' ? 'selected' : ''} ${p.updateStatus?.state === 'ready' ? 'update-ready' : ''}`}
+          onClick={() => (p.updateStatus?.state === 'ready' ? p.onUpdates() : p.onView('settings'))}
         >
           <Settings2 size={16} />
-          Settings<span className="version">v0.1</span>
+          Settings
+          <span className="version">
+            {p.updateStatus?.state === 'ready'
+              ? 'Update ready'
+              : p.updateStatus?.currentVersion
+                ? `v${p.updateStatus.currentVersion}`
+                : 'Preview'}
+          </span>
         </button>
       </div>
     </aside>

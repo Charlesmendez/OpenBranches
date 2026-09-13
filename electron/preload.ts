@@ -11,10 +11,19 @@ import type {
   AgentHistoryStatus,
   AgentLiveStatus,
   HandoffState,
+  UpdateStatus,
 } from '../src/domain/types';
 
 const api: DesktopApi = {
   teams: createTeamBridge(ipcRenderer),
+  getUpdateStatus: () => ipcRenderer.invoke('updates:get'),
+  checkForUpdates: () => ipcRenderer.invoke('updates:check'),
+  installUpdate: () => ipcRenderer.invoke('updates:install'),
+  onUpdate: (callback) => {
+    const listener = (_event: Electron.IpcRendererEvent, status: UpdateStatus) => callback(status);
+    ipcRenderer.on('updates:updated', listener);
+    return () => ipcRenderer.removeListener('updates:updated', listener);
+  },
   setAgentHistoryEnabled: (tool, enabled) => ipcRenderer.invoke('agents:enable', tool, enabled),
   onAgentHistory: (callback) => {
     const listener = (_event: Electron.IpcRendererEvent, statuses: AgentHistoryStatus[]) =>

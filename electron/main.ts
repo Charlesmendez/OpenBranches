@@ -1,5 +1,6 @@
 import {
   app,
+  autoUpdater,
   BrowserWindow,
   clipboard,
   dialog,
@@ -37,6 +38,7 @@ import { TeamConnections } from './team/connections';
 import { registerTeamHandlers } from './team/ipc';
 import { TeamPublisher } from './team/publisher';
 import { legalDocumentCopyPath, legalDocumentKinds, legalDocumentPath } from './legal/documents';
+import { UpdateService, type NativeUpdater } from './updates/service';
 declare const __GITHUB_APP_CLIENT_ID__: string;
 declare const __GITHUB_APP_INSTALL_URL__: string;
 
@@ -60,6 +62,7 @@ let teams: TeamConnections | undefined;
 let teamPublisher: TeamPublisher | undefined;
 let handoffs: HandoffService | undefined;
 let liveAgents: LiveAgentService | undefined;
+let updates: UpdateService | undefined;
 const localHistories = new Map<string, LocalHistoryService>();
 const refreshHistories = () =>
   Promise.all([...localHistories.values()].map((history) => history.refresh()));
@@ -180,6 +183,12 @@ app.whenReady().then(() => {
     if (liveAgents) window?.webContents.send('agents:live-updated', liveAgents.statuses());
   };
   const git = new GitInstallation((status) => window?.webContents.send('git:updated', status));
+  updates = new UpdateService(
+    autoUpdater as unknown as NativeUpdater,
+    app.getVersion(),
+    (status) => window?.webContents.send('updates:updated', status),
+    { enabled: app.isPackaged && process.platform === 'darwin' },
+  );
   service = new RepositoryService(store, publish, git);
   githubAuth = new GitHubAuth(__GITHUB_APP_CLIENT_ID__, createTokenVault(store));
   github = new GitHubService(store, githubAuth, () => service.current(), publish);
@@ -247,6 +256,17 @@ app.whenReady().then(() => {
     (state) => window?.webContents.send('team:sharing-updated', state),
   );
   registerTeamHandlers(handle, teams, (url) => shell.openExternal(url), teamPublisher);
+  handle('updates:get', () => updates!.current());
+  handle('updates:check', () => updates!.check());
+  handle('updates:install', () => {
+    quitting = true;
+    try {
+      updates!.install();
+    } catch (error) {
+      quitting = false;
+      throw error;
+    }
+  });
   handle('agents:enable', (tool: unknown, enabled: unknown) =>
     localHistories
       .get(z.literal('claude-code').parse(tool))!
@@ -401,6 +421,7 @@ app.whenReady().then(() => {
     return github!.refresh();
   });
   createWindow();
+  updates.start();
   teams.start();
   teamPublisher.start();
   void handoffs.start();
@@ -467,6 +488,7 @@ app.on('before-quit', () => {
   teams?.close();
   teamPublisher?.close();
   handoffs?.close();
+  updates?.close();
   void liveAgents?.close();
   for (const history of localHistories.values()) history.close();
   service?.close();

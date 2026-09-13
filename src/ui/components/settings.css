@@ -501,6 +501,130 @@
   margin-bottom: 0;
 }
 
+.update-card {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 17px;
+  padding: 22px;
+  border: 1px solid #536084;
+  border-radius: 12px;
+  background: radial-gradient(circle at 0 0, #8197dc1a, transparent 38%), var(--surface);
+}
+
+.update-card.ready {
+  border-color: #8095d1;
+  box-shadow: 0 0 30px #607bc018;
+}
+
+.update-card.error {
+  border-color: #806a4d;
+}
+
+.update-card-icon {
+  display: grid;
+  place-items: center;
+  width: 50px;
+  height: 50px;
+  border: 1px solid #6072a3;
+  border-radius: 12px;
+  color: #b1c1f1;
+  background: #7790d317;
+}
+
+.update-card.error .update-card-icon {
+  border-color: #866e49;
+  color: #d1b06d;
+  background: #b38d4312;
+}
+
+.update-card-copy {
+  min-width: 0;
+}
+
+.update-version {
+  color: #9cadde;
+  font-size: 8px;
+  font-weight: 650;
+  letter-spacing: 0.12em;
+}
+
+.update-card h3 {
+  margin-top: 8px;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 560;
+}
+
+.update-card p {
+  max-width: 620px;
+  margin: 7px 0 0;
+  color: var(--muted);
+  font-size: 10.5px;
+  line-height: 1.65;
+}
+
+.update-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.update-notes {
+  max-width: 650px;
+  margin-top: 15px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.update-notes summary {
+  width: max-content;
+  cursor: pointer;
+  color: var(--text-soft);
+}
+
+.update-notes div {
+  max-height: 180px;
+  overflow: auto;
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #10121680;
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+
+.update-trust {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 13px;
+  padding: 15px 17px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: #9fb1e4;
+  background: var(--surface);
+}
+
+.update-trust svg {
+  flex: 0 0 auto;
+}
+
+.update-trust strong {
+  color: var(--text-soft);
+  font-size: 10.5px;
+  font-weight: 550;
+}
+
+.update-trust p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 9.5px;
+  line-height: 1.55;
+}
+
 @media (max-width: 1050px) {
   .settings-content {
     display: block;

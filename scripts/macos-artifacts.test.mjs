@@ -52,6 +52,14 @@ describe('Mac release artifacts', () => {
       macArtifactPaths({ ...input, release: false }).diskImage,
       '/project/out/make/OpenBranches-0.1.0-mac-arm64-unsigned.dmg',
     );
+    assert.equal(
+      macArtifactPaths({ ...input, release: true }).archive,
+      '/project/out/make/OpenBranches-0.1.0-mac-arm64.zip',
+    );
+    assert.equal(
+      macArtifactPaths({ ...input, release: false }).archiveChecksum,
+      '/project/out/make/OpenBranches-0.1.0-mac-arm64-unsigned.zip.sha256',
+    );
   });
 
   it('uses one valid, stable bundle identifier for packaging and verification', async () => {
