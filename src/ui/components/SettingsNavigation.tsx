@@ -1,6 +1,7 @@
-import { Cable, FolderGit2, ShieldCheck, Users, type LucideIcon } from 'lucide-react';
+import { Cable, Download, FolderGit2, ShieldCheck, Users, type LucideIcon } from 'lucide-react';
+import type { UpdateStatus } from '../../domain/types';
 
-export type SettingsSection = 'projects' | 'connections' | 'team' | 'privacy';
+export type SettingsSection = 'projects' | 'connections' | 'team' | 'updates' | 'privacy';
 
 const sections: {
   id: SettingsSection;
@@ -29,6 +30,12 @@ const sections: {
     liveOnly: true,
   },
   {
+    id: 'updates',
+    label: 'Updates',
+    description: 'Versions and releases',
+    icon: Download,
+  },
+  {
     id: 'privacy',
     label: 'Privacy',
     description: 'Local and read-only',
@@ -40,11 +47,13 @@ export function SettingsNavigation({
   selected,
   projectCount,
   demo,
+  updateStatus,
   onSelect,
 }: {
   selected: SettingsSection;
   projectCount: number;
   demo: boolean;
+  updateStatus?: UpdateStatus;
   onSelect: (section: SettingsSection) => void;
 }) {
   return (
@@ -61,7 +70,13 @@ export function SettingsNavigation({
             const description =
               section.id === 'projects'
                 ? `${projectCount} ${projectCount === 1 ? 'project' : 'projects'} monitored`
-                : section.description;
+                : section.id === 'updates'
+                  ? updateStatus?.state === 'ready'
+                    ? 'New version ready'
+                    : updateStatus?.currentVersion
+                      ? `Version ${updateStatus.currentVersion}`
+                      : section.description
+                  : section.description;
             return (
               <button
                 key={section.id}

@@ -37,6 +37,8 @@ import { triageFindings } from '../domain/triage';
 import { ProjectWorkSpotlight } from './components/ProjectWorkSpotlight';
 import { ProjectActivityStatus } from './components/ProjectActivityStatus';
 import { SourceStatusMenu } from './components/SourceStatusMenu';
+import { useUpdates } from './hooks/useUpdates';
+import { UpdateNotice } from './components/UpdateNotice';
 
 const People = lazy(() =>
   import('./components/People').then((module) => ({ default: module.People })),
@@ -50,6 +52,8 @@ export function App() {
   const workspace = useWorkspace(positions.initialMode(!!window.openbranches));
   const providers = useProviders();
   const git = useGit();
+  const updates = useUpdates();
+  const [updateNoticeDismissed, setUpdateNoticeDismissed] = useState(false);
   const gitNeedsSetup = !!git.status && git.status.state !== 'ready';
   const { snapshot, mode, setMode, error, setError, loading, adding, add, refresh } = workspace;
   const reviews = useReviews(mode === 'demo', snapshot.repositories);
@@ -346,6 +350,8 @@ export function App() {
           switchMode();
           focusWorkspace();
         }}
+        onUpdates={() => openSettings('updates')}
+        updateStatus={updates.status}
         teamApi={mode === 'live' ? window.openbranches?.teams : undefined}
         onError={setError}
       />
@@ -497,6 +503,7 @@ export function App() {
               onAdd={() => void addRepository()}
               onLive={switchMode}
               focusSection={settingsFocus}
+              updates={updates}
             />
           ) : view === 'people' ? (
             <Suspense
@@ -702,6 +709,9 @@ export function App() {
           <span>Made for a clearer headspace.</span>
         </footer>
       </main>
+      {!updateNoticeDismissed && (
+        <UpdateNotice updates={updates} onLater={() => setUpdateNoticeDismissed(true)} />
+      )}
       {selected && repository && isProjectView && (
         <Inspector
           branch={selected}

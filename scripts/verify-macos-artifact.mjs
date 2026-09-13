@@ -33,6 +33,7 @@ await Promise.all([
   access(artifact.application),
   access(artifact.executable),
   access(artifact.diskImage),
+  access(artifact.archive),
 ]);
 verifyBundleIdentifier(artifact.application);
 
@@ -97,4 +98,44 @@ const digest = await sha256File(artifact.diskImage);
 const expected = `${digest}  ${basename(artifact.diskImage)}\n`;
 if ((await readFile(artifact.checksum, 'utf8')) !== expected)
   throw new Error(`Checksum does not match ${basename(artifact.diskImage)}.`);
-console.log(`Verified ${basename(artifact.diskImage)} for ${options.architecture}.`);
+
+const archiveDigest = await sha256File(artifact.archive);
+const archiveExpected = `${archiveDigest}  ${basename(artifact.archive)}\n`;
+if ((await readFile(artifact.archiveChecksum, 'utf8')) !== archiveExpected)
+  throw new Error(`Checksum does not match ${basename(artifact.archive)}.`);
+
+const archiveStage = await mkdtemp(join(tmpdir(), 'openbranches-update-verify-'));
+try {
+  execFileSync('/usr/bin/ditto', ['-x', '-k', artifact.archive, archiveStage], {
+    stdio: 'inherit',
+  });
+  const archivedApplication = join(archiveStage, `${metadata.productName}.app`);
+  const archivedExecutable = join(archivedApplication, 'Contents', 'MacOS', metadata.productName);
+  await access(archivedExecutable);
+  verifyBundleIdentifier(archivedApplication);
+  await validateLegalResources(archivedApplication);
+  const invalidSymlinks = await absoluteBundleSymlinks(archivedApplication);
+  if (invalidSymlinks.length)
+    throw new Error('The update archive application contains an absolute bundle symlink.');
+  execFileSync(
+    '/usr/bin/lipo',
+    [archivedExecutable, '-verify_arch', lipoArchitecture(options.architecture)],
+    { stdio: 'inherit' },
+  );
+  if (options.release) {
+    execFileSync(
+      '/usr/bin/codesign',
+      ['--verify', '--deep', '--strict', '--verbose=2', archivedApplication],
+      { stdio: 'inherit' },
+    );
+    execFileSync('/usr/bin/xcrun', ['stapler', 'validate', archivedApplication], {
+      stdio: 'inherit',
+    });
+  }
+} finally {
+  await rm(archiveStage, { recursive: true, force: true });
+}
+
+console.log(
+  `Verified ${basename(artifact.diskImage)} and ${basename(artifact.archive)} for ${options.architecture}.`,
+);
