@@ -26,3 +26,8 @@ run(process.execPath, [
   `--arch=${architecture}`,
   ...(release ? ['--release'] : []),
 ]);
+run(process.execPath, [
+  join(root, 'scripts/make-zip.mjs'),
+  `--arch=${architecture}`,
+  ...(release ? ['--release'] : []),
+]);

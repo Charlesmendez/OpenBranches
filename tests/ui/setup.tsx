@@ -9,6 +9,7 @@ import type {
   ProjectDiscoveryState,
   AgentHistoryStatus,
   AgentLiveStatus,
+  UpdateStatus,
 } from '../../src/domain/types';
 import { createDemoSnapshot } from '../../src/data/demo';
 import '../../src/ui/styles.css';
@@ -82,6 +83,11 @@ let liveAgents: AgentLiveStatus[] = [
   },
 ];
 const liveAgentListeners = new Set<(statuses: AgentLiveStatus[]) => void>();
+const updateStatus: UpdateStatus = {
+  currentVersion: '0.1.4',
+  state: 'current',
+  checkedAt: fixtureNow,
+};
 const excluded = new Set<string>();
 const names = [
   'Atlas API',
@@ -149,6 +155,10 @@ const subscribe = <T,>(listeners: Set<(value: T) => void>, listener: (value: T) 
   };
 };
 window.openbranches = {
+  getUpdateStatus: async () => updateStatus,
+  checkForUpdates: async () => updateStatus,
+  installUpdate: async () => {},
+  onUpdate: () => () => {},
   setAgentHistoryEnabled: async (tool, enabled) => {
     agents = [{ tool, enabled, state: enabled ? 'ready' : 'not-connected', taskCount: 0 }];
     agentListeners.forEach((listener) => listener(agents));

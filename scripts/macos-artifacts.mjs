@@ -61,6 +61,7 @@ export function macArtifactPaths({ root, productName, version, architecture, rel
     throw new Error('Invalid Mac artifact metadata.');
   const packageName = `${productName}-darwin-${architecture}`;
   const diskImageName = `${productName}-${version}-mac-${architecture}${release ? '' : '-unsigned'}.dmg`;
+  const archiveName = `${productName}-${version}-mac-${architecture}${release ? '' : '-unsigned'}.zip`;
   return {
     packageName,
     application: join(root, 'out', packageName, `${productName}.app`),
@@ -75,6 +76,8 @@ export function macArtifactPaths({ root, productName, version, architecture, rel
     ),
     diskImage: join(root, 'out', 'make', diskImageName),
     checksum: join(root, 'out', 'make', `${diskImageName}.sha256`),
+    archive: join(root, 'out', 'make', archiveName),
+    archiveChecksum: join(root, 'out', 'make', `${archiveName}.sha256`),
   };
 }
 

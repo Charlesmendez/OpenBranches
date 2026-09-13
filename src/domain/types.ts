@@ -336,8 +336,24 @@ export interface GitStatus {
   installAvailable: boolean;
   message?: string;
 }
+export type UpdateState =
+  'idle' | 'checking' | 'downloading' | 'ready' | 'current' | 'unavailable' | 'error';
+export interface UpdateStatus {
+  currentVersion: string;
+  state: UpdateState;
+  availableVersion?: string;
+  releaseName?: string;
+  releaseNotes?: string;
+  releaseDate?: string;
+  checkedAt?: string;
+  error?: string;
+}
 export interface DesktopApi {
   teams?: import('../team/device').TeamDesktopApi;
+  getUpdateStatus(): Promise<UpdateStatus>;
+  checkForUpdates(): Promise<UpdateStatus>;
+  installUpdate(): Promise<void>;
+  onUpdate(callback: (status: UpdateStatus) => void): () => void;
   setAgentHistoryEnabled(tool: CodingTool, enabled: boolean): Promise<void>;
   onAgentHistory(callback: (statuses: AgentHistoryStatus[]) => void): () => void;
   setAgentLiveEnabled(tool: LiveAgentTool, enabled: boolean): Promise<AgentLiveStatus[]>;

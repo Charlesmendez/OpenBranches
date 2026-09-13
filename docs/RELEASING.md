@@ -1,6 +1,6 @@
 # Mac release process
 
-OpenBranches has one release path for both supported Mac architectures. It produces a signed, notarized DMG and a SHA-256 checksum on a native Apple silicon or Intel runner. The workflow leaves every GitHub release as a draft so a maintainer can install and review both artifacts before making them public.
+OpenBranches has one release path for both supported Mac architectures. It produces a signed, notarized DMG for initial installation and a signed ZIP for in-app updates, with SHA-256 checksums, on a native Apple silicon or Intel runner. The workflow leaves every GitHub release as a draft so a maintainer can install and review both architectures before making them public.
 
 ## Apple account decision
 
@@ -35,7 +35,7 @@ The workflow imports the certificate into a temporary keychain and deletes both 
 1. Update `package.json` to the release version and merge the tested release commit.
 2. Create a tag with the exact form `v<package version>`, such as `v0.1.0`, and push it.
 3. The **Mac release** workflow checks that the tag and package version match, creates a draft GitHub release, and builds both architectures.
-4. Each runner runs the desktop tests, checks the generated dependency notices, signs the application, notarizes the application and DMG, verifies the executable architecture, validates both notarization tickets, verifies the disk image and its mounted bundle structure, confirms the app and third-party legal files, and checks its generated SHA-256 file.
+4. Each runner runs the desktop tests, checks the generated dependency notices, signs the application, notarizes the application and DMG, verifies the executable architecture, validates the notarization tickets, verifies the disk image and its mounted bundle structure, extracts the update ZIP, confirms both app copies and third-party legal files, and checks the generated SHA-256 files.
 5. Download both workflow artifacts. Install each on a clean matching Mac, verify first-run Git setup and project discovery, and confirm GitHub device authorization with the registered app.
 6. Review the generated release notes and the two artifacts in the draft release. Publish the draft only after the clean-machine checks pass.
 
@@ -47,7 +47,10 @@ The public files are named for people rather than build internals:
 
 - `OpenBranches-<version>-mac-arm64.dmg` for Apple silicon Macs.
 - `OpenBranches-<version>-mac-x64.dmg` for Intel Macs.
-- A matching `.sha256` file for each installer.
+- Matching `OpenBranches-<version>-mac-<architecture>.zip` archives used by Electron's public update feed.
+- A matching `.sha256` file for every DMG and ZIP.
+
+Published, non-prerelease GitHub releases are discovered through `update.electronjs.org` using the running platform, architecture, and installed version. Keep the `-mac-arm64.zip` and `-mac-x64.zip` names: the update service uses those identifiers to select the correct asset. The app downloads the update in the background, while Squirrel.Mac and macOS verify the signed bundle before installation.
 
 ## Local packaging
 
