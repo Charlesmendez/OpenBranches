@@ -17,7 +17,8 @@ export class ProjectDiscoveryService {
   private rerun = false;
   private offset = 0;
   private identities = new Map<string, string>();
-  private timer: ReturnType<typeof setInterval>;
+  private timer?: ReturnType<typeof setInterval>;
+  private suspended = false;
   constructor(
     private store: Pick<AppStore, 'read' | 'readStrict' | 'write'>,
     private repositories: RepositorySink,
@@ -43,9 +44,7 @@ export class ProjectDiscoveryService {
       pendingCount: 0,
       recoveryNeeded: !saved.success,
     };
-    this.timer = setInterval(() => {
-      void this.refresh();
-    }, 60_000);
+    this.startPolling();
   }
   state(): ProjectDiscoveryState {
     return this.value;
@@ -90,7 +89,7 @@ export class ProjectDiscoveryService {
     };
   }
   refresh(): Promise<void> {
-    if (this.closed) return Promise.resolve();
+    if (this.closed || this.suspended) return Promise.resolve();
     if (this.job) {
       this.rerun = true;
       return this.job;
@@ -103,6 +102,22 @@ export class ProjectDiscoveryService {
       }
     });
     return this.job;
+  }
+  setSuspended(suspended: boolean): void {
+    if (this.closed || suspended === this.suspended) return;
+    this.suspended = suspended;
+    if (suspended) {
+      ++this.generation;
+      if (this.timer) clearInterval(this.timer);
+      this.timer = undefined;
+    } else this.startPolling();
+  }
+  private startPolling() {
+    if (this.closed || this.suspended || this.timer) return;
+    this.timer = setInterval(() => {
+      void this.refresh();
+    }, 60_000);
+    this.timer.unref?.();
   }
   private async run() {
     const generation = this.generation;
@@ -185,6 +200,6 @@ export class ProjectDiscoveryService {
   close() {
     this.closed = true;
     ++this.generation;
-    clearInterval(this.timer);
+    if (this.timer) clearInterval(this.timer);
   }
 }

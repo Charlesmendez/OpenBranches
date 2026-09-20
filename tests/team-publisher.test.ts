@@ -112,6 +112,7 @@ async function fixture(suppliedVault?: SecretVault) {
 describe('explicit native project publication', () => {
   it('uploads only after approving a live main-process preview and keeps text choices independent', async () => {
     const f = await fixture();
+    expect(f.publisher.requiresBackgroundUpdates()).toBe(false);
     await f.publisher.refresh();
     const review = await f.preview();
     expect(f.mutations).toEqual([]);
@@ -124,6 +125,7 @@ describe('explicit native project publication', () => {
       state: 'sharing',
       consent: { taskTitles: false, taskSummaries: false },
     });
+    expect(f.publisher.requiresBackgroundUpdates()).toBe(true);
     expect(f.uploads).toHaveLength(1);
     expect(f.uploads[0].projectId).toBe(f.profile.projects[0].id);
     expect(
@@ -238,6 +240,7 @@ describe('explicit native project publication', () => {
     expect(f.uploads).toEqual([]);
     expect(f.profile.shares[0]).toMatchObject({ enabled: false, epoch: 2 });
     expect(f.publisher.state().shares[0].state).toBe('stopped');
+    expect(f.publisher.requiresBackgroundUpdates()).toBe(false);
   });
   it('persists an offline withdrawal and ignores a late upload reply after restart', async () => {
     const f = await fixture(),

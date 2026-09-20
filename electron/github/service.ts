@@ -30,8 +30,9 @@ export class GitHubService {
   private fullRequested = false;
   private refreshOffset = 0;
   private lastPullRefreshAt = 0;
-  private pullTimer: ReturnType<typeof setInterval>;
-  private fullTimer: ReturnType<typeof setInterval>;
+  private pullTimer?: ReturnType<typeof setInterval>;
+  private fullTimer?: ReturnType<typeof setInterval>;
+  private suspended = false;
   private installation?: InstallationSnapshot;
   private installationError?: string;
   private installationJob?: Promise<boolean>;
@@ -58,8 +59,7 @@ export class GitHubService {
     this.forgetUnselected();
     // Open PR state is small and time-sensitive. Branch, closed-PR, signal and
     // history reads are substantially more expensive, so rotate them slowly.
-    this.pullTimer = setInterval(() => void this.refreshPullRequests(), PULL_REFRESH_MS);
-    this.fullTimer = setInterval(() => void this.refresh(), FULL_REFRESH_MS);
+    this.startPolling();
   }
   isEnabled() {
     return this.enabled;
@@ -180,8 +180,17 @@ export class GitHubService {
   refreshPullRequests(): Promise<void> {
     return this.startRefresh(false);
   }
+  setSuspended(suspended: boolean): void {
+    if (this.closed || suspended === this.suspended) return;
+    this.suspended = suspended;
+    if (suspended) {
+      ++this.generation;
+      this.fullRequested = false;
+      this.stopPolling();
+    } else this.startPolling();
+  }
   private startRefresh(full: boolean): Promise<void> {
-    if (!this.enabled || this.closed) return Promise.resolve();
+    if (!this.enabled || this.closed || this.suspended) return Promise.resolve();
     if (full) this.fullRequested = true;
     if (this.job?.generation === this.generation) return this.job.promise;
     const job = { generation: this.generation, promise: Promise.resolve() };
@@ -386,9 +395,21 @@ export class GitHubService {
     }
     this.save(generation);
   }
+  private startPolling() {
+    if (this.closed || this.suspended || this.pullTimer || this.fullTimer) return;
+    this.pullTimer = setInterval(() => void this.refreshPullRequests(), PULL_REFRESH_MS);
+    this.fullTimer = setInterval(() => void this.refresh(), FULL_REFRESH_MS);
+    this.pullTimer.unref?.();
+    this.fullTimer.unref?.();
+  }
+  private stopPolling() {
+    if (this.pullTimer) clearInterval(this.pullTimer);
+    if (this.fullTimer) clearInterval(this.fullTimer);
+    this.pullTimer = undefined;
+    this.fullTimer = undefined;
+  }
   close() {
     this.closed = true;
-    clearInterval(this.pullTimer);
-    clearInterval(this.fullTimer);
+    this.stopPolling();
   }
 }

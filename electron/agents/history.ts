@@ -62,7 +62,8 @@ export class LocalHistoryService {
   private generation = 0;
   private closed = false;
   private job?: { generation: number; controller: AbortController; promise: Promise<void> };
-  private timer: ReturnType<typeof setInterval>;
+  private timer?: ReturnType<typeof setInterval>;
+  private suspended = false;
   private prefix: string;
   constructor(
     private store: Pick<AppStore, 'read' | 'write' | 'transaction'>,
@@ -75,9 +76,7 @@ export class LocalHistoryService {
     const saved = indexSchema(source.tool).safeParse(store.read(this.prefix + '.index', null));
     this.index = enabled && saved.success ? this.selectedIndex(saved.data, current()) : empty();
     this.value = { tool: source.tool, enabled, state: 'not-connected' };
-    this.timer = setInterval(() => {
-      void this.refresh();
-    }, 60_000);
+    this.startPolling();
   }
   status(): AgentHistoryStatus {
     return {
@@ -133,7 +132,7 @@ export class LocalHistoryService {
     };
   }
   refresh(): Promise<void> {
-    if (this.closed || !this.value.enabled) return Promise.resolve();
+    if (this.closed || this.suspended || !this.value.enabled) return Promise.resolve();
     if (this.job?.generation === this.generation) return this.job.promise;
     const job = {
       generation: this.generation,
@@ -145,6 +144,23 @@ export class LocalHistoryService {
       if (this.job === job) this.job = undefined;
     });
     return job.promise;
+  }
+  setSuspended(suspended: boolean): void {
+    if (this.closed || suspended === this.suspended) return;
+    this.suspended = suspended;
+    if (suspended) {
+      ++this.generation;
+      this.job?.controller.abort();
+      if (this.timer) clearInterval(this.timer);
+      this.timer = undefined;
+    } else this.startPolling();
+  }
+  private startPolling() {
+    if (this.closed || this.suspended || this.timer) return;
+    this.timer = setInterval(() => {
+      void this.refresh();
+    }, 60_000);
+    this.timer.unref?.();
   }
   private async read(generation: number, controller: AbortController) {
     const signal = controller.signal;
@@ -203,6 +219,6 @@ export class LocalHistoryService {
     this.closed = true;
     ++this.generation;
     this.job?.controller.abort();
-    clearInterval(this.timer);
+    if (this.timer) clearInterval(this.timer);
   }
 }

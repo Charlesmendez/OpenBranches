@@ -478,6 +478,38 @@ describe('stopping project monitoring', () => {
 });
 
 describe('live repository monitoring', () => {
+  it('closes watchers and stops reconciliation while suspended, then restores both', async () => {
+    vi.useFakeTimers();
+    const { store } = await storeFixture();
+    const snapshot = createDemoSnapshot();
+    const repo = structuredClone(snapshot.repositories[0]);
+    repo.commonDir = '/fixture/shared.git';
+    repo.path = '/fixture/primary';
+    repo.worktrees = [checkout(repo.path, repo.branches[0].local!.fullName, 'a'.repeat(40))];
+    store.write('snapshot', { ...snapshot, repositories: [repo] });
+    const watcher = watcherFixture();
+    const scan = vi.fn(async () => structuredClone(repo));
+    const service = new RepositoryService(
+      store,
+      () => {},
+      { executable: async () => '/fixture/git' },
+      { scan, close: () => {} },
+      watcher.factory,
+    );
+    cleanup.push(() => service.close());
+
+    expect(watcher.watchers).toHaveLength(2);
+    service.setSuspended(true);
+    expect(watcher.watchers.every(({ closed }) => closed)).toBe(true);
+    await vi.advanceTimersByTimeAsync(5 * 60_000);
+    expect(scan).not.toHaveBeenCalled();
+
+    service.setSuspended(false);
+    expect(watcher.watchers).toHaveLength(4);
+    await vi.advanceTimersByTimeAsync(5 * 60_000);
+    expect(scan).toHaveBeenCalledOnce();
+  });
+
   it('watches Git and every available checkout, coalesces bursts, and ignores generated folders', async () => {
     vi.useFakeTimers();
     const { store } = await storeFixture();
