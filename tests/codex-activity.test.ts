@@ -79,6 +79,10 @@ describe('Codex local activity', () => {
     ]);
     expect(JSON.stringify(active)).not.toMatch(/PRIVATE|fake|command|prompt|instructions/i);
 
+    reader.setSuspended(true);
+    await expect(reader.read([saved])).resolves.toMatchObject({ tasks: [], partial: true });
+    reader.setSuspended(false);
+
     now += 1_000;
     await appendFile(path, record(at(), 'event_msg', { type: 'task_complete' }) + '\n');
     expect((await reader.read([saved])).tasks).toEqual([]);

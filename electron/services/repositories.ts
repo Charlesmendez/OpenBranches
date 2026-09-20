@@ -5,6 +5,8 @@ import { AppStore } from './store';
 import { GitWorkerClient } from '../git/client';
 import type { GitInstallation } from '../git/installation';
 
+const RECONCILE_INTERVAL = 5 * 60_000;
+
 export class RepositoryService {
   private snapshot: Snapshot;
   private worker: Pick<GitWorkerClient, 'scan' | 'close'>;
@@ -15,7 +17,8 @@ export class RepositoryService {
   private debounces = new Map<string, ReturnType<typeof setTimeout>>();
   private inFlight = new Map<string, Promise<Repository>>();
   private revisions = new Map<string, number>();
-  private reconcile: ReturnType<typeof setInterval>;
+  private reconcile?: ReturnType<typeof setInterval>;
+  private suspended = false;
   constructor(
     private store: AppStore,
     private publish: (snapshot: Snapshot) => void,
@@ -25,9 +28,7 @@ export class RepositoryService {
   ) {
     this.worker = worker;
     this.snapshot = { ...store.snapshot(), scanning: false };
-    this.reconcile = setInterval(() => {
-      void this.refresh();
-    }, 30_000);
+    this.startReconciliation();
     for (const repository of this.snapshot.repositories) this.watchRepository(repository);
   }
   current(): Snapshot {
@@ -87,6 +88,23 @@ export class RepositoryService {
     });
     return this.refreshing;
   }
+  /** Stop background filesystem and Git work while the desktop window is inactive. */
+  setSuspended(suspended: boolean): void {
+    if (this.closed || suspended === this.suspended) return;
+    this.suspended = suspended;
+    if (suspended) {
+      if (this.reconcile) clearInterval(this.reconcile);
+      this.reconcile = undefined;
+      this.watchers.forEach((watchers) => watchers.forEach((watcher) => watcher.close()));
+      this.watchers.clear();
+      this.watchPaths.clear();
+      this.debounces.forEach(clearTimeout);
+      this.debounces.clear();
+      return;
+    }
+    this.startReconciliation();
+    for (const repository of this.snapshot.repositories) this.watchRepository(repository);
+  }
   private async refreshAll(): Promise<void> {
     this.snapshot.scanning = true;
     this.publish(this.snapshot);
@@ -139,7 +157,7 @@ export class RepositoryService {
     this.emit();
   }
   private watchRepository(repository: Repository): void {
-    if (this.closed) return;
+    if (this.closed || this.suspended) return;
     const paths = [
       ...new Set([
         repository.commonDir,
@@ -184,6 +202,13 @@ export class RepositoryService {
     }
     this.watchers.set(repository.id, watchers);
   }
+  private startReconciliation(): void {
+    if (this.closed || this.suspended || this.reconcile) return;
+    this.reconcile = setInterval(() => {
+      void this.refresh();
+    }, RECONCILE_INTERVAL);
+    this.reconcile.unref?.();
+  }
   private emit(): void {
     if (this.closed) return;
     this.snapshot.updatedAt = new Date().toISOString();
@@ -192,7 +217,7 @@ export class RepositoryService {
   }
   close(): void {
     this.closed = true;
-    clearInterval(this.reconcile);
+    if (this.reconcile) clearInterval(this.reconcile);
     this.watchers.forEach((ws) => ws.forEach((w) => w.close()));
     this.debounces.forEach(clearTimeout);
     this.worker.close();

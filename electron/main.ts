@@ -8,6 +8,7 @@ import {
   Menu,
   nativeImage,
   net,
+  powerMonitor,
   protocol,
   safeStorage,
   shell,
@@ -69,7 +70,9 @@ const refreshHistories = () =>
 let reviews: ReviewService;
 let githubAuth: GitHubAuth;
 let githubStatusForWindow: (() => import('../src/domain/types').GitHubStatus) | undefined;
-let authTimer: ReturnType<typeof setInterval> | undefined;
+let authTimer: ReturnType<typeof setTimeout> | undefined;
+let resumeAuthPolling: (() => void) | undefined;
+let monitoringSuspended = false;
 let lastForegroundGitHubRefresh = 0;
 const devUrl = !app.isPackaged ? process.env.OPENBRANCHES_DEV_URL : undefined;
 function refreshGitHubInForeground() {
@@ -91,6 +94,36 @@ function refreshGitHubInForeground() {
 function showWindow() {
   window?.show();
   window?.focus();
+}
+
+function setMonitoringSuspended(suspended: boolean) {
+  const wasSuspended = monitoringSuspended;
+  monitoringSuspended = suspended;
+  const suspendLocalSources = suspended && !teamPublisher?.requiresBackgroundUpdates();
+  service?.setSuspended(suspendLocalSources);
+  github?.setSuspended(suspended);
+  codex?.setSuspended(suspendLocalSources);
+  discovery?.setSuspended(suspended);
+  liveAgents?.setSuspended(suspendLocalSources);
+  for (const history of localHistories.values()) history.setSuspended(suspendLocalSources);
+  if (suspended) {
+    if (authTimer) clearTimeout(authTimer);
+    authTimer = undefined;
+    return;
+  }
+  if (!wasSuspended) return;
+  resumeAuthPolling?.();
+  void service?.refresh();
+  void github?.refreshPullRequests();
+  void codex?.refresh();
+  void discovery?.refresh();
+  void refreshHistories();
+}
+
+function updateMonitoringSuspension() {
+  const inactive = !window || !window.isVisible() || window.isMinimized();
+  const batteryBackground = powerMonitor.isOnBatteryPower() && !window?.isFocused();
+  setMonitoringSuspended(inactive || batteryBackground);
 }
 
 function createWindow() {
@@ -130,8 +163,17 @@ function createWindow() {
   });
   window.on('closed', () => {
     window = null;
+    setMonitoringSuspended(true);
   });
-  window.on('focus', refreshGitHubInForeground);
+  window.on('hide', updateMonitoringSuspension);
+  window.on('minimize', updateMonitoringSuspension);
+  window.on('show', updateMonitoringSuspension);
+  window.on('restore', updateMonitoringSuspension);
+  window.on('blur', updateMonitoringSuspension);
+  window.on('focus', () => {
+    updateMonitoringSuspension();
+    refreshGitHubInForeground();
+  });
   void window.loadURL(devUrl ?? 'openbranches://app/index.html');
 }
 function handle(channel: string, listener: (...args: any[]) => unknown) {
@@ -239,9 +281,17 @@ app.whenReady().then(() => {
     window?.webContents.send('github:updated', status);
     return status;
   };
-  authTimer = setInterval(() => {
-    if (githubAuth.status().device) void pollGitHub();
-  }, 5000);
+  const scheduleAuthPolling = () => {
+    if (authTimer || monitoringSuspended || quitting || !githubAuth.status().device) return;
+    authTimer = setTimeout(() => {
+      authTimer = undefined;
+      void pollGitHub()
+        .catch(() => {})
+        .finally(scheduleAuthPolling);
+    }, 5000);
+    authTimer.unref?.();
+  };
+  resumeAuthPolling = scheduleAuthPolling;
   handle('snapshot:get', snapshot);
   teams = new TeamConnections(
     createSecretVault(store, 'team.credentials', safeStorage),
@@ -253,7 +303,10 @@ app.whenReady().then(() => {
     createSecretVault(store, 'team.sharing', safeStorage),
     teams,
     snapshot,
-    (state) => window?.webContents.send('team:sharing-updated', state),
+    (state) => {
+      window?.webContents.send('team:sharing-updated', state);
+      if (monitoringSuspended) setMonitoringSuspended(true);
+    },
   );
   registerTeamHandlers(handle, teams, (url) => shell.openExternal(url), teamPublisher);
   handle('updates:get', () => updates!.current());
@@ -398,6 +451,7 @@ app.whenReady().then(() => {
   );
   handle('github:connect', async () => {
     await githubAuth.begin();
+    scheduleAuthPolling();
     return githubStatus();
   });
   handle('github:poll', pollGitHub);
@@ -410,6 +464,8 @@ app.whenReady().then(() => {
     return status;
   });
   handle('github:disconnect', () => {
+    if (authTimer) clearTimeout(authTimer);
+    authTimer = undefined;
     githubAuth.disconnect();
     github!.clearInstallations();
     github!.setEnabled(false);
@@ -421,6 +477,12 @@ app.whenReady().then(() => {
     return github!.refresh();
   });
   createWindow();
+  powerMonitor.on('on-battery', updateMonitoringSuspension);
+  powerMonitor.on('on-ac', updateMonitoringSuspension);
+  powerMonitor.on('suspend', () => setMonitoringSuspended(true));
+  powerMonitor.on('resume', updateMonitoringSuspension);
+  powerMonitor.on('lock-screen', () => setMonitoringSuspended(true));
+  powerMonitor.on('unlock-screen', updateMonitoringSuspension);
   updates.start();
   teams.start();
   teamPublisher.start();
@@ -481,7 +543,8 @@ app.on('activate', () => {
 app.on('second-instance', showWindow);
 app.on('before-quit', () => {
   quitting = true;
-  if (authTimer) clearInterval(authTimer);
+  if (authTimer) clearTimeout(authTimer);
+  resumeAuthPolling = undefined;
   github?.close();
   codex?.close();
   discovery?.close();

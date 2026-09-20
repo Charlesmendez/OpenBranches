@@ -23,7 +23,8 @@ export class LiveAgentService {
   private token: string;
   private tasks = new Map<string, SavedAgentTask>();
   private values = new Map<LiveAgentTool, AgentLiveStatus>();
-  private timer: ReturnType<typeof setInterval>;
+  private timer?: ReturnType<typeof setInterval>;
+  private suspended = false;
   private rate = { startedAt: 0, count: 0 };
 
   constructor(
@@ -45,10 +46,7 @@ export class LiveAgentService {
         activeCount: 0,
       });
     }
-    this.timer = setInterval(() => {
-      const changed = this.prune();
-      if (changed || [...this.tasks.values()].some((task) => task.runtime)) this.publish();
-    }, 15_000);
+    this.startTimer();
   }
 
   start() {
@@ -160,9 +158,30 @@ export class LiveAgentService {
 
   async close() {
     this.closed = true;
-    clearInterval(this.timer);
+    if (this.timer) clearInterval(this.timer);
     this.tasks.clear();
     await this.stopServer();
+  }
+
+  setSuspended(suspended: boolean) {
+    if (this.closed || suspended === this.suspended) return;
+    this.suspended = suspended;
+    if (suspended) {
+      if (this.timer) clearInterval(this.timer);
+      this.timer = undefined;
+    } else {
+      this.startTimer();
+      if (this.prune() || [...this.tasks.values()].some((task) => task.runtime)) this.publish();
+    }
+  }
+
+  private startTimer() {
+    if (this.closed || this.suspended || this.timer) return;
+    this.timer = setInterval(() => {
+      const changed = this.prune();
+      if (changed || [...this.tasks.values()].some((task) => task.runtime)) this.publish();
+    }, 15_000);
+    this.timer.unref?.();
   }
 
   private async initialize() {

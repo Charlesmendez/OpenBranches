@@ -27,6 +27,7 @@ interface ActivityState {
 
 export interface CodexActivitySource {
   read(savedTasks: CodexTask[]): Promise<CodexIndex>;
+  setSuspended?(suspended: boolean): void;
   close(): void;
 }
 
@@ -39,6 +40,7 @@ export class CodexActivityLogReader implements CodexActivitySource {
   private nextReconcile = 0;
   private partial = false;
   private closed = false;
+  private suspended = false;
 
   constructor(
     private root = join(homedir(), '.codex', 'sessions'),
@@ -47,7 +49,8 @@ export class CodexActivityLogReader implements CodexActivitySource {
 
   async read(savedTasks: CodexTask[]): Promise<CodexIndex> {
     const now = this.clock();
-    if (this.closed) return { tasks: [], checkedAt: new Date(now).toISOString(), partial: true };
+    if (this.closed || this.suspended)
+      return { tasks: [], checkedAt: new Date(now).toISOString(), partial: true };
     if (now >= this.nextReconcile) await this.reconcile(now);
     await this.pollTracked();
     await this.readDirty(now);
@@ -92,10 +95,21 @@ export class CodexActivityLogReader implements CodexActivitySource {
 
   close() {
     this.closed = true;
-    this.watcher?.close();
-    this.watcher = undefined;
+    this.stopWatcher();
     this.dirty.clear();
     this.states.clear();
+  }
+
+  setSuspended(suspended: boolean) {
+    if (this.closed || suspended === this.suspended) return;
+    this.suspended = suspended;
+    if (suspended) this.stopWatcher();
+    else this.nextReconcile = 0;
+  }
+
+  private stopWatcher() {
+    this.watcher?.close();
+    this.watcher = undefined;
   }
 
   private async reconcile(now: number) {
