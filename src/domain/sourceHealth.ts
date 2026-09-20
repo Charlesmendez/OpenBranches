@@ -22,7 +22,9 @@ export interface WorkspaceSourceHealth {
   rows: SourceHealthRow[];
 }
 
-const LOCAL_STALE_AFTER = 2 * 60_000;
+// Filesystem events keep active projects current; the five-minute scan is only
+// a repair path for missed events, so allow it to finish before reporting delay.
+const LOCAL_STALE_AFTER = 6 * 60_000;
 const REMOTE_STALE_AFTER = 10 * 60_000;
 const HISTORY_STALE_AFTER = 5 * 60_000;
 

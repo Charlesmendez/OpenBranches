@@ -462,7 +462,15 @@ describe('live task metadata', () => {
   });
 });
 
-async function serviceFixture(read: () => Promise<CodexIndex>, activity?: CodexActivitySource) {
+async function serviceFixture(
+  read: () => Promise<CodexIndex>,
+  activity?: CodexActivitySource,
+  launchLive?: () => {
+    initialize: () => Promise<void>;
+    request: (method: string) => Promise<unknown>;
+    close: () => void;
+  },
+) {
   const directory = await mkdtemp(join(tmpdir(), 'openbranches-codex-test-'));
   cleanup.push(() => rm(directory, { recursive: true, force: true }));
   const values = new Map<string, unknown>();
@@ -496,12 +504,47 @@ async function serviceFixture(read: () => Promise<CodexIndex>, activity?: CodexA
     },
     read,
     ...(activity ? { activity } : {}),
+    ...(launchLive ? { launchLive } : {}),
   });
   cleanup.unshift(() => service.close());
   return { service, values, snapshot, clients };
 }
 
 describe('Codex connection lifecycle', () => {
+  it('uses the lightweight activity reader for five-second checks and suspends them in the background', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(checkedAt));
+    const activity = {
+      read: vi.fn(async () => ({ tasks: [], checkedAt, partial: false })),
+      close: vi.fn(),
+    } satisfies CodexActivitySource;
+    const launchLive = vi.fn(() => ({
+      initialize: vi.fn().mockResolvedValue(undefined),
+      request: vi.fn(async (method: string) =>
+        method === 'thread/loaded/list' ? { data: [], nextCursor: null } : undefined,
+      ),
+      close: vi.fn(),
+    }));
+    const fixture = await serviceFixture(
+      async () => ({ tasks: [], checkedAt, partial: false }),
+      activity,
+      launchLive,
+    );
+    await fixture.service.connect();
+    await fixture.service.refreshLive();
+    const daemonReads = launchLive.mock.calls.length;
+    const activityReads = activity.read.mock.calls.length;
+
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(activity.read).toHaveBeenCalledTimes(activityReads + 1);
+    expect(launchLive).toHaveBeenCalledTimes(daemonReads);
+
+    fixture.service.setSuspended(true);
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(activity.read).toHaveBeenCalledTimes(activityReads + 1);
+    expect(launchLive).toHaveBeenCalledTimes(daemonReads);
+  });
+
   it('uses recent local task activity to follow Codex into the exact tool checkout', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(checkedAt));

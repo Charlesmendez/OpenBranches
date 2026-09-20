@@ -40,11 +40,13 @@ export class CodexService {
   private job?: { generation: number; promise: Promise<void> };
   private client?: DiscoveryClient;
   private detection?: Promise<CodexExecutable | undefined>;
-  private timer: ReturnType<typeof setInterval>;
-  private liveTimer: ReturnType<typeof setInterval>;
+  private timer?: ReturnType<typeof setInterval>;
+  private liveTimer?: ReturnType<typeof setInterval>;
+  private suspended = false;
   private liveTasks: CodexTask[] = [];
   private liveClient?: DiscoveryClient;
   private liveJob?: Promise<void>;
+  private liveDaemonRequested = false;
   private dependencies: Dependencies;
 
   constructor(
@@ -59,12 +61,7 @@ export class CodexService {
     const cached = indexSchema.safeParse(store.read('codex.index', null));
     this.index = enabled && cached.success ? cached.data : emptyIndex();
     this.statusValue = { installed: false, enabled, state: 'not-connected' };
-    this.timer = setInterval(() => {
-      void this.refresh();
-    }, 60_000);
-    this.liveTimer = setInterval(() => {
-      void this.refreshLive();
-    }, 5_000);
+    this.startPolling();
   }
 
   status(): CodexStatus {
@@ -193,7 +190,7 @@ export class CodexService {
   }
 
   refresh(): Promise<void> {
-    if (this.closed || !this.statusValue.enabled) return Promise.resolve();
+    if (this.closed || this.suspended || !this.statusValue.enabled) return Promise.resolve();
     void this.refreshLive();
     if (this.job?.generation === this.generation) return this.job.promise;
     const job = { generation: this.generation, promise: Promise.resolve() };
@@ -204,47 +201,96 @@ export class CodexService {
     return job.promise;
   }
 
-  refreshLive(): Promise<void> {
+  refreshLive(includeDaemon = true): Promise<void> {
     if (
       this.closed ||
+      this.suspended ||
       !this.statusValue.enabled ||
       (!this.dependencies.launchLive && !this.dependencies.activity)
     )
       return Promise.resolve();
+    if (this.dependencies.launchLive && (includeDaemon || !this.dependencies.activity))
+      this.liveDaemonRequested = true;
     if (this.liveJob) return this.liveJob;
     const generation = this.generation;
-    const valid = () => !this.closed && this.statusValue.enabled && generation === this.generation;
+    const valid = () =>
+      !this.closed && !this.suspended && this.statusValue.enabled && generation === this.generation;
     this.liveJob = (async () => {
-      const activity = this.dependencies.activity
-        ? this.dependencies.activity.read(this.index.tasks)
-        : undefined;
-      const daemon = this.dependencies.launchLive ? this.readDaemonLive(valid) : undefined;
-      const [activityResult, daemonResult] = await Promise.allSettled([
-        activity ?? Promise.reject(new Error('Activity log source unavailable')),
-        daemon ?? Promise.reject(new Error('Codex daemon unavailable')),
-      ]);
-      if (!valid()) return;
-      const available = [daemonResult, activityResult].flatMap((result) =>
-        result.status === 'fulfilled' ? [result.value] : [],
-      );
-      if (available.length) {
-        const live = mergeLiveIndexes(available);
-        const selected = this.selectedIndex(this.current(), live);
-        this.liveTasks = selected.tasks;
-        this.statusValue = {
-          ...this.statusValue,
-          liveState: live.partial ? 'partial' : 'connected',
-          liveCheckedAt: live.checkedAt,
-        };
-      } else {
-        this.liveTasks = [];
-        this.statusValue = { ...this.statusValue, liveState: 'unavailable' };
-      }
-      this.publish();
+      do {
+        const readDaemon = this.liveDaemonRequested;
+        this.liveDaemonRequested = false;
+        await this.readLiveSources(valid, readDaemon);
+      } while (valid() && this.liveDaemonRequested);
     })().finally(() => {
       this.liveJob = undefined;
     });
     return this.liveJob;
+  }
+
+  private async readLiveSources(valid: () => boolean, includeDaemon: boolean) {
+    const activity = this.dependencies.activity
+      ? this.dependencies.activity.read(this.index.tasks)
+      : undefined;
+    const daemon =
+      includeDaemon && this.dependencies.launchLive ? this.readDaemonLive(valid) : undefined;
+    const [activityResult, daemonResult] = await Promise.allSettled([
+      activity ?? Promise.reject(new Error('Activity log source unavailable')),
+      daemon ?? Promise.reject(new Error('Codex daemon unavailable')),
+    ]);
+    if (!valid()) return;
+    const available = [daemonResult, activityResult].flatMap((result) =>
+      result.status === 'fulfilled' ? [result.value] : [],
+    );
+    if (available.length) {
+      const live = mergeLiveIndexes(available);
+      const selected = this.selectedIndex(this.current(), live);
+      this.liveTasks = selected.tasks;
+      this.statusValue = {
+        ...this.statusValue,
+        liveState: live.partial ? 'partial' : 'connected',
+        liveCheckedAt: live.checkedAt,
+      };
+    } else {
+      this.liveTasks = [];
+      this.statusValue = { ...this.statusValue, liveState: 'unavailable' };
+    }
+    this.publish();
+  }
+
+  setSuspended(suspended: boolean): void {
+    if (this.closed || suspended === this.suspended) return;
+    this.suspended = suspended;
+    this.dependencies.activity?.setSuspended?.(suspended);
+    if (suspended) {
+      ++this.generation;
+      this.liveDaemonRequested = false;
+      this.stopPolling();
+      this.client?.close();
+      this.client = undefined;
+      this.liveClient?.close();
+      this.liveClient = undefined;
+    } else this.startPolling();
+  }
+
+  private startPolling() {
+    if (this.closed || this.suspended || this.timer || this.liveTimer) return;
+    this.timer = setInterval(() => {
+      void this.refresh();
+    }, 60_000);
+    // Local rollout files are already watched. This short pass only consumes
+    // changed file tails; the heavier daemon inspection runs on the minute pass.
+    this.liveTimer = setInterval(() => {
+      void this.refreshLive(false);
+    }, 5_000);
+    this.timer.unref?.();
+    this.liveTimer.unref?.();
+  }
+
+  private stopPolling() {
+    if (this.timer) clearInterval(this.timer);
+    if (this.liveTimer) clearInterval(this.liveTimer);
+    this.timer = undefined;
+    this.liveTimer = undefined;
   }
 
   private async readDaemonLive(valid: () => boolean) {
@@ -311,8 +357,7 @@ export class CodexService {
   close() {
     this.closed = true;
     ++this.generation;
-    clearInterval(this.timer);
-    clearInterval(this.liveTimer);
+    this.stopPolling();
     this.client?.close();
     this.liveClient?.close();
     this.dependencies.activity?.close();

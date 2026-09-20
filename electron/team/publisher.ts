@@ -58,6 +58,9 @@ export class TeamPublisher {
       })),
     };
   }
+  requiresBackgroundUpdates() {
+    return this.registry.all().some(active);
+  }
   private emit() {
     if (!this.closed) this.publish(this.state());
   }

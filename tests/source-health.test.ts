@@ -88,7 +88,7 @@ describe('workspace source health', () => {
 
   it('reports delayed local and remote evidence while preserving their observation times', () => {
     const repository = createDemoSnapshot(now).repositories[0];
-    repository.scannedAt = ago(3 * 60_000);
+    repository.scannedAt = ago(7 * 60_000);
     repository.github = { checkedAt: ago(11 * 60_000), partial: false };
     const health = workspaceSourceHealth(
       [repository],
@@ -100,7 +100,7 @@ describe('workspace source health', () => {
     expect(health).toMatchObject({ state: 'delayed', label: '2 sources need attention' });
     expect(health.rows.find((row) => row.id === 'local')).toMatchObject({
       state: 'delayed',
-      checkedAt: ago(3 * 60_000),
+      checkedAt: ago(7 * 60_000),
     });
     expect(health.rows.find((row) => row.id === 'github')).toMatchObject({
       state: 'delayed',
