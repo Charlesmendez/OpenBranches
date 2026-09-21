@@ -36,7 +36,6 @@
 
 .workspace-now-kicker svg {
   filter: drop-shadow(0 0 5px #8da9ff);
-  animation: live-work-glow 1.8s ease-in-out infinite;
 }
 
 .workspace-now-intro h2 {
@@ -487,7 +486,6 @@
 
 .workspace-now-branch.live .workspace-now-agent-icon {
   box-shadow: 0 0 14px #718ffb3d;
-  animation: live-work-glow 1.8s ease-in-out infinite;
 }
 
 .workspace-now-branch.waiting .workspace-now-agent-icon {
@@ -523,7 +521,6 @@
   border-radius: 50%;
   background: currentColor;
   box-shadow: 0 0 7px currentColor;
-  animation: live-work-dot 1.6s ease-in-out infinite;
 }
 
 .workspace-now-branch.waiting .workspace-now-node-state {
@@ -939,13 +936,5 @@
   .workspace-now-footer > div {
     width: 100%;
     justify-content: space-between;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .workspace-now-kicker svg,
-  .workspace-now-branch.live .workspace-now-agent-icon,
-  .workspace-now-node-state > i:not([class]) {
-    animation: none;
   }
 }

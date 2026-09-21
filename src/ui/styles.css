@@ -1506,9 +1506,6 @@ code {
   background: #668cff;
   box-shadow: 0 0 9px #668cffee;
 }
-.legend-work-dot.live {
-  animation: live-work-glow 1.8s ease-in-out infinite;
-}
 .legend-work-dot.changes {
   border-color: #d8b85e;
   background: #e2c47d;
@@ -3064,7 +3061,6 @@ code {
   border-color: #657db8;
   background: #293249;
   box-shadow: 0 0 16px #668cff28;
-  animation: live-work-glow 1.8s ease-in-out infinite;
 }
 .search-result-icon.waiting {
   color: #d1c6f5;
@@ -3263,17 +3259,9 @@ code {
 .spinning svg {
   animation: spin 1s linear infinite;
 }
-.pulsing {
-  animation: pulse 1.3s ease-in-out infinite;
-}
 @keyframes spin {
   to {
     transform: rotate(360deg);
-  }
-}
-@keyframes pulse {
-  50% {
-    opacity: 0.35;
   }
 }
 @media (min-height: 1000px) {

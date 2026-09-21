@@ -113,7 +113,7 @@ export class RepositoryService {
       if (!this.isCurrent(repository.id, revision)) continue;
       try {
         const fresh = await this.scan(repository.path);
-        if (this.isCurrent(repository.id, revision)) this.replace(fresh);
+        if (this.isCurrent(repository.id, revision)) this.replace(fresh, false);
       } catch (error) {
         const current = this.snapshot.repositories.find((r) => r.id === repository.id);
         if (current && this.isCurrent(repository.id, revision))
@@ -142,7 +142,7 @@ export class RepositoryService {
       this.snapshot.repositories.some((repository) => repository.id === id)
     );
   }
-  private replace(repository: Repository): void {
+  private replace(repository: Repository, emit = true): void {
     if (this.closed) return;
     const previous = this.snapshot.repositories.find((r) => r.id === repository.id);
     if (previous) {
@@ -154,7 +154,7 @@ export class RepositoryService {
       repository,
     ].sort((a, b) => a.name.localeCompare(b.name));
     this.watchRepository(repository);
-    this.emit();
+    if (emit) this.emit();
   }
   private watchRepository(repository: Repository): void {
     if (this.closed || this.suspended) return;

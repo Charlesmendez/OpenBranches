@@ -263,9 +263,6 @@
   font-weight: 750;
   letter-spacing: 0.15em;
 }
-.project-work-spotlight.live .project-work-kicker svg {
-  animation: live-work-glow 1.8s ease-in-out infinite;
-}
 .project-work-spotlight.waiting .project-work-kicker {
   color: #c3b9f1;
 }
@@ -374,9 +371,6 @@
   border-radius: 50%;
   background: currentColor;
   box-shadow: 0 0 7px currentColor;
-}
-.project-work-item.live .project-work-state i {
-  animation: live-work-dot 1.6s ease-in-out infinite;
 }
 .project-work-item.waiting .project-work-state {
   color: #c3b9f1;
@@ -492,9 +486,6 @@
 .route-task.work-checkout {
   border-color: #465473;
 }
-.route-task.work-live > span:first-child {
-  animation: live-work-glow 1.8s ease-in-out infinite;
-}
 .route-task-status {
   display: flex;
   align-items: center;
@@ -604,11 +595,6 @@
     0 0 0 2px #8aabff7a,
     0 0 0 7px #668cff12,
     0 0 38px #668cff55;
-  animation: map-live-card-glow 1.9s ease-in-out infinite;
-}
-.branch-map-card.work-live .node-indicator,
-.cluster-card.work-live .cluster-work-signal i {
-  animation: live-work-glow 1.8s ease-in-out infinite;
 }
 .branch-map-card.work-waiting,
 .cluster-card.work-waiting {
@@ -666,9 +652,6 @@
   border-radius: 50%;
   background: currentColor;
   box-shadow: 0 0 7px currentColor;
-}
-.map-state-badge.live i {
-  animation: live-work-dot 1.6s ease-in-out infinite;
 }
 .map-state-badge.waiting {
   color: #c3b9f1;
@@ -744,35 +727,8 @@
 .cluster-heading > .cluster-work-signal + svg {
   margin-left: 0;
 }
-@keyframes live-work-glow {
-  50% {
-    opacity: 0.5;
-    filter: drop-shadow(0 0 5px #8aabff);
-  }
-}
-@keyframes live-work-dot {
-  50% {
-    opacity: 0.45;
-    transform: scale(0.72);
-    box-shadow: 0 0 3px currentColor;
-  }
-}
-@keyframes map-live-card-glow {
-  50% {
-    box-shadow:
-      0 0 0 2px #9ab5ff9c,
-      0 0 0 10px #668cff16,
-      0 0 46px #668cff6b;
-  }
-}
 .react-flow__edge.work-live .react-flow__edge-path {
   filter: drop-shadow(0 0 3px #8aabff);
-  animation: map-live-edge-glow 1.9s ease-in-out infinite;
-}
-@keyframes map-live-edge-glow {
-  50% {
-    filter: drop-shadow(0 0 7px #8aabff);
-  }
 }
 .branch-map-card.selected {
   outline: 2px solid var(--accent);
@@ -870,9 +826,6 @@
 .activity-presence.live {
   color: var(--accent);
 }
-.activity-presence.live svg {
-  animation: presence-pulse 2s ease-in-out infinite;
-}
 .activity-presence.recent {
   color: #c3b9f1;
 }
@@ -885,11 +838,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-@keyframes presence-pulse {
-  50% {
-    opacity: 0.45;
-  }
 }
 .review-source-status {
   display: flex;
