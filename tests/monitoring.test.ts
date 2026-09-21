@@ -478,6 +478,35 @@ describe('stopping project monitoring', () => {
 });
 
 describe('live repository monitoring', () => {
+  it('batches a full reconciliation into one durable workspace update', async () => {
+    const { store } = await storeFixture();
+    const snapshot = createDemoSnapshot();
+    const repositories = snapshot.repositories.slice(0, 2).map((repository, index) => ({
+      ...structuredClone(repository),
+      path: `/fixture/repository-${index}`,
+    }));
+    store.write('snapshot', { ...snapshot, repositories });
+    const scan = vi.fn(async (path: string) =>
+      structuredClone(repositories.find((repository) => repository.path === path)!),
+    );
+    const scanningStates: boolean[] = [];
+    const write = vi.spyOn(store, 'write');
+    const service = new RepositoryService(
+      store,
+      (current) => scanningStates.push(current.scanning),
+      { executable: async () => '/fixture/git' },
+      { scan, close: () => {} },
+      watcherFixture().factory,
+    );
+    cleanup.push(() => service.close());
+
+    await service.refresh();
+
+    expect(scan).toHaveBeenCalledTimes(repositories.length);
+    expect(scanningStates).toEqual([true, false]);
+    expect(write).toHaveBeenCalledOnce();
+  });
+
   it('closes watchers and stops reconciliation while suspended, then restores both', async () => {
     vi.useFakeTimers();
     const { store } = await storeFixture();
