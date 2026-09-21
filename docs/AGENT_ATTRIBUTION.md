@@ -19,6 +19,8 @@ The Codex connection also watches recent local rollout metadata. This covers a t
 
 Badges appear on the branch map, inventory, and inspector. Recorded model IDs are visible in session details and searchable with tool names and task titles. The Cursor adapter normalizes an explicitly reported Grok model ID to xAI before the Grok icon appears; it stays paired with Cursor. Historical model IDs without provider evidence do not receive that icon. Only Codex sessions expose the association-checked **Open in Codex** action.
 
+Live-state badges use static color, border, and glow treatments. They deliberately avoid perpetual pulse, shadow, filter, and graph-edge animations so a workspace with several active sessions does not continuously repaint the Electron renderer and GPU.
+
 ## Claude history source and privacy
 
 The history reader supports local main-session UUID JSONL files below `~/.claude/projects/<encoded-project-path>/`, or an absolute inherited `CLAUDE_CONFIG_DIR`. This is a local-format integration, not a guaranteed cross-version API. Claude Desktop, Cowork, remote sessions, subagents, and arbitrary custom stores are not claimed as supported.
