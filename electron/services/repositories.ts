@@ -6,10 +6,12 @@ import { GitWorkerClient } from '../git/client';
 import type { GitInstallation } from '../git/installation';
 
 const RECONCILE_INTERVAL = 5 * 60_000;
+type RepositoryWorker = Pick<GitWorkerClient, 'scan' | 'close'> &
+  Partial<Pick<GitWorkerClient, 'release'>>;
 
 export class RepositoryService {
   private snapshot: Snapshot;
-  private worker: Pick<GitWorkerClient, 'scan' | 'close'>;
+  private worker: RepositoryWorker;
   private closed = false;
   private refreshing?: Promise<void>;
   private watchPaths = new Map<string, string>();
@@ -23,7 +25,7 @@ export class RepositoryService {
     private store: AppStore,
     private publish: (snapshot: Snapshot) => void,
     git: Pick<GitInstallation, 'executable'>,
-    worker: Pick<GitWorkerClient, 'scan' | 'close'> = new GitWorkerClient(git),
+    worker: RepositoryWorker = new GitWorkerClient(git),
     private watchDirectory: typeof watch = watch,
   ) {
     this.worker = worker;
@@ -121,7 +123,11 @@ export class RepositoryService {
       }
     }
     this.snapshot.scanning = false;
-    this.emit();
+    try {
+      this.emit();
+    } finally {
+      this.worker.release?.();
+    }
   }
   private scan(path: string): Promise<Repository> {
     const existing = this.inFlight.get(path);

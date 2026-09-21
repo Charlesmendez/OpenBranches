@@ -491,11 +491,12 @@ describe('live repository monitoring', () => {
     );
     const scanningStates: boolean[] = [];
     const write = vi.spyOn(store, 'write');
+    const release = vi.fn();
     const service = new RepositoryService(
       store,
       (current) => scanningStates.push(current.scanning),
       { executable: async () => '/fixture/git' },
-      { scan, close: () => {} },
+      { scan, close: () => {}, release },
       watcherFixture().factory,
     );
     cleanup.push(() => service.close());
@@ -505,6 +506,7 @@ describe('live repository monitoring', () => {
     expect(scan).toHaveBeenCalledTimes(repositories.length);
     expect(scanningStates).toEqual([true, false]);
     expect(write).toHaveBeenCalledOnce();
+    expect(release).toHaveBeenCalledOnce();
   });
 
   it('closes watchers and stops reconciliation while suspended, then restores both', async () => {
