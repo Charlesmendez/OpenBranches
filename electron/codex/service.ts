@@ -1,4 +1,5 @@
 import { mkdir } from 'node:fs/promises';
+import { isDeepStrictEqual } from 'node:util';
 import type { CodexStatus, OpenTaskCommand, Snapshot } from '../../src/domain/types';
 import type { AppStore } from '../services/store';
 import { findCodex, type CodexExecutable } from './executable';
@@ -10,11 +11,14 @@ import {
   type CodexIndex,
   type CodexTask,
 } from './reader';
-import { associateTask, linkRepository } from './associations';
+import { associateTask, createCodexTaskLinker } from './associations';
 import { readCodexAccount } from './account';
 import { createCodexActivitySource, type CodexActivitySource } from './activity';
 
 const emptyIndex = (): CodexIndex => ({ tasks: [], checkedAt: '', partial: false });
+// Saved history is not a live signal. Keep it within the five-minute freshness
+// budget without launching a full inspection on every live-daemon heartbeat.
+const HISTORY_REFRESH_MS = 4 * 60_000;
 type DiscoveryClient = Pick<CodexInspectionClient, 'initialize' | 'request' | 'close'>;
 interface Dependencies {
   find: () => Promise<CodexExecutable | undefined>;
@@ -48,6 +52,8 @@ export class CodexService {
   private liveJob?: Promise<void>;
   private liveDaemonRequested = false;
   private dependencies: Dependencies;
+  private lastIndexAttempt = Number.NEGATIVE_INFINITY;
+  private liveEvidence = '';
 
   constructor(
     private store: Pick<AppStore, 'read' | 'write'>,
@@ -64,11 +70,13 @@ export class CodexService {
     this.startPolling();
   }
 
-  status(): CodexStatus {
+  status(linked?: Snapshot): CodexStatus {
+    const eligible = new Set([...this.index.tasks, ...this.liveTasks].map((task) => task.id));
     const ids = new Set(
-      this.enrich(this.current()).repositories.flatMap((r) =>
+      (eligible.size ? (linked ?? this.enrich(this.current())).repositories : []).flatMap((r) =>
         r.branches.flatMap(
-          (b) => b.tasks?.filter((t) => t.tool === 'codex').map((t) => t.id) ?? [],
+          (b) =>
+            b.tasks?.filter((t) => t.tool === 'codex' && eligible.has(t.id)).map((t) => t.id) ?? [],
         ),
       ),
     );
@@ -122,19 +130,17 @@ export class CodexService {
 
   enrich(snapshot: Snapshot): Snapshot {
     if (!this.statusValue.enabled) return snapshot;
+    const link = createCodexTaskLinker(
+      [
+        ...new Map(
+          [...this.index.tasks, ...this.liveTasks].map((task) => [task.id, task]),
+        ).values(),
+      ],
+      this.index.checkedAt,
+    );
     return {
       ...snapshot,
-      repositories: snapshot.repositories.map((r) =>
-        linkRepository(
-          r,
-          [
-            ...new Map(
-              [...this.index.tasks, ...this.liveTasks].map((task) => [task.id, task]),
-            ).values(),
-          ],
-          this.index.checkedAt,
-        ),
-      ),
+      repositories: snapshot.repositories.map(link),
     };
   }
 
@@ -156,7 +162,7 @@ export class CodexService {
   }
 
   prepareForgetUnselected(snapshot: Snapshot): () => void {
-    const index = this.selectedIndex(snapshot, this.index);
+    const index = this.selectIndex(snapshot, this.index).index;
     this.store.write('codex.index', index);
     return () => {
       ++this.generation;
@@ -173,20 +179,19 @@ export class CodexService {
     };
   }
 
-  private selectedIndex(snapshot: Snapshot, index: CodexIndex): CodexIndex {
-    const linked = this.statusValue.enabled
-      ? snapshot.repositories.map((repository) =>
-          linkRepository(repository, index.tasks, index.checkedAt),
-        )
-      : [];
-    const ids = new Set(
-      linked.flatMap((r) =>
-        r.branches.flatMap(
-          (b) => b.tasks?.filter((t) => t.tool === 'codex').map((t) => t.id) ?? [],
-        ),
-      ),
+  private selectIndex(snapshot: Snapshot, index: CodexIndex) {
+    const linked =
+      this.statusValue.enabled && index.tasks.length
+        ? snapshot.repositories.map(createCodexTaskLinker(index.tasks, index.checkedAt))
+        : [];
+    const evidence = linked.flatMap((repository) =>
+      repository.branches.flatMap((branch) => {
+        const tasks = branch.tasks?.filter((task) => task.tool === 'codex') ?? [];
+        return tasks.length ? [{ branchId: branch.id, tasks }] : [];
+      }),
     );
-    return { ...index, tasks: index.tasks.filter((task) => ids.has(task.id)) };
+    const ids = new Set(evidence.flatMap((item) => item.tasks.map((task) => task.id)));
+    return { index: { ...index, tasks: index.tasks.filter((task) => ids.has(task.id)) }, evidence };
   }
 
   refresh(): Promise<void> {
@@ -199,6 +204,13 @@ export class CodexService {
       if (this.job === job) this.job = undefined;
     });
     return job.promise;
+  }
+
+  refreshIfStale(): Promise<void> {
+    const elapsed = Date.now() - this.lastIndexAttempt;
+    return this.statusValue.state !== 'ready' || elapsed < 0 || elapsed >= HISTORY_REFRESH_MS
+      ? this.refresh()
+      : this.refreshLive();
   }
 
   refreshLive(includeDaemon = true): Promise<void> {
@@ -241,10 +253,21 @@ export class CodexService {
     const available = [daemonResult, activityResult].flatMap((result) =>
       result.status === 'fulfilled' ? [result.value] : [],
     );
+    const previousTasks = this.liveTasks;
+    const previousState = this.statusValue.liveState;
+    const previousEvidence = this.liveEvidence;
     if (available.length) {
       const live = mergeLiveIndexes(available);
-      const selected = this.selectedIndex(this.current(), live);
-      this.liveTasks = selected.tasks;
+      const selection = live.tasks.length
+        ? this.selectIndex(this.current(), live)
+        : { index: live, evidence: [] };
+      const selected = selection.index;
+      // Include derived evidence, not the poll timestamp: a checkout or runtime
+      // becoming stale must still clear live labels even if raw tasks are equal.
+      this.liveEvidence = JSON.stringify(selection.evidence);
+      this.liveTasks = isDeepStrictEqual(previousTasks, selected.tasks)
+        ? previousTasks
+        : selected.tasks;
       this.statusValue = {
         ...this.statusValue,
         liveState: live.partial ? 'partial' : 'connected',
@@ -252,9 +275,15 @@ export class CodexService {
       };
     } else {
       this.liveTasks = [];
+      this.liveEvidence = '';
       this.statusValue = { ...this.statusValue, liveState: 'unavailable' };
     }
-    this.publish();
+    if (
+      previousState !== this.statusValue.liveState ||
+      previousEvidence !== this.liveEvidence ||
+      !isDeepStrictEqual(previousTasks, this.liveTasks)
+    )
+      this.publish();
   }
 
   setSuspended(suspended: boolean): void {
@@ -275,7 +304,7 @@ export class CodexService {
   private startPolling() {
     if (this.closed || this.suspended || this.timer || this.liveTimer) return;
     this.timer = setInterval(() => {
-      void this.refresh();
+      void this.refreshIfStale();
     }, 60_000);
     // Local rollout files are already watched. This short pass only consumes
     // changed file tails; the heavier daemon inspection runs on the minute pass.
@@ -311,6 +340,7 @@ export class CodexService {
   }
 
   private async refreshIndex(generation: number) {
+    this.lastIndexAttempt = Date.now();
     const valid = () => !this.closed && this.statusValue.enabled && generation === this.generation;
     this.statusValue = { ...this.statusValue, state: 'connecting', error: undefined };
     this.publish();
@@ -331,7 +361,7 @@ export class CodexService {
         ? await this.dependencies.read(client)
         : { tasks: [], checkedAt: new Date().toISOString(), partial: false };
       if (!valid()) return;
-      const index = this.selectedIndex(this.current(), fresh);
+      const index = this.selectIndex(this.current(), fresh).index;
       this.store.write('codex.index', index);
       this.index = index;
       this.statusValue = { ...this.statusValue, state: 'ready', error: undefined };

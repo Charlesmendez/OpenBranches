@@ -140,7 +140,16 @@ export function linkRepository(
   tool: SavedAgentTask['tool'],
   options: { merge?: boolean } = {},
 ): Repository {
-  const evidence = context(repository);
+  return createTaskLinker(tasks, checkedAt, tool, options)(repository);
+}
+
+/** Build candidate indexes once for a workspace pass, not once per repository. */
+export function createTaskLinker(
+  tasks: SavedAgentTask[],
+  checkedAt: string,
+  tool: SavedAgentTask['tool'],
+  options: { merge?: boolean } = {},
+): (repository: Repository) => Repository {
   const byBranch = new Map<string, SavedAgentTask[]>();
   const byCommit = new Map<string, SavedAgentTask[]>();
   const liveByCwd = new Map<string, SavedAgentTask[]>();
@@ -162,59 +171,62 @@ export function linkRepository(
       byCommit.set(task.gitInfo.sha, group);
     }
   }
-  return {
-    ...repository,
-    branches: repository.branches.map((branch) => {
-      const existing = branch.tasks ?? [];
-      const linked = (
-        branch.detached
-          ? [
-              ...new Map(
-                commitIds(branch)
-                  .flatMap((sha) => byCommit.get(sha) ?? [])
-                  .map((task) => [task.id, task]),
-              ).values(),
-            ]
-          : [
-              ...new Map(
-                [
-                  ...(byBranch.get(branch.name) ?? []),
-                  ...branch.worktrees.flatMap((tree) => liveByCwd.get(resolve(tree.path)) ?? []),
-                ].map((task) => [task.id, task]),
-              ).values(),
-            ]
-      ).flatMap((task) => {
-        const link = matchTask(evidence, branch, task, checkedAt);
-        if (!link) return [];
-        const prior = existing.find(
-          (candidate) => candidate.tool === link.tool && candidate.id === link.id,
-        );
-        return [
-          prior && options.merge
-            ? {
-                ...prior,
-                ...link,
-                title: task.name?.trim() ? link.title : prior.title,
-                model: link.model ?? prior.model,
-              }
-            : link,
-        ];
-      });
-      const linkedKeys = new Set(linked.map((task) => `${task.tool}:${task.id}`));
-      return {
-        ...branch,
-        tasks: [
-          ...existing.filter(
-            (task) =>
-              (options.merge || task.tool !== tool) && !linkedKeys.has(`${task.tool}:${task.id}`),
+  return (repository) => {
+    const evidence = context(repository);
+    return {
+      ...repository,
+      branches: repository.branches.map((branch) => {
+        const existing = branch.tasks ?? [];
+        const linked = (
+          branch.detached
+            ? [
+                ...new Map(
+                  commitIds(branch)
+                    .flatMap((sha) => byCommit.get(sha) ?? [])
+                    .map((task) => [task.id, task]),
+                ).values(),
+              ]
+            : [
+                ...new Map(
+                  [
+                    ...(byBranch.get(branch.name) ?? []),
+                    ...branch.worktrees.flatMap((tree) => liveByCwd.get(resolve(tree.path)) ?? []),
+                  ].map((task) => [task.id, task]),
+                ).values(),
+              ]
+        ).flatMap((task) => {
+          const link = matchTask(evidence, branch, task, checkedAt);
+          if (!link) return [];
+          const prior = existing.find(
+            (candidate) => candidate.tool === link.tool && candidate.id === link.id,
+          );
+          return [
+            prior && options.merge
+              ? {
+                  ...prior,
+                  ...link,
+                  title: task.name?.trim() ? link.title : prior.title,
+                  model: link.model ?? prior.model,
+                }
+              : link,
+          ];
+        });
+        const linkedKeys = new Set(linked.map((task) => `${task.tool}:${task.id}`));
+        return {
+          ...branch,
+          tasks: [
+            ...existing.filter(
+              (task) =>
+                (options.merge || task.tool !== tool) && !linkedKeys.has(`${task.tool}:${task.id}`),
+            ),
+            ...linked,
+          ].sort(
+            (a, b) =>
+              (a.association === 'verified' ? 0 : 1) - (b.association === 'verified' ? 0 : 1) ||
+              Date.parse(b.updatedAt ?? '') - Date.parse(a.updatedAt ?? ''),
           ),
-          ...linked,
-        ].sort(
-          (a, b) =>
-            (a.association === 'verified' ? 0 : 1) - (b.association === 'verified' ? 0 : 1) ||
-            Date.parse(b.updatedAt ?? '') - Date.parse(a.updatedAt ?? ''),
-        ),
-      };
-    }),
+        };
+      }),
+    };
   };
 }

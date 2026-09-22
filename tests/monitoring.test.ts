@@ -541,6 +541,36 @@ describe('live repository monitoring', () => {
     expect(scan).toHaveBeenCalledOnce();
   });
 
+  it('stops a running batch after the current repository when hidden and preserves prior observations', async () => {
+    const { store } = await storeFixture();
+    const snapshot = createDemoSnapshot();
+    store.write('snapshot', snapshot);
+    const pending = deferred<Repository>();
+    const scan = vi.fn(() => pending.promise);
+    const release = vi.fn();
+    const service = new RepositoryService(
+      store,
+      () => {},
+      { executable: async () => '/fixture/git' },
+      { scan, close() {}, release },
+      watcherFixture().factory,
+    );
+    cleanup.push(() => service.close());
+    const before = service.current();
+    const work = service.refresh();
+    expect(before.scanning).toBe(false);
+    expect(service.current().scanning).toBe(true);
+    service.setSuspended(true);
+    pending.resolve({ ...snapshot.repositories[0], scannedAt: new Date().toISOString() });
+    await work;
+    await service.refresh();
+    expect(scan).toHaveBeenCalledOnce();
+    expect(release).toHaveBeenCalledOnce();
+    expect(service.current().scanning).toBe(false);
+    expect(before.repositories[0].scannedAt).toBe(snapshot.repositories[0].scannedAt);
+    expect(before).not.toBe(service.current());
+  });
+
   it('watches Git and every available checkout, coalesces bursts, and ignores generated folders', async () => {
     vi.useFakeTimers();
     const { store } = await storeFixture();
