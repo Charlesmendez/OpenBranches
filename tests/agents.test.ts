@@ -6,7 +6,7 @@ import { createDemoSnapshot } from '../src/data/demo';
 import { branchTools, taskKey, agentSearchText, isGrokModel } from '../src/domain/agents';
 import { recommendationRevision } from '../src/domain/reviews';
 import type { Branch, Repository, Snapshot, TaskLink } from '../src/domain/types';
-import { associateTask, linkRepository } from '../electron/agents/associations';
+import { associateTask, createTaskLinker, linkRepository } from '../electron/agents/associations';
 import type { SavedAgentTask } from '../electron/agents/types';
 import {
   parseClaudeMetadata,
@@ -85,6 +85,18 @@ const index = (tasks = [task()], partial = false, at = checkedAt): AgentIndex =>
 });
 
 describe('coding-tool attribution', () => {
+  it('shares candidate indexes across repositories without leaking links or mutating inputs', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(checkedAt));
+    const repo = repository();
+    const other = { ...repository('/fixture/other'), id: 'other', remotes: [] };
+    const tasks = [task()];
+    const link = createTaskLinker(tasks, checkedAt, 'claude-code');
+    expect(link(repo)).toEqual(linkRepository(repo, tasks, checkedAt, 'claude-code'));
+    expect(link(other).branches[0].tasks).toEqual([]);
+    expect(repo.branches[0].tasks).toEqual([]);
+  });
+
   it('keeps mixed confidence visible, separates a reported model from its tool, and tolerates unknown tools', () => {
     const base: TaskLink = {
       id,

@@ -491,7 +491,8 @@ async function serviceFixture(
     request: ReturnType<typeof vi.fn>;
     close: ReturnType<typeof vi.fn>;
   }[] = [];
-  const service = new CodexService(store, directory, () => snapshot, vi.fn(), {
+  const publish = vi.fn();
+  const service = new CodexService(store, directory, () => snapshot, publish, {
     find: async () => ({ path: '/fixture/codex', version: 'codex-cli 0.144.4', supported: true }),
     launch: () => {
       const client = {
@@ -507,10 +508,146 @@ async function serviceFixture(
     ...(launchLive ? { launchLive } : {}),
   });
   cleanup.unshift(() => service.close());
-  return { service, values, snapshot, clients };
+  return { service, values, snapshot, clients, publish };
 }
 
 describe('Codex connection lifecycle', () => {
+  it('does not republish unchanged live checks, but publishes evidence expiry, completion and failures', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(checkedAt));
+    let tasks = [
+      task({
+        runtime: { state: 'active' as const, checkedAt, source: 'codex-session-log' as const },
+      }),
+    ];
+    let fail = false;
+    const activity = {
+      read: vi.fn(async () => {
+        if (fail) throw new Error('unavailable');
+        return {
+          tasks: structuredClone(tasks),
+          checkedAt: new Date().toISOString(),
+          partial: false,
+        };
+      }),
+      close: vi.fn(),
+    };
+    const fixture = await serviceFixture(
+      async () => ({ tasks: [task()], checkedAt, partial: false }),
+      activity,
+    );
+    await fixture.service.connect();
+    await fixture.service.refreshLive(false);
+    fixture.publish.mockClear();
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(fixture.publish).not.toHaveBeenCalled();
+    expect(fixture.service.status().liveCheckedAt).toBe(
+      new Date(Date.parse(checkedAt) + 30_000).toISOString(),
+    );
+
+    // The reader returns identical raw data, but matching must expire it.
+    vi.setSystemTime(Date.parse(checkedAt) + 91_000);
+    await fixture.service.refreshLive(false);
+    expect(fixture.publish).toHaveBeenCalledOnce();
+    expect(
+      fixture.service.enrich(fixture.snapshot).repositories[0].branches[0].tasks?.[0].status,
+    ).toBe('unknown');
+    fixture.publish.mockClear();
+    tasks = [];
+    await fixture.service.refreshLive(false);
+    expect(fixture.publish).toHaveBeenCalledOnce();
+    fixture.publish.mockClear();
+    fail = true;
+    await fixture.service.refreshLive(false);
+    expect(fixture.publish).toHaveBeenCalledOnce();
+    expect(fixture.service.status().liveState).toBe('unavailable');
+    fixture.publish.mockClear();
+    await fixture.service.refreshLive(false);
+    expect(fixture.publish).not.toHaveBeenCalled();
+  });
+
+  it('still publishes checkout-evidence expiry while the runtime observation remains fresh', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(checkedAt));
+    const runtimeAt = new Date(Date.parse(checkedAt) + 60_000).toISOString();
+    const fixture = await serviceFixture(async () => ({ tasks: [], checkedAt, partial: false }), {
+      read: async () => ({
+        tasks: [
+          task({ runtime: { state: 'active', checkedAt: runtimeAt, source: 'codex-session-log' } }),
+        ],
+        checkedAt,
+        partial: false,
+      }),
+      close() {},
+    });
+    await fixture.service.connect();
+    await fixture.service.refreshLive(false);
+    fixture.publish.mockClear();
+    vi.setSystemTime(Date.parse(checkedAt) + 121_000);
+    await fixture.service.refreshLive(false);
+    expect(fixture.publish).toHaveBeenCalledOnce();
+    expect(
+      fixture.service.enrich(fixture.snapshot).repositories[0].branches[0].tasks?.[0].status,
+    ).toBe('unknown');
+  });
+
+  it('refreshes saved history every four minutes while keeping minute daemon and five-second log checks', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(checkedAt));
+    const read = vi.fn(async () => ({
+      tasks: [],
+      checkedAt: new Date().toISOString(),
+      partial: false,
+    }));
+    const activity = {
+      read: vi.fn(async () => ({ tasks: [], checkedAt: new Date().toISOString(), partial: false })),
+      close: vi.fn(),
+    };
+    const launchLive = vi.fn(() => ({
+      initialize: vi.fn().mockResolvedValue(undefined),
+      request: vi.fn(async () => ({ data: [], nextCursor: null })),
+      close: vi.fn(),
+    }));
+    const fixture = await serviceFixture(read, activity, launchLive);
+    await fixture.service.connect();
+    await fixture.service.refreshLive();
+    const daemonReads = launchLive.mock.calls.length;
+    const refresh = vi.spyOn(fixture.service, 'refresh');
+    expect(read).toHaveBeenCalledOnce();
+    await vi.advanceTimersByTimeAsync(180_000);
+    await fixture.service.refreshLive(false);
+    expect(read).toHaveBeenCalledOnce();
+    expect(refresh).not.toHaveBeenCalled();
+    expect(launchLive).toHaveBeenCalledTimes(daemonReads + 3);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(refresh).toHaveBeenCalledOnce();
+    // Let real filesystem setup finish after the fake interval fires.
+    await refresh.mock.results[0].value;
+    expect(read).toHaveBeenCalledTimes(2);
+    await fixture.service.refresh();
+    expect(read).toHaveBeenCalledTimes(3);
+  });
+
+  it('reuses already-linked snapshots for counts and excludes unrelated hook or handoff tasks', async () => {
+    const fixture = await serviceFixture(async () => ({
+      tasks: [task()],
+      checkedAt,
+      partial: false,
+    }));
+    await fixture.service.connect();
+    const linked = fixture.service.enrich(fixture.snapshot);
+    linked.repositories[0].branches[0].tasks!.push({
+      id: 'hook-only',
+      tool: 'codex',
+      title: 'Hook',
+      status: 'active',
+      association: 'verified',
+    });
+    const enrich = vi.spyOn(fixture.service, 'enrich');
+    expect(fixture.service.status(linked).taskCount).toBe(1);
+    expect(enrich).not.toHaveBeenCalled();
+  });
+
   it('uses the lightweight activity reader for five-second checks and suspends them in the background', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(checkedAt));
@@ -645,6 +782,32 @@ describe('Codex connection lifecycle', () => {
     finish({ tasks: [task({ id: 'old-task' })], checkedAt, partial: false });
     await old;
     expect(fixture.values.get('codex.index')).toMatchObject({ tasks: [{ id: 'current-task' }] });
+  });
+
+  it('retries interrupted history immediately on resume instead of leaving a connecting status for four minutes', async () => {
+    let finish!: (index: CodexIndex) => void;
+    let entered!: () => void;
+    const started = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    let reads = 0;
+    const fixture = await serviceFixture(async () => {
+      if (++reads > 1) return { tasks: [task()], checkedAt, partial: false };
+      entered();
+      return new Promise((resolve) => {
+        finish = resolve;
+      });
+    });
+    const old = fixture.service.connect();
+    await started;
+    fixture.service.setSuspended(true);
+    fixture.service.setSuspended(false);
+    await fixture.service.refreshIfStale();
+    expect(reads).toBe(2);
+    expect(fixture.service.status().state).toBe('ready');
+    finish({ tasks: [], checkedAt, partial: false });
+    await old;
+    expect(fixture.service.status().taskCount).toBe(1);
   });
   it('stores only task metadata associated with selected projects and forgets removed projects', async () => {
     const fixture = await serviceFixture(async () => ({

@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { AgentHistoryStatus, CodingTool, Repository, Snapshot } from '../../src/domain/types';
 import type { AppStore } from '../services/store';
 import type { SavedAgentTask } from './types';
-import { linkRepository } from './associations';
+import { createTaskLinker } from './associations';
 
 export interface AgentIndex {
   tasks: SavedAgentTask[];
@@ -78,20 +78,34 @@ export class LocalHistoryService {
     this.value = { tool: source.tool, enabled, state: 'not-connected' };
     this.startPolling();
   }
-  status(): AgentHistoryStatus {
+  status(linked?: Snapshot): AgentHistoryStatus {
+    const eligible = new Set(this.index.tasks.map((task) => task.id));
+    const taskCount = !eligible.size
+      ? 0
+      : linked
+        ? new Set(
+            linked.repositories.flatMap((repository) =>
+              repository.branches.flatMap((branch) =>
+                (branch.tasks ?? [])
+                  .filter((task) => task.tool === this.source.tool && eligible.has(task.id))
+                  .map((task) => task.id),
+              ),
+            ),
+          ).size
+        : this.selectedIndex(this.index, this.current()).tasks.length;
     return {
       ...this.value,
       checkedAt: this.index.checkedAt || undefined,
       partial: this.index.partial,
-      taskCount: this.selectedIndex(this.index, this.current()).tasks.length,
+      taskCount,
     };
   }
   enrich(snapshot: Snapshot): Snapshot {
     if (!this.value.enabled) return snapshot;
     return {
       ...snapshot,
-      repositories: snapshot.repositories.map((repository) =>
-        linkRepository(repository, this.index.tasks, this.index.checkedAt, this.source.tool),
+      repositories: snapshot.repositories.map(
+        createTaskLinker(this.index.tasks, this.index.checkedAt, this.source.tool),
       ),
     };
   }
@@ -109,13 +123,14 @@ export class LocalHistoryService {
     return this.refresh();
   }
   private selectedIndex(index: AgentIndex, snapshot: Snapshot): AgentIndex {
+    if (!index.tasks.length) return index;
+    const link = createTaskLinker(index.tasks, index.checkedAt, this.source.tool);
     const ids = new Set(
       snapshot.repositories.flatMap((repository) =>
-        linkRepository(repository, index.tasks, index.checkedAt, this.source.tool).branches.flatMap(
-          (branch) =>
-            (branch.tasks ?? [])
-              .filter((task) => task.tool === this.source.tool)
-              .map((task) => task.id),
+        link(repository).branches.flatMap((branch) =>
+          (branch.tasks ?? [])
+            .filter((task) => task.tool === this.source.tool)
+            .map((task) => task.id),
         ),
       ),
     );

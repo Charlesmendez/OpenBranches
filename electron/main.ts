@@ -20,6 +20,7 @@ import { access, copyFile, mkdir } from 'node:fs/promises';
 import { z } from 'zod';
 import { AppStore } from './services/store';
 import { RepositoryService } from './services/repositories';
+import { WorkspacePublisher } from './services/workspacePublisher';
 import { GitHubAuth } from './github/auth';
 import { GitHubService } from './github/service';
 import { createTokenVault } from './github/vault';
@@ -55,6 +56,7 @@ let window: BrowserWindow | null = null;
 let tray: Tray | undefined;
 let quitting = false;
 let service: RepositoryService;
+let workspacePublisher: WorkspacePublisher | undefined;
 let store: AppStore;
 let github: GitHubService | undefined;
 let codex: CodexService | undefined;
@@ -115,9 +117,10 @@ function setMonitoringSuspended(suspended: boolean) {
   resumeAuthPolling?.();
   void service?.refresh();
   void github?.refreshPullRequests();
-  void codex?.refresh();
+  void codex?.refreshIfStale();
   void discovery?.refresh();
   void refreshHistories();
+  workspacePublisher?.request();
 }
 
 function updateMonitoringSuspension() {
@@ -215,15 +218,22 @@ app.whenReady().then(() => {
     const live = liveAgents?.enrich(linked) ?? linked;
     return handoffs?.enrich(live) ?? live;
   };
-  const publish = () => {
-    window?.webContents.send('snapshot:updated', snapshot());
-    if (codex) window?.webContents.send('codex:updated', codex.status());
-    window?.webContents.send(
-      'agents:updated',
-      [...localHistories.values()].map((history) => history.status()),
-    );
-    if (liveAgents) window?.webContents.send('agents:live-updated', liveAgents.statuses());
-  };
+  workspacePublisher = new WorkspacePublisher(
+    () => {
+      // Team sharing can continue collecting while the desktop is hidden. It
+      // reads its own snapshot; no renderer work is needed until the window returns.
+      if (!window || window.isDestroyed() || monitoringSuspended) return;
+      const current = snapshot();
+      return {
+        'snapshot:updated': current,
+        'codex:updated': codex?.status(current),
+        'agents:updated': [...localHistories.values()].map((history) => history.status(current)),
+        'agents:live-updated': liveAgents?.statuses(),
+      };
+    },
+    (channel, value) => window?.webContents.send(channel, value),
+  );
+  const publish = () => workspacePublisher!.request();
   const git = new GitInstallation((status) => window?.webContents.send('git:updated', status));
   updates = new UpdateService(
     autoUpdater as unknown as NativeUpdater,
@@ -543,6 +553,7 @@ app.on('activate', () => {
 app.on('second-instance', showWindow);
 app.on('before-quit', () => {
   quitting = true;
+  workspacePublisher?.close();
   if (authTimer) clearTimeout(authTimer);
   resumeAuthPolling = undefined;
   github?.close();
