@@ -4,6 +4,8 @@ const inspector = vi.hoisted(() => ({
   connections: 0,
   disconnections: 0,
   collections: 0,
+  callbackActive: false,
+  disconnectedInCallback: false,
 }));
 
 vi.mock('node:inspector', () => ({
@@ -14,10 +16,13 @@ vi.mock('node:inspector', () => ({
     post(method: string, callback: () => void) {
       expect(method).toBe('HeapProfiler.collectGarbage');
       inspector.collections++;
+      inspector.callbackActive = true;
       callback();
+      inspector.callbackActive = false;
     }
     disconnect() {
       inspector.disconnections++;
+      inspector.disconnectedInCallback ||= inspector.callbackActive;
     }
   },
 }));
@@ -34,7 +39,13 @@ describe('main-process memory reclamation', () => {
     releaseUnusedMemory();
     releaseUnusedMemory();
     await vi.advanceTimersByTimeAsync(0);
-    expect(inspector).toEqual({ connections: 1, disconnections: 1, collections: 1 });
+    expect(inspector.collections).toBe(1);
+    expect(inspector.disconnections).toBe(0);
+    releaseUnusedMemory(true);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(inspector.connections).toBe(1);
+    expect(inspector.disconnections).toBe(1);
+    expect(inspector.disconnectedInCallback).toBe(false);
 
     releaseUnusedMemory();
     await vi.advanceTimersByTimeAsync(29_999);
@@ -42,6 +53,10 @@ describe('main-process memory reclamation', () => {
 
     releaseUnusedMemory(true);
     await vi.advanceTimersByTimeAsync(0);
-    expect(inspector).toEqual({ connections: 2, disconnections: 2, collections: 2 });
+    await vi.advanceTimersByTimeAsync(1);
+    expect(inspector.connections).toBe(2);
+    expect(inspector.disconnections).toBe(2);
+    expect(inspector.collections).toBe(2);
+    expect(inspector.disconnectedInCallback).toBe(false);
   });
 });
