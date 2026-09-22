@@ -19,24 +19,28 @@ export function releaseUnusedMemory(immediate = false): void {
     scheduled = undefined;
     collecting = true;
     const session = new Session();
-    try {
-      session.connect();
-      session.post('HeapProfiler.collectGarbage', () => {
+    let disconnectScheduled = false;
+    const finish = () => {
+      if (disconnectScheduled) return;
+      disconnectScheduled = true;
+      // Electron can deadlock if an inspector response disconnects its own
+      // session. Let the response return before disposing the connection.
+      setImmediate(() => {
         try {
           session.disconnect();
+        } catch {
+          // The session may never have connected.
         } finally {
           lastCollection = Date.now();
           collecting = false;
         }
       });
+    };
+    try {
+      session.connect();
+      session.post('HeapProfiler.collectGarbage', finish);
     } catch {
-      lastCollection = Date.now();
-      collecting = false;
-      try {
-        session.disconnect();
-      } catch {
-        // The session never connected.
-      }
+      finish();
     }
   }, delay);
   scheduled.unref?.();
