@@ -1,7 +1,7 @@
 {
   "name": "openbranches",
   "productName": "OpenBranches",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "private": true,
   "description": "A local map of branches, worktrees, and the work behind them.",
   "license": "MIT",
@@ -18,6 +18,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run && npm run test:scripts && npm run notices:check",
     "test:scripts": "node --test scripts/*.test.mjs",
+    "test:electron": "node scripts/test-electron-memory.mjs",
     "notices:generate": "node scripts/notices.mjs --write",
     "notices:check": "node scripts/notices.mjs --check",
     "test:watch": "vitest",

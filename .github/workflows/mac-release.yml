@@ -89,6 +89,7 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - run: npm run electron:install
       - run: npm test && npm run format:check
+      - run: npm run test:electron
       - name: Import Developer ID certificate
         env:
           MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
