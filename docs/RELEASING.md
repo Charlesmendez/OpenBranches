@@ -52,6 +52,16 @@ The public files are named for people rather than build internals:
 
 Published, non-prerelease GitHub releases are discovered through `update.electronjs.org` using the running platform, architecture, and installed version. Keep the `-mac-arm64.zip` and `-mac-x64.zip` names: the update service uses those identifiers to select the correct asset. The app downloads the update in the background, while Squirrel.Mac and macOS verify the signed bundle before installation.
 
+### Delivering performance fixes
+
+Merging a fix or running a package from `out/` does not update the installed application. For a battery or memory fix, complete the handoff against the copy the user actually launches:
+
+1. Give the corrected release a new version so the update feed can deliver it and the installed build is distinguishable from the affected build.
+2. Verify the downloaded artifact's checksum, signing identity, and notarization. Quit the running app, preserve its existing data, and retain a recoverable copy of the previous app bundle before replacing it.
+3. Launch the installed app and verify both its executable path and bundle version. Do not treat a workspace preview as evidence that `/Applications/OpenBranches.app` is updated.
+4. Wait for the user's repositories and UI to finish loading. Measure main, renderer, and GPU CPU use and memory for at least five minutes, including focused and background idle states. Record whether the Mac is on battery or AC power. A single startup sample is not an idle-performance check.
+5. Report the installed version and measured results, separately from source merges and public-release status. If a release remains a draft pending clean-machine checks, say so explicitly.
+
 ## Local packaging
 
 On macOS, `npm run make` creates an unsigned developer preview for the current architecture. `npm run make:arm64` and `npm run make:x64` select an architecture explicitly. Preview names include `-unsigned` so they cannot be mistaken for a public release.
