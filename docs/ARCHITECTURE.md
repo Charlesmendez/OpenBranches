@@ -24,6 +24,12 @@ The renderer has no Node.js access. It talks through a narrow typed preload brid
 - `vendor/extract-zip`: five-line CommonJS bridge to the maintained `@electron-internal/extract-zip` package, for older Forge consumers. No custom extraction implementation is maintained here.
 - `tests`: temporary Git fixtures and provider protocol/evidence tests.
 
+## Idle refresh cost
+
+Live Codex logs are checked every five seconds, but unchanged observations do not publish a workspace. Comparisons include derived checkout/runtime evidence so freshness expiry still clears live labels. Shared-daemon checks remain on a one-minute interval; saved task history refreshes every four minutes or immediately on an explicit refresh. Failed or interrupted history reads remain eligible for retry.
+
+Workspace publication coalesces source completions over 50 ms and sends only changed channels. Provider counts reuse the already-enriched snapshot, candidate indexes are built once per workspace pass, and empty live integrations do not clone every branch. Repository observations are replaced immutably so publication comparisons cannot miss a changed scan state or error. Hidden windows do not receive workspace publications, including when explicitly enabled team sharing keeps collection active. A suspended Git batch finishes only its current repository and releases its worker.
+
 ## Evidence model
 
 A repository identity comes from its canonical common Git directory, so linked worktrees share an identity. Branch entries retain full local and remote ref names. Local and tracked remote commits can differ; their ancestry is evaluated separately. A matching branch name alone does not prove a task association or a merge.

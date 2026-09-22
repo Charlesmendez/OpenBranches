@@ -83,7 +83,7 @@ export class RepositoryService {
     this.publish(this.snapshot);
   }
   refresh(): Promise<void> {
-    if (this.closed) return Promise.resolve();
+    if (this.closed || this.suspended) return Promise.resolve();
     if (this.refreshing) return this.refreshing;
     this.refreshing = this.refreshAll().finally(() => {
       this.refreshing = undefined;
@@ -108,9 +108,10 @@ export class RepositoryService {
     for (const repository of this.snapshot.repositories) this.watchRepository(repository);
   }
   private async refreshAll(): Promise<void> {
-    this.snapshot.scanning = true;
+    this.snapshot = { ...this.snapshot, scanning: true };
     this.publish(this.snapshot);
     for (const repository of [...this.snapshot.repositories]) {
+      if (this.closed || this.suspended) break;
       const revision = this.revision(repository.id);
       if (!this.isCurrent(repository.id, revision)) continue;
       try {
@@ -119,10 +120,16 @@ export class RepositoryService {
       } catch (error) {
         const current = this.snapshot.repositories.find((r) => r.id === repository.id);
         if (current && this.isCurrent(repository.id, revision))
-          current.error = error instanceof Error ? error.message : 'Repository unavailable';
+          this.replace(
+            {
+              ...current,
+              error: error instanceof Error ? error.message : 'Repository unavailable',
+            },
+            false,
+          );
       }
     }
-    this.snapshot.scanning = false;
+    this.snapshot = { ...this.snapshot, scanning: false };
     try {
       this.emit();
     } finally {
@@ -151,14 +158,15 @@ export class RepositoryService {
   private replace(repository: Repository, emit = true): void {
     if (this.closed) return;
     const previous = this.snapshot.repositories.find((r) => r.id === repository.id);
-    if (previous) {
-      const events = observedActivity(previous, repository);
-      this.snapshot.events = [...events, ...this.snapshot.events].slice(0, 500);
-    }
-    this.snapshot.repositories = [
-      ...this.snapshot.repositories.filter((r) => r.id !== repository.id),
-      repository,
-    ].sort((a, b) => a.name.localeCompare(b.name));
+    const events = previous ? observedActivity(previous, repository) : [];
+    this.snapshot = {
+      ...this.snapshot,
+      events: [...events, ...this.snapshot.events].slice(0, 500),
+      repositories: [
+        ...this.snapshot.repositories.filter((r) => r.id !== repository.id),
+        repository,
+      ].sort((a, b) => a.name.localeCompare(b.name)),
+    };
     this.watchRepository(repository);
     if (emit) this.emit();
   }
@@ -180,6 +188,7 @@ export class RepositoryService {
     for (const path of paths) {
       try {
         const watcher = this.watchDirectory(path, { recursive: true }, (_event, filename) => {
+          if (this.closed || this.suspended) return;
           if (filename && ignored.test(String(filename))) return;
           const timer = this.debounces.get(repository.id);
           if (timer) clearTimeout(timer);
@@ -187,6 +196,7 @@ export class RepositoryService {
             repository.id,
             setTimeout(async () => {
               this.debounces.delete(repository.id);
+              if (this.closed || this.suspended) return;
               const revision = this.revision(repository.id);
               try {
                 const fresh = await this.scan(repository.path);
@@ -217,7 +227,7 @@ export class RepositoryService {
   }
   private emit(): void {
     if (this.closed) return;
-    this.snapshot.updatedAt = new Date().toISOString();
+    this.snapshot = { ...this.snapshot, updatedAt: new Date().toISOString() };
     this.store.write('snapshot', this.snapshot);
     this.publish(this.snapshot);
   }

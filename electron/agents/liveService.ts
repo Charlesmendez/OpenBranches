@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { LIVE_ACTIVITY_TTL } from '../../src/domain/branchActivity';
 import type { AgentLiveStatus, LiveAgentTool, Snapshot } from '../../src/domain/types';
 import type { AppStore } from '../services/store';
-import { linkRepository } from './associations';
+import { createTaskLinker } from './associations';
 import { AgentHookInstaller } from './hookConfig';
 import { parseLiveHookEvent } from './liveEvents';
 import type { SavedAgentTask } from './types';
@@ -138,20 +138,17 @@ export class LiveAgentService {
     const tasks = [...this.tasks.values()].filter((task) =>
       enabled.has(task.tool as LiveAgentTool),
     );
+    if (!tasks.length) return snapshot;
+    const linkers = tools.flatMap((tool) => {
+      const selected = tasks.filter((task) => task.tool === tool);
+      return selected.length
+        ? [createTaskLinker(selected, new Date().toISOString(), tool, { merge: true })]
+        : [];
+    });
     return {
       ...snapshot,
       repositories: snapshot.repositories.map((repository) =>
-        tools.reduce(
-          (current, tool) =>
-            linkRepository(
-              current,
-              tasks.filter((task) => task.tool === tool),
-              new Date().toISOString(),
-              tool,
-              { merge: true },
-            ),
-          repository,
-        ),
+        linkers.reduce((current, link) => link(current), repository),
       ),
     };
   }
