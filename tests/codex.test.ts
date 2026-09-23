@@ -831,8 +831,13 @@ describe('Codex connection lifecycle', () => {
     const daemonReads = launchLive.mock.calls.length;
     const refresh = vi.spyOn(fixture.service, 'refresh');
     expect(read).toHaveBeenCalledOnce();
-    await vi.advanceTimersByTimeAsync(180_000);
-    await fixture.service.refreshLive(false);
+    // Each daemon pass includes real asynchronous directory setup. Drain it
+    // between simulated minutes, otherwise pending passes can legitimately
+    // coalesce when fake time outruns the filesystem on a busy CI runner.
+    for (let minute = 0; minute < 3; minute++) {
+      await vi.advanceTimersByTimeAsync(60_000);
+      await fixture.service.refreshLive(false);
+    }
     expect(read).toHaveBeenCalledOnce();
     expect(refresh).not.toHaveBeenCalled();
     expect(launchLive).toHaveBeenCalledTimes(daemonReads + 3);
