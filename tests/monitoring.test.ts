@@ -87,6 +87,58 @@ const remote = (sha: string): RemoteSnapshot => ({
 });
 
 describe('stopping project monitoring', () => {
+  it('reuses GitHub enrichment until the repository or its remote observations change', async () => {
+    const { store } = await storeFixture();
+    let snapshot = createDemoSnapshot();
+    snapshot = { ...snapshot, repositories: snapshot.repositories.slice(0, 2) };
+    const repo = snapshot.repositories[0];
+    const key = `${repo.id}:origin:example/atlas-api`;
+    store.write('github.enabled', true);
+    store.write('github.sources', { [key]: remote('cached') });
+    const read = vi.fn(async () => remote('updated'));
+    const service = new GitHubService(
+      store,
+      {
+        http: new GitHubHttp(
+          async () => undefined,
+          async () => new Response('[]'),
+        ),
+      },
+      () => snapshot,
+      () => {},
+      read,
+    );
+    cleanup.push(() => service.close());
+    const first = service.enrich(snapshot);
+    const repeated = service.enrich({ ...snapshot, scanning: true });
+    expect(repeated.scanning).toBe(true);
+    expect(repeated.repositories[0]).toBe(first.repositories[0]);
+    expect(repeated.repositories[1]).toBe(first.repositories[1]);
+    snapshot = {
+      ...snapshot,
+      repositories: [{ ...repo, scannedAt: '2026-09-23T12:00:00Z' }, snapshot.repositories[1]],
+    };
+    const scanned = service.enrich(snapshot);
+    expect(scanned.repositories[0]).not.toBe(first.repositories[0]);
+    expect(scanned.repositories[0].scannedAt).toBe('2026-09-23T12:00:00Z');
+    expect(scanned.repositories[1]).toBe(first.repositories[1]);
+    await service.refresh();
+    const refreshed = service.enrich(snapshot);
+    expect(refreshed.repositories[0]).not.toBe(scanned.repositories[0]);
+    expect(
+      refreshed.repositories[0].branches.find((branch) => branch.name === 'fixture')?.remote?.sha,
+    ).toBe('updated');
+    expect(
+      first.repositories[0].branches.find((branch) => branch.name === 'fixture')?.remote?.sha,
+    ).toBe('cached');
+    service.setEnabled(false);
+    expect(service.enrich(snapshot)).toBe(snapshot);
+    service.setEnabled(true);
+    expect(
+      service.enrich(snapshot).repositories[0].branches.some((branch) => branch.name === 'fixture'),
+    ).toBe(false);
+  });
+
   it.each([null, [], { broken: { branches: null } }])(
     'ignores malformed GitHub cache data: %j',
     async (cached) => {
@@ -478,6 +530,183 @@ describe('stopping project monitoring', () => {
 });
 
 describe('live repository monitoring', () => {
+  async function watchFixture(scan?: (path: string) => Promise<Repository>) {
+    const { store } = await storeFixture();
+    const snapshot = createDemoSnapshot();
+    const repo = snapshot.repositories[0];
+    repo.path = '/fixture/primary';
+    repo.commonDir = '/fixture/shared.git';
+    repo.worktrees = [checkout(repo.path, repo.branches[0].local!.fullName, 'a'.repeat(40))];
+    store.write('snapshot', { ...snapshot, repositories: [repo] });
+    const workerScan =
+      scan ?? vi.fn(async () => ({ ...repo, scannedAt: new Date().toISOString() }));
+    const watcher = watcherFixture();
+    const publish = vi.fn();
+    const service = new RepositoryService(
+      store,
+      publish,
+      { executable: async () => '/fixture/git' },
+      { scan: workerScan, close() {} },
+      watcher.factory,
+    );
+    cleanup.push(() => service.close());
+    const change = () =>
+      watcher.watchers.filter((w) => !w.closed)[0].change('change', 'src/file.ts');
+    const gitChange = (filename: string) =>
+      watcher.watchers
+        .find((w) => !w.closed && w.path === repo.commonDir)!
+        .change('change', filename);
+    return { service, scan: workerScan, publish, repo, change, gitChange };
+  }
+
+  it.each(['HEAD', 'refs/heads/main', 'packed-refs', 'worktrees/linked/HEAD', 'config'])(
+    'keeps Git metadata changes prompt during a working-file cooldown: %s',
+    async (filename) => {
+      vi.useFakeTimers();
+      const fixture = await watchFixture();
+      await fixture.service.refresh();
+      fixture.change();
+      await vi.advanceTimersByTimeAsync(1000);
+      fixture.gitChange(filename);
+      await vi.advanceTimersByTimeAsync(499);
+      expect(fixture.scan).toHaveBeenCalledOnce();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(fixture.scan).toHaveBeenCalledTimes(2);
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(fixture.scan).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  it('does not treat temporary Git lock files as checkout or ref changes', async () => {
+    vi.useFakeTimers();
+    const fixture = await watchFixture();
+    await fixture.service.refresh();
+    fixture.gitChange('HEAD.lock');
+    fixture.gitChange('refs/heads/main.lock');
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(fixture.scan).toHaveBeenCalledOnce();
+    await vi.advanceTimersByTimeAsync(29_000);
+    expect(fixture.scan).toHaveBeenCalledTimes(2);
+  });
+
+  it('bounds continuous file writes without starving scans and consumes the final trailing change', async () => {
+    vi.useFakeTimers();
+    const fixture = await watchFixture();
+    for (let i = 0; i < 600; i++) {
+      fixture.change();
+      await vi.advanceTimersByTimeAsync(100);
+    }
+    expect(fixture.scan).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(500);
+    expect(fixture.scan).toHaveBeenCalledTimes(3);
+    expect(fixture.publish).toHaveBeenCalledTimes(3);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(fixture.scan).toHaveBeenCalledTimes(3);
+  });
+
+  it('coalesces separated editor bursts instead of rescanning the project each second', async () => {
+    vi.useFakeTimers();
+    const fixture = await watchFixture();
+    for (let i = 0; i < 60; i++) {
+      fixture.change();
+      await vi.advanceTimersByTimeAsync(1000);
+    }
+    expect(fixture.scan).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(500);
+    expect(fixture.scan).toHaveBeenCalledTimes(3);
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(fixture.scan).toHaveBeenCalledTimes(3);
+  });
+
+  it('keeps edits received during a slow scan for exactly one trailing scan', async () => {
+    vi.useFakeTimers();
+    const pending = deferred<Repository>();
+    const scan = vi.fn().mockReturnValueOnce(pending.promise);
+    const fixture = await watchFixture(scan);
+    scan.mockResolvedValue({ ...fixture.repo, name: 'latest' });
+    fixture.change();
+    await vi.advanceTimersByTimeAsync(500);
+    fixture.change();
+    await vi.advanceTimersByTimeAsync(40_000);
+    expect(scan).toHaveBeenCalledOnce();
+    pending.resolve(fixture.repo);
+    await vi.advanceTimersByTimeAsync(500);
+    expect(scan).toHaveBeenCalledTimes(2);
+    expect(fixture.service.current().repositories[0].name).toBe('latest');
+    expect(fixture.publish).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(scan).toHaveBeenCalledTimes(2);
+  });
+
+  it('lets manual refresh bypass the cooldown and consume already queued edits', async () => {
+    vi.useFakeTimers();
+    const fixture = await watchFixture();
+    await fixture.service.refresh();
+    fixture.change();
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(fixture.scan).toHaveBeenCalledOnce();
+    await fixture.service.refresh();
+    expect(fixture.scan).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(fixture.scan).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not republish an in-flight manual scan and retains edits received during it', async () => {
+    vi.useFakeTimers();
+    const pending = deferred<Repository>();
+    const scan = vi.fn().mockReturnValueOnce(pending.promise);
+    const fixture = await watchFixture(scan);
+    scan.mockResolvedValue(fixture.repo);
+    const work = fixture.service.refresh();
+    fixture.change();
+    await vi.advanceTimersByTimeAsync(35_000);
+    expect(scan).toHaveBeenCalledOnce();
+    pending.resolve(fixture.repo);
+    await work;
+    expect(fixture.publish).toHaveBeenCalledTimes(2); // scanning start and finish
+    await vi.advanceTimersByTimeAsync(500);
+    expect(scan).toHaveBeenCalledTimes(2);
+    expect(fixture.publish).toHaveBeenCalledTimes(3);
+  });
+
+  it('cancels queued scans on suspension and shutdown', async () => {
+    vi.useFakeTimers();
+    const fixture = await watchFixture();
+    await fixture.service.refresh();
+    fixture.change();
+    fixture.service.setSuspended(true);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(fixture.scan).toHaveBeenCalledOnce();
+    fixture.service.setSuspended(false);
+    fixture.change();
+    await vi.advanceTimersByTimeAsync(500);
+    expect(fixture.scan).toHaveBeenCalledTimes(2);
+    fixture.change();
+    fixture.service.close();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(fixture.scan).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not let a removed monitoring session overwrite or block a newly added one', async () => {
+    vi.useFakeTimers();
+    const pending = deferred<Repository>();
+    const scan = vi.fn().mockReturnValueOnce(pending.promise);
+    const fixture = await watchFixture(scan);
+    const fresh = { ...fixture.repo, name: 'new session' };
+    scan.mockResolvedValue(fresh);
+    fixture.change();
+    await vi.advanceTimersByTimeAsync(500);
+    fixture.service.remove(fixture.repo.id);
+    await fixture.service.add(fixture.repo.path);
+    fixture.change();
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(scan).toHaveBeenCalledTimes(3);
+    pending.resolve(fixture.repo);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(fixture.service.current().repositories[0].name).toBe('new session');
+    expect(scan).toHaveBeenCalledTimes(3);
+  });
+
   it('batches a full reconciliation into one durable workspace update', async () => {
     const { store } = await storeFixture();
     const snapshot = createDemoSnapshot();

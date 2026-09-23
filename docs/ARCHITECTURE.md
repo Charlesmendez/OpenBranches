@@ -24,9 +24,13 @@ The renderer has no Node.js access. It talks through a narrow typed preload brid
 - `vendor/extract-zip`: five-line CommonJS bridge to the maintained `@electron-internal/extract-zip` package, for older Forge consumers. No custom extraction implementation is maintained here.
 - `tests`: temporary Git fixtures and provider protocol/evidence tests.
 
-## Idle refresh cost
+## Idle and active refresh cost
 
-Live Codex logs are checked every five seconds, but unchanged observations do not publish a workspace. Comparisons include derived checkout/runtime evidence so freshness expiry still clears live labels. Shared-daemon checks remain on a one-minute interval; saved task history refreshes every four minutes or immediately on an explicit refresh. Failed or interrupted history reads remain eligible for retry.
+Live Codex logs are checked every five seconds, but unchanged observations do not publish a workspace. Timestamp-only heartbeats are delivered at most once every 30 seconds; the latest raw observations remain available to explicit snapshot reads and team sharing in between. Task state, metadata, association changes, and derived checkout/runtime expiry publish on the next live check without waiting for that heartbeat batch. Task ordering alone is not a state change. Shared-daemon checks remain on a one-minute interval; saved task history refreshes every four minutes or immediately on an explicit refresh. Failed or interrupted history reads remain eligible for retry.
+
+Ordinary working-file events start a scan after a 500 ms coalescing window, then at most once per project every 30 seconds. Continuous writes cannot postpone that scheduled scan indefinitely, and edits arriving during an in-flight scan schedule a trailing pass. Checkout/ref/config metadata changes bypass the cooldown, as do explicit refreshes and five-minute reconciliation. Suspension, project removal, and shutdown cancel queued scans.
+
+GitHub overlays are reused for unchanged immutable repository/source observations. Weakly keyed caches do not retain removed repository inputs; updated local scans, new remote observations, disconnect, and shutdown invalidate or clear the relevant cached results. This avoids rebuilding remote branch and pull-request evidence on every live-task check.
 
 Workspace publication coalesces source completions over 50 ms and sends only changed channels. Provider counts reuse the already-enriched snapshot, candidate indexes are built once per workspace pass, and empty live integrations do not clone every branch. Repository observations are replaced immutably so publication comparisons cannot miss a changed scan state or error. Hidden windows do not receive workspace publications, including when explicitly enabled team sharing keeps collection active. A suspended Git batch finishes only its current repository and releases its worker.
 
