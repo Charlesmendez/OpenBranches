@@ -512,6 +512,223 @@ async function serviceFixture(
 }
 
 describe('Codex connection lifecycle', () => {
+  it('does not mistake task ordering changes from heartbeats for new activity', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(checkedAt));
+    const fixture = await serviceFixture(async () => ({ tasks: [], checkedAt, partial: false }), {
+      read: async () => ({
+        tasks: ['first', 'second']
+          .map((id, index) =>
+            task({
+              id,
+              updatedAt:
+                Math.floor(Date.now() / 1000) +
+                (Math.floor(Date.now() / 5000) % 2 === index ? 1 : 0),
+              runtime: {
+                state: 'active',
+                checkedAt: new Date().toISOString(),
+                source: 'codex-session-log',
+              },
+            }),
+          )
+          .sort((a, b) => b.updatedAt - a.updatedAt),
+        checkedAt: new Date().toISOString(),
+        partial: false,
+      }),
+      close() {},
+    });
+    await fixture.service.connect();
+    await fixture.service.refreshLive(false);
+    fixture.publish.mockClear();
+    await vi.advanceTimersByTimeAsync(25_000);
+    expect(fixture.publish).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(fixture.publish).toHaveBeenCalledOnce();
+  });
+
+  it.each(['runtime', 'checkout'])(
+    'publishes %s expiry before the heartbeat batch deadline',
+    async (source) => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date(checkedAt));
+      const runtimeAt =
+        source === 'runtime' ? new Date(Date.now() - 89_000).toISOString() : checkedAt;
+      const fixture = await serviceFixture(
+        async () => ({ tasks: [task()], checkedAt, partial: false }),
+        {
+          read: async () => ({
+            tasks: [
+              task({
+                runtime: { state: 'active', checkedAt: runtimeAt, source: 'codex-session-log' },
+              }),
+            ],
+            checkedAt: new Date().toISOString(),
+            partial: false,
+          }),
+          close() {},
+        },
+      );
+      if (source === 'checkout')
+        fixture.snapshot.repositories[0].scannedAt = new Date(Date.now() - 119_000).toISOString();
+      await fixture.service.connect();
+      await fixture.service.refreshLive(false);
+      expect(
+        fixture.service.enrich(fixture.snapshot).repositories[0].branches[0].tasks?.[0].status,
+      ).toBe('active');
+      fixture.publish.mockClear();
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(fixture.publish).toHaveBeenCalledOnce();
+      expect(
+        fixture.service.enrich(fixture.snapshot).repositories[0].branches[0].tasks?.[0].status,
+      ).toBe('unknown');
+    },
+  );
+
+  it('catches up a batched heartbeat after suspension', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(checkedAt));
+    const fixture = await serviceFixture(async () => ({ tasks: [], checkedAt, partial: false }), {
+      read: async () => ({
+        tasks: [
+          task({
+            runtime: {
+              state: 'active',
+              checkedAt: new Date().toISOString(),
+              source: 'codex-session-log',
+            },
+          }),
+        ],
+        checkedAt: new Date().toISOString(),
+        partial: false,
+      }),
+      close() {},
+    });
+    await fixture.service.connect();
+    await fixture.service.refreshLive(false);
+    fixture.publish.mockClear();
+    await vi.advanceTimersByTimeAsync(5_000);
+    fixture.service.setSuspended(true);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(fixture.publish).not.toHaveBeenCalled();
+    fixture.service.setSuspended(false);
+    await fixture.service.refreshLive(false);
+    expect(fixture.publish).toHaveBeenCalledOnce();
+  });
+
+  it('batches timestamp-only live updates but publishes state changes and the latest heartbeat', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(checkedAt));
+    let state: 'active' | 'waiting' = 'active';
+    const fixture = await serviceFixture(
+      async () => ({ tasks: [task()], checkedAt, partial: false }),
+      {
+        read: async () => ({
+          tasks: [
+            task({
+              updatedAt: Math.floor(Date.now() / 1000),
+              runtime: { state, checkedAt: new Date().toISOString(), source: 'codex-session-log' },
+            }),
+          ],
+          checkedAt: new Date().toISOString(),
+          partial: false,
+        }),
+        close() {},
+      },
+    );
+    await fixture.service.connect();
+    await fixture.service.refreshLive(false);
+    fixture.publish.mockClear();
+    await vi.advanceTimersByTimeAsync(25_000);
+    expect(fixture.publish).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(fixture.publish).toHaveBeenCalledOnce();
+    expect(
+      fixture.service.enrich(fixture.snapshot).repositories[0].branches[0].tasks?.[0],
+    ).toMatchObject({ status: 'active', checkedAt: new Date().toISOString() });
+    fixture.publish.mockClear();
+    state = 'waiting';
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(fixture.publish).toHaveBeenCalledOnce();
+    expect(
+      fixture.service.enrich(fixture.snapshot).repositories[0].branches[0].tasks?.[0],
+    ).toMatchObject({ status: 'idle', waiting: true });
+  });
+
+  it('flushes a queued heartbeat even when log writes stop before the batch deadline', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(checkedAt));
+    let heartbeat = checkedAt;
+    const fixture = await serviceFixture(
+      async () => ({ tasks: [task()], checkedAt, partial: false }),
+      {
+        read: async () => ({
+          tasks: [
+            task({
+              runtime: { state: 'active', checkedAt: heartbeat, source: 'codex-session-log' },
+            }),
+          ],
+          checkedAt: new Date().toISOString(),
+          partial: false,
+        }),
+        close() {},
+      },
+    );
+    await fixture.service.connect();
+    await fixture.service.refreshLive(false);
+    fixture.publish.mockClear();
+    heartbeat = new Date(Date.parse(checkedAt) + 5_000).toISOString();
+    await vi.advanceTimersByTimeAsync(25_000);
+    expect(fixture.publish).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(fixture.publish).toHaveBeenCalledOnce();
+    fixture.publish.mockClear();
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(fixture.publish).not.toHaveBeenCalled();
+  });
+
+  it('does not delay changed task metadata or checkout switches behind a heartbeat batch', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(checkedAt));
+    let name = 'Before';
+    const fixture = await serviceFixture(async () => ({ tasks: [], checkedAt, partial: false }), {
+      read: async () => ({
+        tasks: [
+          task({
+            name,
+            runtime: {
+              state: 'active',
+              checkedAt: new Date().toISOString(),
+              source: 'codex-session-log',
+            },
+          }),
+        ],
+        checkedAt: new Date().toISOString(),
+        partial: false,
+      }),
+      close() {},
+    });
+    await fixture.service.connect();
+    await fixture.service.refreshLive(false);
+    fixture.publish.mockClear();
+    name = 'After';
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(fixture.publish).toHaveBeenCalledOnce();
+    fixture.publish.mockClear();
+    const repo = fixture.snapshot.repositories[0];
+    fixture.snapshot.repositories = [
+      {
+        ...repo,
+        branches: repo.branches.map((branch) => ({ ...branch, worktrees: [] })),
+        worktrees: [],
+      },
+    ];
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(fixture.publish).toHaveBeenCalledOnce();
+    expect(
+      fixture.service.enrich(fixture.snapshot).repositories[0].branches[0].tasks?.[0].status,
+    ).toBe('unknown');
+  });
+
   it('does not republish unchanged live checks, but publishes evidence expiry, completion and failures', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(checkedAt));
@@ -614,8 +831,13 @@ describe('Codex connection lifecycle', () => {
     const daemonReads = launchLive.mock.calls.length;
     const refresh = vi.spyOn(fixture.service, 'refresh');
     expect(read).toHaveBeenCalledOnce();
-    await vi.advanceTimersByTimeAsync(180_000);
-    await fixture.service.refreshLive(false);
+    // Each daemon pass includes real asynchronous directory setup. Drain it
+    // between simulated minutes, otherwise pending passes can legitimately
+    // coalesce when fake time outruns the filesystem on a busy CI runner.
+    for (let minute = 0; minute < 3; minute++) {
+      await vi.advanceTimersByTimeAsync(60_000);
+      await fixture.service.refreshLive(false);
+    }
     expect(read).toHaveBeenCalledOnce();
     expect(refresh).not.toHaveBeenCalled();
     expect(launchLive).toHaveBeenCalledTimes(daemonReads + 3);
