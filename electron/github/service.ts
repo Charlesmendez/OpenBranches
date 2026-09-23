@@ -38,6 +38,12 @@ export class GitHubService {
   private installationJob?: Promise<boolean>;
   private lastInstallationAttemptAt = 0;
   private installationGeneration = 0;
+  // Repository observations and remote snapshots are replaced, never mutated.
+  // Keep only weak references to inputs so old workspaces can be collected.
+  private enriched = new WeakMap<
+    Repository,
+    { sources: RemoteSnapshot[]; repository: Repository }
+  >();
 
   constructor(
     private store: Pick<AppStore, 'read' | 'write'>,
@@ -154,6 +160,7 @@ export class GitHubService {
     this.store.write('github.enabled', enabled);
     if (!enabled) {
       this.sources = {};
+      this.enriched = new WeakMap();
       this.store.write('github.sources', this.sources);
     }
     this.publish();
@@ -162,9 +169,19 @@ export class GitHubService {
     if (!this.enabled) return snapshot;
     return {
       ...snapshot,
-      repositories: snapshot.repositories.map((repository) =>
-        enrichRepository(repository, this.forRepository(repository)),
-      ),
+      repositories: snapshot.repositories.map((repository) => {
+        const sources = this.forRepository(repository);
+        const cached = this.enriched.get(repository);
+        if (
+          cached &&
+          sources.length === cached.sources.length &&
+          sources.every((source, index) => source === cached.sources[index])
+        )
+          return cached.repository;
+        const enriched = enrichRepository(repository, sources);
+        this.enriched.set(repository, { sources, repository: enriched });
+        return enriched;
+      }),
     };
   }
   private forRepository(repository: Repository) {
@@ -411,5 +428,6 @@ export class GitHubService {
   close() {
     this.closed = true;
     this.stopPolling();
+    this.enriched = new WeakMap();
   }
 }

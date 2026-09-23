@@ -19,6 +19,9 @@ const emptyIndex = (): CodexIndex => ({ tasks: [], checkedAt: '', partial: false
 // Saved history is not a live signal. Keep it within the five-minute freshness
 // budget without launching a full inspection on every live-daemon heartbeat.
 const HISTORY_REFRESH_MS = 4 * 60_000;
+// Heartbeats keep live labels fresh without rebuilding the workspace for every
+// log write. State/checkout changes and evidence expiry still publish immediately.
+const LIVE_HEARTBEAT_PUBLISH_MS = 30_000;
 type DiscoveryClient = Pick<CodexInspectionClient, 'initialize' | 'request' | 'close'>;
 interface Dependencies {
   find: () => Promise<CodexExecutable | undefined>;
@@ -54,6 +57,8 @@ export class CodexService {
   private dependencies: Dependencies;
   private lastIndexAttempt = Number.NEGATIVE_INFINITY;
   private liveEvidence = '';
+  private lastLivePublication = Number.NEGATIVE_INFINITY;
+  private pendingLiveHeartbeat = false;
 
   constructor(
     private store: Pick<AppStore, 'read' | 'write'>,
@@ -116,6 +121,8 @@ export class CodexService {
     this.client = undefined;
     this.liveClient?.close();
     this.liveTasks = [];
+    this.liveEvidence = '';
+    this.pendingLiveHeartbeat = false;
     this.index = emptyIndex();
     this.statusValue = {
       installed: this.statusValue.installed,
@@ -170,6 +177,8 @@ export class CodexService {
       this.client = undefined;
       this.index = index;
       this.liveTasks = [];
+      this.liveEvidence = '';
+      this.pendingLiveHeartbeat = false;
       this.liveClient?.close();
       if (this.statusValue.state === 'connecting')
         this.statusValue = {
@@ -262,9 +271,16 @@ export class CodexService {
         ? this.selectIndex(this.current(), live)
         : { index: live, evidence: [] };
       const selected = selection.index;
-      // Include derived evidence, not the poll timestamp: a checkout or runtime
-      // becoming stale must still clear live labels even if raw tasks are equal.
-      this.liveEvidence = JSON.stringify(selection.evidence);
+      // Compare meaningful derived evidence separately from heartbeat timestamps.
+      // A checkout switch or expired observation must never wait for the batch.
+      this.liveEvidence = JSON.stringify(
+        selection.evidence.map(({ branchId, tasks }) => ({
+          branchId,
+          tasks: tasks
+            .map(({ checkedAt: _checkedAt, updatedAt: _updatedAt, ...task }) => task)
+            .sort((a, b) => a.id.localeCompare(b.id)),
+        })),
+      );
       this.liveTasks = isDeepStrictEqual(previousTasks, selected.tasks)
         ? previousTasks
         : selected.tasks;
@@ -278,12 +294,20 @@ export class CodexService {
       this.liveEvidence = '';
       this.statusValue = { ...this.statusValue, liveState: 'unavailable' };
     }
+    const tasksChanged = !isDeepStrictEqual(previousTasks, this.liveTasks);
+    this.pendingLiveHeartbeat ||= tasksChanged;
+    const elapsed = Date.now() - this.lastLivePublication;
     if (
       previousState !== this.statusValue.liveState ||
       previousEvidence !== this.liveEvidence ||
-      !isDeepStrictEqual(previousTasks, this.liveTasks)
-    )
+      (tasksChanged &&
+        !isDeepStrictEqual(liveTaskMeanings(previousTasks), liveTaskMeanings(this.liveTasks))) ||
+      (this.pendingLiveHeartbeat && (elapsed < 0 || elapsed >= LIVE_HEARTBEAT_PUBLISH_MS))
+    ) {
+      this.lastLivePublication = Date.now();
+      this.pendingLiveHeartbeat = false;
       this.publish();
+    }
   }
 
   setSuspended(suspended: boolean): void {
@@ -298,7 +322,10 @@ export class CodexService {
       this.client = undefined;
       this.liveClient?.close();
       this.liveClient = undefined;
-    } else this.startPolling();
+    } else {
+      this.lastLivePublication = Number.NEGATIVE_INFINITY;
+      this.startPolling();
+    }
   }
 
   private startPolling() {
@@ -392,6 +419,15 @@ export class CodexService {
     this.liveClient?.close();
     this.dependencies.activity?.close();
   }
+}
+
+function liveTaskMeanings(tasks: CodexTask[]) {
+  return tasks
+    .map(({ updatedAt: _updatedAt, runtime, ...metadata }) => ({
+      ...metadata,
+      runtime: runtime && { state: runtime.state, source: runtime.source },
+    }))
+    .sort((a, b) => a.id.localeCompare(b.id));
 }
 
 function mergeLiveIndexes(indexes: CodexIndex[]): CodexIndex {
